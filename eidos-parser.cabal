@@ -1,0 +1,38 @@
+cabal-version:      3.0
+name:               eidos-parser
+version:            0.1.0.0
+synopsis:           EidosLang parser in Haskell
+build-type:         Simple
+
+common warnings
+    ghc-options: -Wall
+
+common deps
+    build-depends:    base >=4.17 && <5
+
+library
+    import:           warnings, deps
+    exposed-modules:  Eidos.Lexer
+                    , Eidos.AST
+                    , Eidos.Parser
+    hs-source-dirs:   src
+    default-language: GHC2021
+    build-depends:    megaparsec >=9.0
+                    , parser-combinators >=1.3
+
+executable eidos-parser
+    import:           warnings, deps
+    main-is:          Main.hs
+    hs-source-dirs:   app
+    default-language: GHC2021
+    build-depends:    eidos-parser
+
+test-suite eidos-parser-test
+    import:           warnings, deps
+    type:             exitcode-stdio-1.0
+    main-is:          Spec.hs
+    hs-source-dirs:   test
+    default-language: GHC2021
+    build-depends:    eidos-parser
+                    , hspec >=2.0
+                    , megaparsec >=9.0
