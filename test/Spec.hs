@@ -240,8 +240,8 @@ main = hspec $ do
     it "parses Σ with var decl"    $ mustParse (wrapAssert "Σz : D (z) = z;")     >>= \_ -> return ()
     it "parses Π with bare id"     $ mustParse (wrapAssert "[y : S] Πy(y) = y;")  >>= \_ -> return ()
     it "parses Π with var decl"    $ mustParse (wrapAssert "Πz : D (z) = z;")     >>= \_ -> return ()
-  --  it "rejects Σ with no bound var" $ mustFail (wrapAssert "Σ(x) = y;")
-  --  it "rejects Π with no bound var" $ mustFail (wrapAssert "Π(x) = y;")
+    it "rejects Σ with no bound var" $ mustFail (wrapAssert "Σ(x) = y;")
+    it "rejects Π with no bound var" $ mustFail (wrapAssert "Π(x) = y;")
 
   -- -------------------------------------------------------------------------
   -- 9. Subtheories
