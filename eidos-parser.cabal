@@ -18,6 +18,7 @@ library
                     , Eidos.FromSyntax
                     , Eidos.IR
                     , Eidos.Pretty
+                    , Eidos.TypeCheck
     hs-source-dirs:   src
     default-language: GHC2021
     build-depends:    megaparsec >=9.0
@@ -39,6 +40,8 @@ test-suite eidos-tests
   build-depends: base,
                  eidos-parser,
                  hspec,
+                 hspec-expectations,
+                 HUnit,
                  tasty,
                  tasty-hunit,
                  tasty-expected-failure,

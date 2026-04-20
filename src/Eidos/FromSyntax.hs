@@ -31,6 +31,7 @@ import           Data.Maybe           (fromMaybe, isJust, isNothing, mapMaybe)
 import           Eidos.AST            hiding (theoryBody, theoryName, funcName, funcDomain, relName)
 import qualified Eidos.AST            as AST
 import           Eidos.IR
+import           Eidos.TypeCheck
 
 -- ---------------------------------------------------------------------------
 -- Public entry point
@@ -451,13 +452,18 @@ addPropFact :: Theory -> FactKind -> Theory -> PropExprInclVars -> Either BuildE
 addPropFact th0 fk th prop = do
   let ctx = emptyVarContext
   (resolvedExpr, _ctx') <- resolvePropExprInclVars th0 ctx prop
+  
+  -- Type check the resolved expression
+  case typeCheckResolvedExpr resolvedExpr of
+    Left typeErr -> Left ("Type error in " ++ show fk ++ ": " ++ typeErr)
+    Right _ -> return ()
+  
   let fact = Fact
         { factIsMereologicalTranslation = False
         , factIsInherited               = False
         , factKind                      = fk
         , factPropExpr                  = resolvedExpr
         }
-  -- Propagate to parent theories (mirrors 'addFactToTheory' in theory.go)
   return (th { theoryFacts = theoryFacts th ++ [fact] })
 
 -- ---------------------------------------------------------------------------
@@ -828,3 +834,4 @@ firstLetterIsUppercase (c:_) = isUpper c
 foldM' :: (b -> a -> Either e b) -> b -> [a] -> Either e b
 foldM' _ z []     = Right z
 foldM' f z (x:xs) = f z x >>= \z' -> foldM' f z' xs
+
