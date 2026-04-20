@@ -242,8 +242,16 @@ main = hspec $ do
           `shouldSatisfy` isLeft
 
       it "accepts mixed distinct sections" $
-        parseString "{ subtheories { implicit { { } } named { sub: {} } reflection { sub: {} } } }"
+        parseString "{ subtheories { implicit { { } } named { sub1: {} } reflection { sub2: {} } } }"
           `shouldSatisfy` isRight
+                
+      it "rejects repeated subtheory names for subtheories of the same kind" $
+        parseString "{ subtheories { named { sub: {} sub: {} } } }"
+          `shouldSatisfy` isLeft
+          
+      it "rejects repeated subtheory names for subtheories of different kinds" $
+        parseString "{ subtheories { named { sub: {} } reflection { sub: {} } } }"
+          `shouldSatisfy` isLeft
           
 -- Helper functions
 isRight :: Either a b -> Bool

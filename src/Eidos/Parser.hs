@@ -29,6 +29,10 @@ import           Eidos.Lexer
 
 type Parser = Parsec Void String
 
+-- | Find duplicate elements in a list (returns each element that appears more than once)
+findDuplicates :: Ord a => [a] -> [a]
+findDuplicates = map head . filter (\l -> length l > 1) . group . sort
+
 -- ---------------------------------------------------------------------------
 -- Entry points
 -- ---------------------------------------------------------------------------
@@ -211,15 +215,34 @@ pSubtheoriesSection = do
   entries <- between lbrace rbrace (many (pSubtheoryEntry <* optional comma))
   -- Check for duplicate group keywords
   let groupKws = mapMaybe getGroupKeyword entries
-      duplicates = findDuplicates groupKws
-  unless (null duplicates) $
-    fail $ "Duplicate subtheory group keyword(s): " ++ intercalate ", " duplicates
+      dupGroups = findDuplicates groupKws
+  unless (null dupGroups) $
+    fail $ "Duplicate subtheory group keyword(s): " ++ intercalate ", " dupGroups
+  -- Check for duplicate aliases across all entries (including inside groups)
+  let aliases = collectAliases entries
+      dupAliases = findDuplicates aliases
+  unless (null dupAliases) $
+    fail $ "Duplicate subtheory alias(es): " ++ intercalate ", " dupAliases
   return $ SubtheoriesSection entries
   where
     getGroupKeyword (SubtheoryEntryGroup (SubtheoryGroup kw _)) = Just kw
     getGroupKeyword _ = Nothing
-    findDuplicates xs =
-      map head $ filter (\l -> length l > 1) $ group $ sort xs
+
+    collectAliases :: [SubtheoryEntry] -> [String]
+    collectAliases = concatMap go
+      where
+        go (SubtheoryEntryItem (SubtheoryItem _ (Just n) _)) = [n]
+        go (SubtheoryEntryItem _) = []
+        go (SubtheoryEntryGroup (SubtheoryGroup _ items)) = 
+          mapMaybe (\(SubtheoryItem _ n _) -> n) items
+
+collectAliases :: [SubtheoryEntry] -> [String]
+collectAliases = concatMap go
+  where
+    go (SubtheoryEntryItem (SubtheoryItem _ (Just n) _)) = [n]
+    go (SubtheoryEntryItem _) = []
+    go (SubtheoryEntryGroup (SubtheoryGroup _ items)) = 
+      mapMaybe (\(SubtheoryItem _ n _) -> n) items
 
 pSubtheoryEntry :: Parser SubtheoryEntry
 pSubtheoryEntry =
