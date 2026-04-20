@@ -458,6 +458,11 @@ addPropFact th0 fk th prop = do
     Left typeErr -> Left ("Type error in " ++ show fk ++ ": " ++ typeErr)
     Right _ -> return ()
   
+  -- Validate all term pairs in the expression (semantic validation)
+  case validateAllTermPairs resolvedExpr of
+    Left opErr -> Left ("Operation error in " ++ show fk ++ ": " ++ opErr)
+    Right _ -> return ()
+  
   let fact = Fact
         { factIsMereologicalTranslation = False
         , factIsInherited               = False
@@ -465,6 +470,94 @@ addPropFact th0 fk th prop = do
         , factPropExpr                  = resolvedExpr
         }
   return (th { theoryFacts = theoryFacts th ++ [fact] })
+
+-- ---------------------------------------------------------------------------
+-- Term pair validation
+-- ---------------------------------------------------------------------------
+
+-- | Validate all term pairs in a resolved expression
+validateAllTermPairs :: ResolvedPropExpr -> Either String ()
+validateAllTermPairs (ResolvedPropBicond left rests) = do
+  validateRightImplTermPairs left
+  mapM_ (\(ResolvedPropRest _ right) -> validateRightImplTermPairs right) rests
+
+validateRightImplTermPairs :: ResolvedRightImpl -> Either String ()
+validateRightImplTermPairs (ResolvedRightImpl left mbRight) = do
+  validateLeftImplTermPairs left
+  case mbRight of
+    Nothing -> return ()
+    Just (_, right) -> validateRightImplTermPairs right
+
+validateLeftImplTermPairs :: ResolvedLeftImpl -> Either String ()
+validateLeftImplTermPairs (ResolvedLeftImpl disj rests) = do
+  validateDisjTermPairs disj
+  mapM_ (\(ResolvedLeftImplRest _ d) -> validateDisjTermPairs d) rests
+
+validateDisjTermPairs :: ResolvedDisj -> Either String ()
+validateDisjTermPairs (ResolvedDisj conj rests) = do
+  validateConjTermPairs conj
+  mapM_ (\(ResolvedDisjRest _ c) -> validateConjTermPairs c) rests
+
+validateConjTermPairs :: ResolvedConj -> Either String ()
+validateConjTermPairs (ResolvedConj neg rests) = do
+  validateNegTermPairs neg
+  mapM_ (\(ResolvedConjRest _ n) -> validateNegTermPairs n) rests
+
+validateNegTermPairs :: ResolvedNeg -> Either String ()
+validateNegTermPairs (ResolvedNegNot inner) = validateNegTermPairs inner
+validateNegTermPairs (ResolvedNegChild quantified) = validateQuantifiedTermPairs quantified
+
+validateQuantifiedTermPairs :: ResolvedQuantified -> Either String ()
+validateQuantifiedTermPairs (ResolvedQuantified _ atomic) = validateAtomicPropTermPairs atomic
+
+validateAtomicPropTermPairs :: ResolvedAtomicProp -> Either String ()
+validateAtomicPropTermPairs (ResolvedAtomicTermPair tp) = validateTermPairSemantics tp
+validateAtomicPropTermPairs (ResolvedAtomicConstant _) = Right ()
+
+-- | Validate the semantic meaning of a term pair (checking ∈, ⊆, etc.)
+validateTermPairSemantics :: ResolvedTermPair -> Either String ()
+validateTermPairSemantics (ResolvedTermPair left rights _) = do
+  -- Get the type of the left term
+  leftType <- getResolvedTermType left
+  
+  -- For each relation, validate the operation
+  forM_ rights $ \(ResolvedRelationFollowedByTerm _ op _ right) -> do
+    rightType <- getResolvedTermType right
+    
+    let leftWithAny = (leftType, False)
+    let rightWithAny = (rightType, False)
+    
+    case op of
+      "∈" -> do
+        if not (acceptIndividualOperand leftWithAny)
+          then Left $ "Left operand of ∈ must be an individual, got " ++ show leftType
+          else if not (acceptSetOperand rightWithAny)
+            then Left $ "Right operand of ∈ must be a set, got " ++ show rightType
+            else Right ()
+      "⊆" -> do
+        if not (acceptSetOperand leftWithAny)
+          then Left $ "Left operand of ⊆ must be a set, got " ++ show leftType
+          else if not (acceptSetOperand rightWithAny)
+            then Left $ "Right operand of ⊆ must be a set, got " ++ show rightType
+            else Right ()
+      "≤" -> Right ()
+      "=" -> Right ()
+      _ -> Left $ "Unknown operator: " ++ op
+
+-- | Helper to get the Level2Type from a ResolvedTerm
+getResolvedTermType :: ResolvedTerm -> Either String Level2Type
+getResolvedTermType term = do
+  let ty = resolvedTermType term
+  case exprMajorType ty of
+    MajorTypeMereologicalObject ->
+      case exprMereoSubtype ty of
+        Just MereologicalSubtypeIndividual -> Right L2Individual
+        Just MereologicalSubtypeSet -> Right L2Set
+        Just MereologicalSubtypeProposition -> Right L2Proposition
+        Just MereologicalSubtypeMereological -> Right L2BareMereological
+        Nothing -> Right L2BareMereological
+    MajorTypeFunction -> Right (L2Function (fromMaybe 0 (exprNumArgs ty)))
+    MajorTypeSort -> Right L2Sort
 
 -- ---------------------------------------------------------------------------
 -- Name resolution
@@ -634,7 +727,6 @@ resolveBaseTerm th ctx bt = case bt of
             termTypeMereological (Just MereologicalSubtypeProposition) Nothing)
 
 -- | Resolve term suffixes and propagate the type.
--- Mirrors the suffix loop in 'resolveReferencesAndDetermineTypesInFactor'.
 resolveSuffix
   :: Theory
   -> VarContext
@@ -697,7 +789,6 @@ resolveSuffix th ctx (acc, ty) suffix = case suffix of
 
 -- | Resolve a constant reference — may be a bound variable, ⊤/⊥, a sort,
 -- a function, or an individual / set.
--- Mirrors 'resolveReferencesAndDetermineTypesInConstantRef' in the Go code.
 resolveConstantRef :: Theory -> VarContext -> ConstantRef -> Either BuildError ResolvedConstantRef
 resolveConstantRef th ctx (ConstantRef specs ref) = do
   let path = map theoryRefName specs
@@ -740,9 +831,6 @@ resolveConstantRef th ctx (ConstantRef specs ref) = do
 -- ---------------------------------------------------------------------------
 
 -- | Produce the mereological translation of a fact (assertions and facts only).
--- In the Go code this calls 'translateAxiom' / 'translateIdentity'.  Here we
--- produce a wrapper Fact marked with 'factIsMereologicalTranslation = True';
--- the actual translation work would live in a separate Translate module.
 mereologicalTranslation :: Theory -> Fact -> [Fact]
 mereologicalTranslation _th fact = case factKind fact of
   FactKindAssertion ->
@@ -834,4 +922,3 @@ firstLetterIsUppercase (c:_) = isUpper c
 foldM' :: (b -> a -> Either e b) -> b -> [a] -> Either e b
 foldM' _ z []     = Right z
 foldM' f z (x:xs) = f z x >>= \z' -> foldM' f z' xs
-

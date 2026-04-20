@@ -463,3 +463,66 @@ checkResolvedBaseTerm (ResolvedBTParen _) = Right ()
 -- Helper to create a ResolvedTerm from a ResolvedFactor (simplified)
 termFromFactor :: ResolvedFactor -> ResolvedTerm
 termFromFactor factor = ResolvedTerm factor [] (resolvedFactorType factor)
+
+
+-- Add to TypeCheck.hs:
+
+-- | Validate a binary operation between two resolved terms.
+validateBinaryOp :: ResolvedTerm -> String -> ResolvedTerm -> Either String ()
+validateBinaryOp left op right = do
+  leftType <- checkResolvedTerm left
+  rightType <- checkResolvedTerm right
+  
+  -- For now, treat all resolved terms as non-any (they come from entities)
+  -- The any flag would come from explicit #mereological conversions
+  let leftWithAny = (leftType, False)
+  let rightWithAny = (rightType, False)
+  
+  case op of
+    "∈" -> do
+      if not (acceptIndividualOperand leftWithAny)
+        then Left $ "Left operand of ∈ must be an individual, got " ++ show leftType
+        else if not (acceptSetOperand rightWithAny)
+          then Left $ "Right operand of ∈ must be a set, got " ++ show rightType
+          else Right ()
+    "⊆" -> do
+      if not (acceptSetOperand leftWithAny)
+        then Left $ "Left operand of ⊆ must be a set, got " ++ show leftType
+        else if not (acceptSetOperand rightWithAny)
+          then Left $ "Right operand of ⊆ must be a set, got " ++ show rightType
+          else Right ()
+    "∪" -> do
+      if not (acceptSetOperand leftWithAny)
+        then Left $ "Left operand of ∪ must be a set, got " ++ show leftType
+        else if not (acceptSetOperand rightWithAny)
+          then Left $ "Right operand of ∪ must be a set, got " ++ show rightType
+          else Right ()
+    "∩" -> do
+      if not (acceptSetOperand leftWithAny)
+        then Left $ "Left operand of ∩ must be a set, got " ++ show leftType
+        else if not (acceptSetOperand rightWithAny)
+          then Left $ "Right operand of ∩ must be a set, got " ++ show rightType
+          else Right ()
+    "→" -> do
+      if not (acceptPropositionOperand leftWithAny)
+        then Left $ "Left operand of → must be a proposition, got " ++ show leftType
+        else if not (acceptPropositionOperand rightWithAny)
+          then Left $ "Right operand of → must be a proposition, got " ++ show rightType
+          else Right ()
+    "∧" -> do
+      if not (acceptPropositionOperand leftWithAny)
+        then Left $ "Left operand of ∧ must be a proposition, got " ++ show leftType
+        else if not (acceptPropositionOperand rightWithAny)
+          then Left $ "Right operand of ∧ must be a proposition, got " ++ show rightType
+          else Right ()
+    "∨" -> do
+      if not (acceptPropositionOperand leftWithAny)
+        then Left $ "Left operand of ∨ must be a proposition, got " ++ show leftType
+        else if not (acceptPropositionOperand rightWithAny)
+          then Left $ "Right operand of ∨ must be a proposition, got " ++ show rightType
+          else Right ()
+    "¬" -> do
+      if not (acceptPropositionOperand rightWithAny)
+        then Left $ "Operand of ¬ must be a proposition, got " ++ show rightType
+        else Right ()
+    _ -> Right ()
