@@ -447,7 +447,7 @@ pGeneralizedSumOrProduct = do
   op  <- between lparen rparen pTerm
   return $ GeneralizedSumOrProduct sym v op
   where
-    bareId = try $ ident >>= \i -> notFollowedBy (char '(') >> return i
+    bareId = ident
 
 -- | VarDecl without the surrounding brackets — used inside Σ/Π.
 pTypedVarDecl :: Parser VarDecl

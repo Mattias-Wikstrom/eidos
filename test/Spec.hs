@@ -307,7 +307,7 @@ main = hspec $ do
               IR.theoryName (head subs) `shouldBe` "Sub"
       
       it "resolves qualified names in subtheories" $ do
-        let input = "{ signature { sort S; } subtheories { named: Sub { signature { sort T; } } } axioms { assertions { Sub.T#min ⊆ Sub.T#max; } } }"
+        let input = "{ signature { sort S; } subtheories { named { Sub { signature { sort T; } } } axioms { assertions { Sub.T#min ⊆ Sub.T#max; } } } }"
         case parseString input of
           Left err -> fail (errorBundlePretty err)
           Right ast -> case buildTheory ast of
