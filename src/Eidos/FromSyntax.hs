@@ -336,8 +336,11 @@ buildSignatureItem :: Theory -> Theory -> SignatureItem -> Either BuildError The
 buildSignatureItem th0 th item = case item of
 
   SigSimpleSort (SimpleSortDeclaration nm) -> do
-    let s = mkSort th SortKindFromSignature nm FromSignature
-    return (addEntityToTh th (EntitySort s))
+    case Map.lookup nm (theoryObjectsByName th) of
+      Just _  -> Left ("duplicate sort declaration: " ++ nm)
+      Nothing -> do
+        let s = mkSort th SortKindFromSignature nm FromSignature
+        return (addEntityToTh th (EntitySort s))
 
   SigRelationalSort (RelationalSortDeclaration nm rel sortExprAST) -> do
     parentSort <- lookupSort th (sortConstant (sortRef sortExprAST))

@@ -13,7 +13,7 @@ module Eidos.Lexer
   , symbol
     -- * Punctuation
   , lbrace, rbrace, lparen, rparen, lbrack, rbrack
-  , semi, colon, comma, dot, hash, underscore, caret
+  , semi, colon, comma, dot, hash, at, underscore, caret
   , lt, gt, doubleLt, doubleGt, doubleLbrack, doubleRbrack
     -- * Operators
   , arrow, bicond, impliedBy, impliesOp
@@ -80,12 +80,13 @@ rbrack = lexeme $ try $ do
   notFollowedBy (char ']')
   return [c]
 
-semi, colon, comma, dot, hash, underscore, caret :: Parser String
+semi, colon, comma, dot, hash, at, underscore, caret :: Parser String
 semi       = symbol ";"
 colon      = symbol ":"
 comma      = symbol ","
 dot        = symbol "."
 hash       = symbol "#"
+at        = symbol "@"
 underscore = symbol "_"
 caret      = symbol "^"
 

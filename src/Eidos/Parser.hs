@@ -229,10 +229,17 @@ pSubtheoryItem = do
   def  <- pSubtheoryDef
   return $ SubtheoryItem qual name def
 
+dottedIdent :: Parser String
+dottedIdent = do
+  first <- ident
+  rest  <- many (try ((:) <$> char '.' <*> ident))
+  return (concat (first : rest))
+
 pSubtheoryDef :: Parser SubtheoryDef
 pSubtheoryDef =
       SubtheoryBody        <$> between lbrace rbrace pTheoryBody
-  <|> SubtheoryExternalRef <$> (doubleLbrack *> ident <* doubleRbrack)
+  <|> SubtheoryExternalRef <$> (doubleLbrack *> dottedIdent <* doubleRbrack)
+  <|> SubtheoryExternalRef <$> (at *> dottedIdent)
 
 -- ---------------------------------------------------------------------------
 -- Propositions

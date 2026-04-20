@@ -92,7 +92,7 @@ main = hspec $ do
       parseString "{ subtheories { implicit { { signature { sort Q; } } } } }" `shouldSatisfy` isRight
     
     it "parses named subtheory block" $
-      parseString "{ subtheories { named { sub: [[ext]] } } }" `shouldSatisfy` isRight
+      parseString "{ subtheories { named { sub: @dir.ext } } }" `shouldSatisfy` isRight
     
     it "parses reflection subtheory block" $
       parseString "{ subtheories { reflection { sub2: { signature { sort Z; } } } } }" `shouldSatisfy` isRight
@@ -114,7 +114,7 @@ main = hspec $ do
       parseString input `shouldSatisfy` isRight
     
     it "parses subtheory with external reference" $ do
-      let input = "{ subtheories { named { sub: [[external.theory]] } } }"
+      let input = "{ subtheories { named { sub: [[external]] } } }"
       parseString input `shouldSatisfy` isRight
     
     it "parses complete example from documentation" $ do
@@ -161,7 +161,7 @@ main = hspec $ do
                     }
                 },
                 named {
-                    sub: [[ext]]
+                    sub: @ext
                 },
                 reflection {
                     sub2: {
@@ -307,7 +307,7 @@ main = hspec $ do
               IR.theoryName (head subs) `shouldBe` "Sub"
       
       it "resolves qualified names in subtheories" $ do
-        let input = "{ signature { sort S; } subtheories { named { Sub { signature { sort T; } } } axioms { assertions { Sub.T#min ⊆ Sub.T#max; } } } }"
+        let input = "{ signature { sort S; } axioms { assertions { Sub.T#min ⊆ Sub.T#max; } } subtheories { named { Sub: { signature { sort T; } } } } }"
         case parseString input of
           Left err -> fail (errorBundlePretty err)
           Right ast -> case buildTheory ast of
