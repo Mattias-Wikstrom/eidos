@@ -50,6 +50,19 @@ test-suite eidos-tests
                  megaparsec
   default-language: Haskell2010
 
+
+test-suite basic-tests
+  import:           warnings, deps
+  type:             exitcode-stdio-1.0
+  main-is:          BasicSpec.hs
+  hs-source-dirs:   test
+  default-language: GHC2021
+  build-depends:    eidos-parser,
+                    hspec >=2.0,
+                    base,
+                    raw-strings-qq,
+                    megaparsec
+
 test-suite typecheck-tests
   import:           warnings, deps
   type:             exitcode-stdio-1.0
