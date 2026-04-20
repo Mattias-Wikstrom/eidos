@@ -17,10 +17,12 @@ module Eidos.Parser
   , Parser
   ) where
 
-import           Control.Monad          (void)
+import           Control.Monad          (void, unless)
 import           Data.Void              (Void)
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
+import Data.List (sort, group, intercalate)
+import Data.Maybe (mapMaybe)
 
 import           Eidos.AST
 import           Eidos.Lexer
@@ -204,9 +206,20 @@ pMetafactsSection =
 -- ---------------------------------------------------------------------------
 
 pSubtheoriesSection :: Parser SubtheoriesSection
-pSubtheoriesSection =
-  SubtheoriesSection <$>
-    (kwSubtheories *> between lbrace rbrace (many (pSubtheoryEntry <* optional comma)))
+pSubtheoriesSection = do
+  void kwSubtheories
+  entries <- between lbrace rbrace (many (pSubtheoryEntry <* optional comma))
+  -- Check for duplicate group keywords
+  let groupKws = mapMaybe getGroupKeyword entries
+      duplicates = findDuplicates groupKws
+  unless (null duplicates) $
+    fail $ "Duplicate subtheory group keyword(s): " ++ intercalate ", " duplicates
+  return $ SubtheoriesSection entries
+  where
+    getGroupKeyword (SubtheoryEntryGroup (SubtheoryGroup kw _)) = Just kw
+    getGroupKeyword _ = Nothing
+    findDuplicates xs =
+      map head $ filter (\l -> length l > 1) $ group $ sort xs
 
 pSubtheoryEntry :: Parser SubtheoryEntry
 pSubtheoryEntry =

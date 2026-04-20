@@ -71,7 +71,7 @@ main = hspec $ do
               , extRefTheoryType = PlainTheory
               , extRefSource = MemorySource "{ signature { sort Custom; } }"
               }
-        let input = "{ subtheories { named { sub1: @anything } named { sub2: @whatever } } }"
+        let input = "{ subtheories { named { sub1: @anything sub2: @whatever } } }"
         case parseString input of
           Left err -> fail (show err)
           Right ast -> case buildTheoryWithResolver customResolver Nothing ast of
@@ -80,7 +80,7 @@ main = hspec $ do
               let subs = IR.theorySubtheories th
               length subs `shouldBe` 2
               all (\sub -> IR.theoryName sub == "sub1" || IR.theoryName sub == "sub2") subs `shouldBe` True
-      
+
       it "can use base context for resolution" $ do
         -- The resolver uses base context to find the file, but the theory name is the alias
         let contextResolver baseContext ref =

@@ -19,11 +19,16 @@ library
                     , Eidos.IR
                     , Eidos.Pretty
                     , Eidos.TypeCheck
+                    , Eidos.ExternalRef
+                    , Eidos.BuildMonad 
     hs-source-dirs:   src
     default-language: GHC2021
     build-depends:    megaparsec >=9.0
                     , parser-combinators >=1.3
                     , containers
+                    , directory
+                    , filepath
+                    , mtl
 
 executable eidos-parser
     import:           warnings, deps
@@ -72,3 +77,16 @@ test-suite typecheck-tests
   build-depends:    eidos-parser,
                     hspec >=2.0,
                     base
+
+test-suite externalref-tests
+  import:           warnings, deps
+  type:             exitcode-stdio-1.0
+  main-is:          ExternalRefSpec.hs
+  hs-source-dirs:   test
+  default-language: GHC2021
+  build-depends:    eidos-parser,
+                    hspec >=2.0,
+                    base,
+                    temporary,
+                    directory,
+                    filepath

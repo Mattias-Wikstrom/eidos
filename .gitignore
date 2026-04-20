@@ -1,4 +1,0 @@
-# Haskell build artifacts
-.stack-work/
-dist-newstyle/
-stack.yaml.lock

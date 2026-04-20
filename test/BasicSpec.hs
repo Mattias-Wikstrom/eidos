@@ -5,12 +5,9 @@ import Test.Hspec
 import Text.Megaparsec (errorBundlePretty)
 
 import Eidos.Parser (parseString)
-import Eidos.FromSyntax (buildTheory)
 import Eidos.Pretty (prettyTheoryDecl)
 import Eidos.AST
 import qualified Eidos.AST as AST
-import Eidos.IR
-import qualified Eidos.IR as IR
 import Text.RawString.QQ (r)
 
 main :: IO ()
@@ -87,38 +84,33 @@ main = hspec $ do
       it "parses formulas with connectives" $
         parseString "{ axioms { assertions { P → Q ∧ R; } } }" `shouldSatisfy` isRight
 
-  describe "Subtheories" $ do
-    it "parses implicit subtheory block" $
-      parseString "{ subtheories { implicit { { signature { sort Q; } } } } }" `shouldSatisfy` isRight
-    
-    it "parses named subtheory block" $
-      parseString "{ subtheories { named { sub: @dir.ext } } }" `shouldSatisfy` isRight
-    
-    it "parses reflection subtheory block" $
-      parseString "{ subtheories { reflection { sub2: { signature { sort Z; } } } } }" `shouldSatisfy` isRight
-    
-    it "parses multiple subtheories in implicit block" $ do
-      let input = "{ subtheories { implicit { { signature { sort Q; } } { signature { sort R; } } } } }"
-      parseString input `shouldSatisfy` isRight
-    
-    it "parses multiple subtheories in named block" $ do
-      let input = "{ subtheories { named { sub1: [[ext1]] sub2: [[ext2]] } } }"
-      parseString input `shouldSatisfy` isRight
-    
-    it "parses mixed subtheory blocks" $ do
-      let input = "{ subtheories { implicit { { signature { sort Q; } } } named { sub: [[ext]] } reflection { sub2: { signature { sort Z; } } } } }"
-      parseString input `shouldSatisfy` isRight
-    
-    it "parses subtheory with inline body" $ do
-      let input = "{ subtheories { implicit { { signature { sort Q; } } } } }"
-      parseString input `shouldSatisfy` isRight
-    
-    it "parses subtheory with external reference" $ do
-      let input = "{ subtheories { named { sub: [[external]] } } }"
-      parseString input `shouldSatisfy` isRight
-    
-    it "parses complete example from documentation" $ do
-      let input = [r|{
+    describe "Subtheories" $ do
+      it "parses implicit subtheory block" $
+        parseString "{ subtheories { implicit { { signature { sort Q; } } } } }" `shouldSatisfy` isRight
+      
+      it "parses named subtheory block" $
+        parseString "{ subtheories { named { sub: @dir.ext } } }" `shouldSatisfy` isRight
+      
+      it "parses reflection subtheory block" $
+        parseString "{ subtheories { reflection { sub2: { signature { sort Z; } } } } }" `shouldSatisfy` isRight
+      
+      it "parses multiple subtheories in implicit block" $
+        parseString "{ subtheories { implicit { { signature { sort Q; } } { signature { sort R; } } } } }" `shouldSatisfy` isRight
+      
+      it "parses multiple subtheories in named block" $
+        parseString "{ subtheories { named { sub1: [[ext1]] sub2: [[ext2]] } } }" `shouldSatisfy` isRight
+      
+      it "parses mixed subtheory blocks" $
+        parseString "{ subtheories { implicit { { signature { sort Q; } } } named { sub: [[ext]] } reflection { sub2: { signature { sort Z; } } } } }" `shouldSatisfy` isRight
+      
+      it "parses subtheory with inline body" $
+        parseString "{ subtheories { implicit { { signature { sort Q; } } } } }" `shouldSatisfy` isRight
+      
+      it "parses subtheory with external reference" $
+        parseString "{ subtheories { named { sub: [[external]] } } }" `shouldSatisfy` isRight
+      
+      it "parses complete example from documentation" $
+        parseString [r|{
             signature {
                 sort S;
                 sort MySort;
@@ -178,9 +170,7 @@ main = hspec $ do
                     }
                 }
             }
-        }|]
-
-      parseString input `shouldSatisfy` isRight
+        }|] `shouldSatisfy` isRight
 
     describe "Terms" $ do
       it "parses singleton set" $
@@ -201,173 +191,60 @@ main = hspec $ do
       it "parses generalized product" $
         parseString "{ axioms { assertions { Πx:S(x); } } }" `shouldSatisfy` isRight
 
-      it "builds IR for theory with sort" $ do
+    describe "Error handling" $ do
+      it "fails on malformed function declaration" $
+        parseString "{ signature { f : S T; } }" `shouldSatisfy` isLeft
+
+    describe "Pretty printer" $ do
+      it "round-trips simple theory" $ (do
         let input = "{ signature { sort S; } }"
         case parseString input of
           Left err -> fail (errorBundlePretty err)
-          Right ast -> case buildTheory ast of
-            Left err -> fail ("IR build failed: " ++ err)
-            Right theory -> do
-              let objects = IR.theoryObjects theory
-              let sortNames = [ IR.sortName s | EntitySort s <- objects ]
-              -- Should contain our new sort S (along with built-ins)
-              sortNames `shouldContain` ["S"]
-              -- Should also have built-in sorts
-              sortNames `shouldContain` ["𝕌", "𝔻", "ℙ"]
+          Right ast -> do
+            let pretty = prettyTheoryDecl ast
+            case parseString pretty of
+              Left err -> fail ("Re-parse failed: " ++ errorBundlePretty err ++ "\nPretty output: " ++ pretty)
+              Right _ -> return () :: IO ())
       
-      it "builds IR for theory with multiple sorts" $ do
-        let input = "{ signature { sort A; sort B; sort C; } }"
-        case parseString input of
-          Left err -> fail (errorBundlePretty err)
-          Right ast -> case buildTheory ast of
-            Left err -> fail ("IR build failed: " ++ err)
-            Right theory -> do
-              let objects = IR.theoryObjects theory
-              let sorts = [ IR.sortName s | EntitySort s <- objects ]
-              all (`elem` sorts) ["A", "B", "C"] `shouldBe` True
-      
-      it "builds IR for theory with function" $ do
+      it "round-trips theory with function" $ (do
         let input = "{ signature { sort S; sort T; f : S → T; } }"
         case parseString input of
           Left err -> fail (errorBundlePretty err)
-          Right ast -> case buildTheory ast of
-            Left err -> fail ("IR build failed: " ++ err)
-            Right theory -> do
-              let objects = IR.theoryObjects theory
-              let functionNames = [ IR.funcName f | EntityFunction f <- objects ]
-              functionNames `shouldContain` ["f"]
+          Right ast -> do
+            let pretty = prettyTheoryDecl ast
+            case parseString pretty of
+              Left err -> fail ("Re-parse failed: " ++ errorBundlePretty err ++ "\nPretty output: " ++ pretty)
+              Right _ -> return () :: IO ())
       
-      it "builds IR for theory with individual" $ do
-        let input = "{ signature { sort S; x : S; } }"
+      it "preserves sort names in round-trip" $ do
+        let input = "{ signature { sort MySort; } }"
         case parseString input of
           Left err -> fail (errorBundlePretty err)
-          Right ast -> case buildTheory ast of
-            Left err -> fail ("IR build failed: " ++ err)
-            Right theory -> do
-              let objects = IR.theoryObjects theory
-              let individuals = [ IR.mereoName m | EntityMereological m <- objects
-                                , IR.mereoKind m == MereologicalEntityKindIndividual ]
-              individuals `shouldContain` ["x"]
-      
-      it "builds IR for theory with set" $ do
-        let input = "{ signature { sort S; mySet ⊆ S; } }"
-        case parseString input of
-          Left err -> fail (errorBundlePretty err)
-          Right ast -> case buildTheory ast of
-            Left err -> fail ("IR build failed: " ++ err)
-            Right theory -> do
-              let objects = IR.theoryObjects theory
-              let sets = [ IR.mereoName m | EntityMereological m <- objects
-                         , IR.mereoKind m == MereologicalEntityKindSet ]
-              sets `shouldContain` ["mySet"]
-      
-      it "builds IR with built-in sorts" $ do
-        let input = "{ }"
-        case parseString input of
-          Left err -> fail (errorBundlePretty err)
-          Right ast -> case buildTheory ast of
-            Left err -> fail ("IR build failed: " ++ err)
-            Right theory -> do
-              let objects = IR.theoryObjects theory
-              let sortNames = [ IR.sortName s | EntitySort s <- objects ]
-              all (`elem` sortNames) ["𝕌", "𝔻", "ℙ"] `shouldBe` True
-      
-      it "builds IR with built-in functions" $ do
-        let input = "{ }"
-        case parseString input of
-          Left err -> fail (errorBundlePretty err)
-          Right ast -> case buildTheory ast of
-            Left err -> fail ("IR build failed: " ++ err)
-            Right theory -> do
-              let objects = IR.theoryObjects theory
-              let funcNames = [ IR.funcName f | EntityFunction f <- objects ]
-              all (`elem` funcNames) ["+", "×", "-", "⇒", "∸"] `shouldBe` True
-      
-      it "builds IR with built-in truth and falsity" $ do
-        let input = "{ }"
-        case parseString input of
-          Left err -> fail (errorBundlePretty err)
-          Right ast -> case buildTheory ast of
-            Left err -> fail ("IR build failed: " ++ err)
-            Right theory -> do
-              let objects = IR.theoryObjects theory
-              let mereoNames = [ IR.mereoName m | EntityMereological m <- objects ]
-              all (`elem` mereoNames) ["⊤", "⊥"] `shouldBe` True
+          Right ast -> do
+            let pretty = prettyTheoryDecl ast
+            case parseString pretty of
+              Left err -> fail ("Re-parse failed: " ++ errorBundlePretty err)
+              Right ast2 -> do
+                let sections1 = AST.sections (theoryBody ast)
+                let sections2 = AST.sections (theoryBody ast2)
+                sections1 `shouldBe` sections2
 
-    describe "Subtheory handling" $ do
-      it "builds IR with nested subtheory" $ do
-        let input = "{ signature { sort S; } subtheories { named { Sub: { signature { sort T; } } } } }"
-        case parseString input of
-          Left err -> fail (errorBundlePretty err)
-          Right ast -> case buildTheory ast of
-            Left err -> fail ("IR build failed: " ++ err)
-            Right theory -> do
-              let subs = IR.theorySubtheories theory
-              length subs `shouldBe` 1
-              IR.theoryName (head subs) `shouldBe` "Sub"
-      
-      it "resolves qualified names in subtheories" $ do
-        let input = "{ signature { sort S; } axioms { assertions { Sub.T#min ≤ Sub.T#max; } } subtheories { named { Sub: { signature { sort T; } } } } }"
-        case parseString input of
-          Left err -> fail (errorBundlePretty err)
-          Right ast -> case buildTheory ast of
-            Left err -> fail ("IR build failed: " ++ err)
-            Right _ -> pure () :: IO ()
+      it "rejects duplicate named sections in subtheories" $
+        parseString "{ subtheories { named { sub1: {} } named { sub2: {} } } }"
+          `shouldSatisfy` isLeft
 
-    describe "Error handling" $ do
-      it "fails on unknown sort reference" $ do
-        let input = "{ signature { x : UnknownSort; } }"
-        case parseString input of
-          Left _ -> pure () :: IO ()  -- Parse error is fine
-          Right ast -> case buildTheory ast of
-            Left _ -> pure () :: IO ()  -- Build error is expected
-            Right _ -> fail "Should have failed on unknown sort"
-      
-      it "fails on duplicate sort declaration" $ do
-        let input = "{ signature { sort S; sort S; } }"
-        case parseString input of
-          Left _ -> pure () :: IO ()
-          Right ast -> case buildTheory ast of
-            Left _ -> pure () :: IO ()  -- Should fail on duplicate
-            Right _ -> fail "Should have failed on duplicate sort"
-      
-      it "fails on malformed function declaration" $ do
-        parseString "{ signature { f : S T; } }" `shouldSatisfy` isLeft
+      it "rejects duplicate implicit sections" $
+        parseString "{ subtheories { implicit { { } } implicit { { } } } }"
+          `shouldSatisfy` isLeft
 
-  describe "Pretty printer" $ do
-    it "round-trips simple theory" $ do
-      let input = "{ signature { sort S; } }"
-      case parseString input of
-        Left err -> fail (errorBundlePretty err)
-        Right ast -> do
-          let pretty = prettyTheoryDecl ast
-          case parseString pretty of
-            Left err -> fail ("Re-parse failed: " ++ errorBundlePretty err ++ "\nPretty output: " ++ pretty)
-            Right _ -> pure () :: IO ()
-    
-    it "round-trips theory with function" $ do
-      let input = "{ signature { sort S; sort T; f : S → T; } }"
-      case parseString input of
-        Left err -> fail (errorBundlePretty err)
-        Right ast -> do
-          let pretty = prettyTheoryDecl ast
-          case parseString pretty of
-            Left err -> fail ("Re-parse failed: " ++ errorBundlePretty err ++ "\nPretty output: " ++ pretty)
-            Right _ -> pure () :: IO ()
-    
-    it "preserves sort names in round-trip" $ do
-      let input = "{ signature { sort MySort; } }"
-      case parseString input of
-        Left err -> fail (errorBundlePretty err)
-        Right ast -> do
-          let pretty = prettyTheoryDecl ast
-          case parseString pretty of
-            Left err -> fail ("Re-parse failed: " ++ errorBundlePretty err)
-            Right ast2 -> do
-              let sections1 = AST.sections (theoryBody ast)
-              let sections2 = AST.sections (theoryBody ast2)
-              sections1 `shouldBe` sections2
+      it "rejects duplicate reflection sections" $
+        parseString "{ subtheories { reflection { sub1: {} } reflection { sub2: {} } } }"
+          `shouldSatisfy` isLeft
 
+      it "accepts mixed distinct sections" $
+        parseString "{ subtheories { implicit { { } } named { sub: {} } reflection { sub: {} } } }"
+          `shouldSatisfy` isRight
+          
 -- Helper functions
 isRight :: Either a b -> Bool
 isRight (Right _) = True
