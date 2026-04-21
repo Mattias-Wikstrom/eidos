@@ -715,51 +715,51 @@ reflectEntity e = e
 -- Subtheory propagation (Gap 7)
 -- ---------------------------------------------------------------------------
 
--- | After a subtheory has been built, propagate its entities to the parent theory.
---
--- Rules (mirroring Go's addEntityToTheory):
---   * implicit subtheory (name ""):  entity is added under its own name (no prefix)
---   * named subtheory:               entity is added under "subName.entityName"
---   * reflection subtheory:          entity is first transformed (reflectEntity),
---                                    then added under "subName.entityName"
---
--- The propagated names are inserted into the parent's objectsByName map only
--- (not into theoryObjects, which lists only locally-declared entities).
+-- Only these three built-ins need equality facts
+builtInNames :: [String]
+builtInNames = ["𝔻", "ℙ", "𝕌"]
+
+-- Built-in entity names that should get equality facts
+--builtInNames :: [String]
+--builtInNames = ["𝔻", "ℙ", "𝕌", "⊤", "⊥", "+", "×", "-", "⇒", "∸"]
+
 propagateSubtheory parentTh subName isImplicit isReflection subTh =
   let addAll th (name, entities) =
         let transformed = if isReflection then map reflectEntity entities else entities
             -- Always add qualified name
             qualifiedName = if null subName then name else subName ++ "." ++ name
             th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
-            -- For implicit subtheories, handle unqualified name
+            
+            -- For implicit subtheories, add unqualified name for ALL entities
             th2 = if isImplicit
-                  then foldl (\t e -> 
-                         case Map.lookup name (theoryObjectsByName t) of
-                           Just (existing:_) -> 
-                             -- Add equality fact between existing and new entity
-                             addEqualityFact t existing e
-                           Nothing -> 
-                             addEntityToParent t name e
-                       ) th1 transformed
+                  then let thWithUnqual = foldl (\t e -> addEntityToParent t name e) th1 transformed
+                       in -- Add equality facts only for built-in sorts
+                          if name `elem` builtInNames
+                          then case ( Map.lookup name (theoryObjectsByName parentTh)
+                                    , Map.lookup qualifiedName (theoryObjectsByName thWithUnqual) ) of
+                                 (Just (parentEntity:_), Just (subEntity:_)) -> 
+                                   addEqualityFact thWithUnqual parentEntity subEntity
+                                 _ -> thWithUnqual
+                          else thWithUnqual
                   else th1
         in th2
   in foldl addAll parentTh (Map.toList (theoryObjectsByName subTh))
-  
--- Built-in entity names that should be merged via equality facts
-builtInNames :: [String]
-builtInNames = ["𝔻", "ℙ", "𝕌", "⊤", "⊥", "+", "×", "-", "⇒", "∸"]
 
--- Add an equality fact between two entities
+
+-- | Add an entity to a theory's name map only (not to theoryObjects)
+addEntityToParent :: Theory -> String -> Entity -> Theory
+addEntityToParent th name entity =
+  th { theoryObjectsByName = Map.insertWith (++) name [entity] (theoryObjectsByName th) }
+
+-- | Add an equality fact between two entities
 addEqualityFact :: Theory -> Entity -> Entity -> Theory
 addEqualityFact th parentEntity subEntity =
-  let -- Create a fact: parentEntity = subEntity
-      fact = mkEqualityFact parentEntity subEntity
+  let fact = mkEqualityFact parentEntity subEntity
   in addFactToTh th fact
 
--- Create an equality fact between two entities
+-- | Create an equality fact between two entities
 mkEqualityFact :: Entity -> Entity -> Fact
 mkEqualityFact e1 e2 =
-  -- Build a ResolvedPropExpr representing e1 = e2
   let leftTerm = termFromEntity e1
       rightTerm = termFromEntity e2
       relation = ResolvedRelationFollowedByTerm [] "=" Nothing rightTerm
@@ -774,11 +774,11 @@ mkEqualityFact e1 e2 =
   in Fact
     { factIsMereologicalTranslation = False
     , factIsInherited = False
-    , factKind = FactKindAssertion  -- or FactKindFact? Assertion is appropriate
+    , factKind = FactKindAssertion
     , factPropExpr = ResolvedPropBicond rightImpl []
     }
 
--- Helper to create a ResolvedTerm from an Entity
+-- | Helper to create a ResolvedTerm from an Entity
 termFromEntity :: Entity -> ResolvedTerm
 termFromEntity entity =
   let constRef = ResolvedConstantRef
@@ -788,12 +788,6 @@ termFromEntity entity =
         }
       factor = ResolvedFactor (ResolvedBTAtomic constRef) [] (entityToExprType entity)
   in ResolvedTerm factor [] (entityToExprType entity)
-
-
--- Add an entity to a theory's name map only (not to theoryObjects)
-addEntityToParent :: Theory -> String -> Entity -> Theory
-addEntityToParent th name entity =
-  th { theoryObjectsByName = Map.insertWith (++) name [entity] (theoryObjectsByName th) }
 
 -- ---------------------------------------------------------------------------
 -- Mereological translations (pass 4)
