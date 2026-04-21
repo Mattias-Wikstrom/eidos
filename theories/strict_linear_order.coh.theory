@@ -1,0 +1,13 @@
+/* Theory in coherent logic that axiomatizes the concept of a strict linear order */
+{
+  subtheories {
+    implicit {
+      strict_preorder: @strict_preorder
+    }
+  },
+  axioms {
+    assertions {
+      [x : D] [y : D] (lessThan(x, y) ∨ lessThan(y, x)); // Totality
+    }
+  }
+}

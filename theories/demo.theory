@@ -1,0 +1,102 @@
+/* Theory that demonstrates many features of the language */
+{
+  signature {
+    sort A; // A is a sort
+    sort B; // B is a sort
+    sort C; // C is a sort
+    sort D; // D is a sort
+    o1 : A; // o1 has sort A
+    o2 : B; // o2 has sort B
+    o3 : B; // o3 has sort B
+    A subsort B; // A is a subsort of B
+    C quotient B; // C is a quotient of B
+    D subquotient B; // D is a subquotient of B
+    f : A → B; // f is a function from A to B
+    h : A, A → A; // h is a function of two arguments
+    pred ⊆ A; // pred is a monadic predicate that is applied to objects of sort A
+    Pred2 : A, B → Prop; // Pred2 is a relation between A and B
+  },
+  axioms {
+    assertions {
+      o2 = f(o1); // applying f to o1 gives one o2
+      ∃x:D ∀y:D x = y; // Some object x of sort D is identical to every object of sort D
+      ∃X:Prop X = X; // There exists a proposition
+      ∃x:A ∃Pr ⊆ A Pr(x); // x is an individual of sort A, Pr a monadic predicate
+      ⊥ → ⊤; // ⊤ follows from ⊥
+      [x : A] x = x; // Free variables need to be given sortings using the notation [variable : NameOfSort]
+      [x : A] ∃y : B x = y; // Any object x of sort A is identical to some object of sort B 
+      0 ≤ 1; // ≤ is the part-whole relation, 0 is part of 1
+      (A).min ≤ o1; // <min>(A) is the minimum among things of sort A
+      (A).min ≤ pred; // That includes predicates
+      o1 ≤ (A).max; // <max>(A) is the maximum among things of sort A
+      pred ≤ (A).max; // That includes predicates
+      (A).min = (B).min; // This holds since A is a subsort of B
+      (A).max ≤ (B).max; // This holds since A is a subsort of B
+      (B).min ≤ (C).min; // This holds since C is a quotient of B
+      (B).max = (C).max; // This holds since C is a quotient of B
+      (B).min ≤ (D).min; // This holds since D is a subquotient of B
+      (D).max ≤ (B).max; // This holds since D is a subquotient of B
+    },
+    /* The identities section exists mostly to provide a natural way to express theories
+        in weak logics such as equational logic. */
+    facts {
+      o2 = f(o1 + o1); // + expresses the mereological sum of two objects
+      o3 = o1 * o2; // * expresses the mereological product of two objects
+      o3 = o1 - o2; // - expresses the mereological difference between two objects
+      /* Mereological operations can be applied to all objects, including propositions and predicates. 
+        (Everything is given a mereological interpretation.)
+      */
+      o2 = sub1.o1; // What the inner theory calls 'o1', the outer theory calls 'sub1.o1'
+      [x : D] [y : D] x = y; // Any two objects x, y of sort D are identical 
+    }
+  },
+  // A theory can extend other theories
+  subtheories {
+    named {
+      sub1: {
+        signature {
+          sort M; // M is a sort
+          o1 : M; // The outer theory will refer to this object as sub1.o1  
+          m : M;  // sub1.m has sort sub1.M
+        },
+        axioms {
+          assertions {
+            o1 = m + o1;
+          }
+        }
+      },
+      /* The following is used to allow a subtheory to be specified in a separate computer file.
+        Like the 'implicit' (see below) feature, this is solely a convenience.
+      */
+      sub3: @preorder // Look for a file named 'preorder' and use the theory specified there
+    },    
+    /* Using implicit makes it possible to omit the name
+        of the subtheory when referring to the things defined in it. This is only a
+        convenience. 
+        
+       The rule is as follows: It is exactly as if 1) everything in the implicit subtheory had 
+       been duplicated in the current theory and as if 2) identities had subsequently been
+       added for every entity to make sure that no actual duplication occurs. For example, sort N 
+       in the inner theory will be identical to sort N in the outer theory.
+
+       Note: Although it is an error to redeclare an entity, the rule just described
+       can effectively lead to the same entity being declared in multiple places. There will then
+       be a 'unification' among those declarations and the unification algorithm is applied recursively.
+       For example, if f: A -> B is unified with f: C -> D then A is unified with C while B is
+       unified with D.
+      */
+    implicit {
+      sub2: {
+        signature {
+          sort N; // The outer theory can refer to this sort as either sub2.N or N
+          n : N; // The outer theory can refer to this object as either sub2.n or n
+        },
+        axioms {
+          facts {
+            n = n + n;
+          }
+        }
+      },
+    }
+  }
+}

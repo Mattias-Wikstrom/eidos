@@ -172,6 +172,47 @@ main = hspec $ do
             }
         }|] `shouldSatisfy` isRight
 
+      it "parses subtheories separated by commas" $
+        parseString [r|{
+          subtheories {
+            implicit {
+              field: @field,
+              strict_linear_order: @strict_linear_order
+            }
+          },
+          axioms {
+          }
+        }|] `shouldSatisfy` isRight
+
+      it "sfsdf" $
+        parseString [r|{
+          subtheories {
+           implicit {
+             ring: @ring
+           },
+           named {
+             multiplicative_group: @group
+           }
+         },
+         signature {
+           sort E; // Used for non-zero elements
+           multiplicative_inv: E → E;
+           E subsort D; // The non-zero elements form a subdomain
+         },
+         axioms {
+           facts {
+             multiplicative_group.D = E;
+             ring.one = multiplicative_group.n;
+             multiplicative_inv = multiplicative_group.inv;
+             [x : E] [y : E] ring.prod(x, y) = multiplicative_group.op(x, y);
+           },
+           assertions {
+             [x : D] (x = 0) ∨ ∃y:E x=y; // Any element is either zero or non-zero
+           }
+         }
+        }|] `shouldSatisfy` isRight
+        
+ 
     describe "Terms" $ do
       it "parses singleton set" $
         parseString "{ axioms { assertions { {x} ⊆ S; } } }" `shouldSatisfy` isRight

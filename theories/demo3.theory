@@ -1,0 +1,71 @@
+/* Theory that demonstrates how references work when there are subtheories marked with [implicit] */
+{
+  signature {
+    sort DemoSortD;
+    sort DemoSortE;
+    sort DemoSortF;
+    sort DemoSortG;
+    sort DemoSortH;
+  },
+  axioms {
+    assertions {
+      DemoSortD = subB.subA.DemoSortA; // Nested subtheories
+      DemoSortE = subC.subA.DemoSortA; // Nested subtheories
+      DemoSortF = subA.DemoSortA; // This works too but would fail if demo3_subtheoryB and demo3_subtheoryC were implicit
+      DemoSortG = DemoSortA; // This works too
+    }
+  },
+  subtheories {
+    implicit {
+      subB: {
+        signature {
+          sort DemoSortB;
+          sort DemoSortB2; 
+        },
+        axioms {
+          assertions {
+            DemoSortB = subA.DemoSortA; // Asserts the identity between two sorts
+          }
+        },
+        subtheories {
+          [implicit] subA: {
+            signature {
+              sort DemoSortA; // Coincides with subC.subA.DemoSortA
+
+              a : DemoSortA; // Coincides with subC.subA.a
+              f : DemoSortA → DemoSortA; // Coincides with subC.subA.f
+            },
+            axioms {
+              assertions {
+                f(a) = a;
+              }
+            }
+          }
+        }
+      },
+      subC: {
+        signature {
+          sort DemoSortB; // NOTE: This definition clashes with the one in subtheoryB; Not an error
+        },
+        axioms {
+          
+        },
+        subtheories {
+          [implicit] subA: {
+            signature {
+              sort DemoSortA; // Coincides with subB.subA.DemoSortA
+
+              a : DemoSortA; // Coincides with subB.subA.a
+              f : DemoSortA → DemoSortA; // Coincides with subB.subA.f
+            },
+            axioms {
+              assertions {
+                f(a) = a;
+              }
+            }
+          }
+        }
+      } 
+    }
+  }
+}

@@ -252,7 +252,7 @@ pSubtheoryEntry =
 pSubtheoryGroup :: Parser SubtheoryGroup
 pSubtheoryGroup = do
   kw    <- pGroupKeyword
-  items <- between lbrace rbrace (many pSubtheoryItem)
+  items <- between lbrace rbrace (many (pSubtheoryItem <* optional comma))
   return $ SubtheoryGroup kw items
 
 pGroupKeyword :: Parser String

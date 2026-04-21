@@ -1,0 +1,18 @@
+/* Theory in regular logic that axiomatizes the concept of a lower semi-lattice */
+{
+  subtheories {
+    implicit {
+      partial_order: @partial_order
+    }
+  },
+  signature {
+    meet : D, D → D;
+  },
+  axioms {
+    assertions {
+      [x : D] [y : D] lessThanOrEq(meet(x, y), x);
+      [x : D] [y : D] lessThanOrEq(meet(x, y), y);
+      [x : D] [y : D] [z : D] (lessThanOrEq(z, x) ∧ lessThanOrEq(z, y)) → lessThanOrEq(z, meet(x, y));
+    }
+  }
+}

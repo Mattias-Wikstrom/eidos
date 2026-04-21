@@ -1,0 +1,16 @@
+/* Theory in coherent logic that axiomatizes the concept of a strict preorder (=strict partial order) */
+{
+  signature {
+    sort D;
+    lessThan : D, D → Prop; // Order relation
+  },
+  axioms {
+    assertions {
+      [x : D] ¬lessThan(x, x); // Irreflexivity
+      [x : D] [y : D] [z : D] (lessThan(x, y) ∧ lessThan(y, z)) → lessThan(x, z); // Transitivity
+    
+      // The following follows automatically:
+      // [x : D] [y : D] lessThan(x, y) ∧ lessThan(y, x) → ⊥; // Assymmetry
+    }
+  }
+}

@@ -1,0 +1,18 @@
+/* Equational theory that axiomatizes the concept of a group */
+{
+  subtheories {
+    implicit {
+      monoid: @monoid
+    }
+  },
+  signature {
+    sort D;
+    inv : D → D; // Extend the signature with an operation for inversion
+  },
+  axioms {
+    facts {
+      [x : D] op(inv(x), x) = n; // Left inverse
+      [x : D] op(x, inv(x)) = n; // Right inverse
+    }
+  }
+}

@@ -1,0 +1,13 @@
+/* Theory in regular logic that axiomatizes the concept of a preorder */
+{
+  signature {
+    sort D;
+    lessThanOrEq : D, D → Prop; // Order relation
+  },
+  axioms {
+    assertions {
+      [x : D] lessThanOrEq(x, x); // Reflexivity
+      [x : D] [y : D] [z : D] (lessThanOrEq(x, y) ∧ lessThanOrEq(y, z)) → lessThanOrEq(x, z); // Transitivity
+    }
+  }
+}
