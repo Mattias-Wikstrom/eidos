@@ -71,8 +71,16 @@ decorateTheoryBody body parentMaybe name isReflection = do
   -- ── Base theory skeleton ──────────────────────────────────────────────
   let th0 = createTheory parentMaybe name isReflection
 
+  -- ── Register built-in sorts (adds min/max entities + sort-limit facts) ─
+  -- addSortToTh skips universe-self and prop-self guards internally.
+  -- We pass th0 as the base for relateSortToProp/Universe since the
+  -- built-in sort references (theoryProp, theoryUniverse) are stable.
+  let thA = addSortToTh th0 (theoryUniverse th0)
+      thB = addSortToTh thA (theoryDomain   th0)
+      thC = addSortToTh thB (theoryProp     th0)
+
   -- ── Pass 1: subtheories ───────────────────────────────────────────────
-  (th1, subtheories) <- foldM (buildSubtheoryEntry) (th0, []) (sections body)
+  (th1, subtheories) <- foldM buildSubtheoryEntry (thC, []) (sections body)
   let th2 = th1 { theorySubtheories = subtheories }
 
   -- ── Pass 2: signature ─────────────────────────────────────────────────
@@ -145,8 +153,10 @@ processItem kw (th, subs) item = do
   
   sub <- local (const subContext) $ 
     decorateTheoryBody subBody (Just th) finalName isRefl
+  -- Propagate sub's entities to the parent theory
   let th' = addSubtheoryToTheory th sub
-  return (th', subs ++ [sub])
+      th'' = propagateSubtheory th' finalName isRefl (theoryObjects sub)
+  return (th'', subs ++ [sub])
 
 -- | Resolve a subtheory definition using the resolver from the monad
 resolveSubtheoryBody
@@ -200,24 +210,43 @@ buildSignatureItem th0 th item = case item of
       Just _  -> throwError ("duplicate sort declaration: " ++ nm)
       Nothing -> do
         let s = mkSort th SortKindFromSignature nm FromSignature
-        return (addEntityToTh th (EntitySort s))
+        return (addSortToTh th s)
 
   SigRelationalSort (RelationalSortDeclaration nm rel sortExprAST) -> do
-    parentSort <- either throwError return $ 
+    parentSort <- either throwError return $
       lookupSort th (sortConstant (sortRef sortExprAST))
-    let s = mkRelatedSort th nm rel parentSort
-    return (addEntityToTh th (EntitySort s))
+    let s   = mkRelatedSort th nm
+        th1 = addSortToTh th s
+        th2 = relationalSortFacts th1 rel s parentSort
+    return th2
 
   SigFunction (FunctionDeclaration nm domainExprs codomainExpr) -> do
     argSorts <- mapM (liftLookup (lookupSortByExpr th)) domainExprs
     resSort <- either throwError return $ lookupSortByExpr th codomainExpr
     if firstLetterIsUppercase nm
       then do
+        -- SOL function (uppercase name)
         let f = mkSOLFunction th nm FunctionKindSOLFunctionFromTheory argSorts resSort FromSignature
         return (addEntityToTh th (EntityFunction f))
       else do
-        let f = mkFOLFunction th nm FunctionKindFOLFunctionFromTheory argSorts resSort FromSignature
-        return (addEntityToTh th (EntityFunction f))
+        -- FOL function (lowercase name): also create domain sort, inverse, image functions
+        let (f, domSort, invFn, dirImg, invImg) =
+              mkFOLFunction th nm argSorts resSort FromSignature
+        -- Add domain sort (product sort) + its limits
+        let th1 = addEntityToTh th  (EntitySort domSort)
+            th2 = addEntityToTh th1 (EntityMereological (sortMin domSort))
+            th3 = addEntityToTh th2 (EntityMereological (sortMax domSort))
+        -- Add inverse domain sort + limits
+        let invDomSort = case funcDomain invFn of { Just d -> d; Nothing -> domSort }
+            th4 = addEntityToTh th3 (EntitySort invDomSort)
+            th5 = addEntityToTh th4 (EntityMereological (sortMin invDomSort))
+            th6 = addEntityToTh th5 (EntityMereological (sortMax invDomSort))
+        -- Add main function and companions
+        let th7 = addEntityToTh th6 (EntityFunction f)
+            th8 = addEntityToTh th7 (EntityFunction invFn)
+            th9 = addEntityToTh th8 (EntityFunction dirImg)
+            th10= addEntityToTh th9 (EntityFunction invImg)
+        return th10
 
   SigIndividual (IndividualDeclaration nm sortExprAST) -> do
     s <- either throwError return $ lookupSortByExpr th sortExprAST
@@ -376,16 +405,22 @@ createTheory parentMaybe name isRefl =
       revDiffF = mkBinSOL "⇒"
       symDiffF = mkBinSOL "∸"
 
-      builtins = map EntitySort [universe, domain, prop]
-             ++ map EntityMereological [truth, falsity]
-             ++ map EntityFunction [sumF, prodF, diffF, revDiffF, symDiffF]
+      -- createTheory only seeds the theory with truth, falsity, and the mereological
+      -- functions.  The three built-in sorts (universe, domain, prop) are added via
+      -- addSortToTh in decorateTheoryBody, which also registers their min/max objects
+      -- and emits sort-limit metafacts.  Keeping sorts out of builtins here prevents
+      -- them from appearing twice in theoryObjects.
+      builtins = map EntityMereological [truth, falsity]
+              ++ map EntityFunction [sumF, prodF, diffF, revDiffF, symDiffF]
 
       builtinsByName = Map.fromListWith (++)
         [ (entityName e, [e]) | e <- builtins ]
 
+      -- The three core sort-limit facts are: truth = ℙ#min, falsity = ℙ#max,
+      -- and ℙ#max ≤ 𝔻#min.  The universe/domain/prop interval facts are emitted
+      -- by addSortToTh in decorateTheoryBody.
       builtinFacts =
-        [ mkSortLimitFact (sortMax prop)   "≤" (sortMin domain)
-        , mkSortLimitFact (theoryTruth th) "=" (sortMin prop)
+        [ mkSortLimitFact (theoryTruth th)   "=" (sortMin prop)
         , mkSortLimitFact (theoryFalsity th) "=" (sortMax prop)
         ]
 
@@ -405,69 +440,104 @@ mkSort th k nm orig = Sort
   , sortName              = nm
   , sortComponentSorts    = []
   , sortAssociatedEntity  = Nothing
+  , sortReflectedFrom     = Nothing
   }
   where
     mkSortMin = MereologicalObject
-      { mereoKind         = MereologicalEntityKindLowerLimitForSort
-      , mereoOrigin       = orig
-      , mereoTheory       = th
-      , mereoName         = nm ++ "#min"
-      , mereoSort         = mkSort th k nm orig
-      , mereoLimitForSort = Just (mkSort th k nm orig)
+      { mereoKind          = MereologicalEntityKindLowerLimitForSort
+      , mereoOrigin        = orig
+      , mereoTheory        = th
+      , mereoName          = nm ++ "#min"
+      , mereoSort          = mkSort th k nm orig
+      , mereoLimitForSort  = Just (mkSort th k nm orig)
+      , mereoReflectedFrom = Nothing
       }
     mkSortMax = MereologicalObject
-      { mereoKind         = MereologicalEntityKindUpperLimitForSort
-      , mereoOrigin       = orig
-      , mereoTheory       = th
-      , mereoName         = nm ++ "#max"
-      , mereoSort         = mkSort th k nm orig
-      , mereoLimitForSort = Just (mkSort th k nm orig)
+      { mereoKind          = MereologicalEntityKindUpperLimitForSort
+      , mereoOrigin        = orig
+      , mereoTheory        = th
+      , mereoName          = nm ++ "#max"
+      , mereoSort          = mkSort th k nm orig
+      , mereoLimitForSort  = Just (mkSort th k nm orig)
+      , mereoReflectedFrom = Nothing
       }
 
 mkMereo :: Theory -> EntityKind -> String -> Sort -> Origin -> MereologicalObject
 mkMereo th k nm s orig = MereologicalObject
-  { mereoKind         = k
-  , mereoOrigin       = orig
-  , mereoTheory       = th
-  , mereoName         = nm
-  , mereoSort         = s
-  , mereoLimitForSort = Nothing
+  { mereoKind          = k
+  , mereoOrigin        = orig
+  , mereoTheory        = th
+  , mereoName          = nm
+  , mereoSort          = s
+  , mereoLimitForSort  = Nothing
+  , mereoReflectedFrom = Nothing
   }
 
 mkSOLFunction :: Theory -> String -> EntityKind -> [Sort] -> Sort -> Origin -> Function
 mkSOLFunction th nm k argSorts resSort orig = Function
-  { funcKind        = k
-  , funcOrigin      = orig
-  , funcTheory      = th
-  , funcName        = nm
-  , funcArgSorts    = argSorts
-  , funcResSort     = resSort
-  , funcResObject   = mkMereo th MereologicalEntityKindResultOfSOLFunction (nm ++ "#res") resSort orig
-  , funcArgObjects  = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
-                                        (nm ++ "#" ++ show i) s orig) argSorts [1..]
-  , funcDomain      = Nothing
-  , funcArgument    = Nothing
-  , funcDirectImage = Nothing
-  , funcInverseImage = Nothing
+  { funcKind          = k
+  , funcOrigin        = orig
+  , funcTheory        = th
+  , funcName          = nm
+  , funcArgSorts      = argSorts
+  , funcResSort       = resSort
+  , funcResObject     = mkMereo th MereologicalEntityKindResultOfSOLFunction (nm ++ "#res") resSort orig
+  , funcArgObjects    = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
+                                          (nm ++ "#" ++ show i) s orig) argSorts [1..]
+  , funcDomain        = Nothing
+  , funcArgument      = Nothing
+  , funcDirectImage   = Nothing
+  , funcInverseImage  = Nothing
+  , funcReflectedFrom = Nothing
   }
 
-mkFOLFunction :: Theory -> String -> EntityKind -> [Sort] -> Sort -> Origin -> Function
-mkFOLFunction th nm k argSorts resSort orig =
-  let f = mkSOLFunction th nm k argSorts resSort orig
+-- | Build a FOL function (lowercase name): creates a product-sort domain, an arg object,
+--   a paired inverse function f_inv, and direct/inverse image SOL functions.
+--   Returns (mainFn, domSort, invFn, dirImgFn, invImgFn).
+mkFOLFunction :: Theory -> String -> [Sort] -> Sort -> Origin
+              -> (Function, Sort, Function, Function, Function)
+mkFOLFunction th nm argSorts resSort orig =
+  let f0 = mkSOLFunction th nm FunctionKindFOLFunctionFromTheory argSorts resSort orig
       domSort = Sort
         { sortKind             = SortKindProduct
         , sortTheory           = th
         , sortOrigin           = orig
         , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "#dom#min") domSort orig
         , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "#dom#max") domSort orig
-        , sortName             = ""
+        , sortName             = nm ++ "#dom"
         , sortComponentSorts   = argSorts
         , sortAssociatedEntity = Just (EntityFunction f)
+        , sortReflectedFrom    = Nothing
         }
       domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "#arg") domSort orig
-  in f { funcDomain   = Just domSort
-       , funcArgument = Just domArg
-       }
+      -- Direct-image SOL function: dom → res
+      dirImg = mkSOLFunction th (nm ++ "#dir_img") FunctionKindDirectImageFunction [domSort] resSort orig
+      -- Inverse-image SOL function: res → dom
+      invImg = mkSOLFunction th (nm ++ "#inv_img") FunctionKindInverseImageFunction [resSort] domSort orig
+      -- The main function, wired with domain, domArg, and image functions
+      f = f0 { funcDomain      = Just domSort
+             , funcArgument    = Just domArg
+             , funcDirectImage  = Just dirImg
+             , funcInverseImage = Just invImg
+             }
+      -- Inverse function f_inv: resSort → domSort (also a FOL function)
+      inv0 = mkSOLFunction th (nm ++ "_inv") FunctionKindFOLFunctionFromTheory [resSort] domSort orig
+      invDomSort = Sort
+        { sortKind             = SortKindProduct
+        , sortTheory           = th
+        , sortOrigin           = orig
+        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_inv#dom#min") invDomSort orig
+        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_inv#dom#max") invDomSort orig
+        , sortName             = nm ++ "_inv#dom"
+        , sortComponentSorts   = [resSort]
+        , sortAssociatedEntity = Just (EntityFunction invFn)
+        , sortReflectedFrom    = Nothing
+        }
+      invArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_inv#arg") invDomSort orig
+      invFn = inv0 { funcDomain   = Just invDomSort
+                   , funcArgument = Just invArg
+                   }
+  in (f, domSort, invFn, dirImg, invImg)
 
 mkSortLimitFact :: MereologicalObject -> String -> MereologicalObject -> Fact
 mkSortLimitFact l op r = Fact
@@ -514,18 +584,74 @@ twoTermPropExpr l op r =
     kindToSubtype MereologicalEntityKindProposition  = MereologicalSubtypeProposition
     kindToSubtype _                                  = MereologicalSubtypeMereological
 
--- | Add an entity to the theory's object lists and name map
+-- | Add an entity to the theory's object list and name map (local only; propagation
+--   to ancestors is done explicitly via 'propagateSubtheory').
 addEntityToTh :: Theory -> Entity -> Theory
 addEntityToTh th e =
-  th { theoryObjects     = theoryObjects th ++ [e]
+  th { theoryObjects      = theoryObjects th ++ [e]
      , theoryObjectsByName = Map.insertWith (++) (entityName e) [e]
                                (theoryObjectsByName th)
      }
 
--- | Build a sort that stands in a relational position to an existing sort
-mkRelatedSort :: Theory -> String -> String -> Sort -> Sort
-mkRelatedSort th nm _rel _parentSort =
-  mkSort th SortKindFromSignature nm FromSignature
+-- | Add a fact to the theory.
+addFactToTh :: Theory -> Fact -> Theory
+addFactToTh th f = th { theoryFacts = theoryFacts th ++ [f] }
+
+-- | Emit the two metafacts that relate a sort to the universe:
+--   𝕌#min ≤ sort#min   and   sort#max ≤ 𝕌#max
+--   (Skip if the sort IS the universe itself, mirroring the Go check.)
+relateSortToUniverse :: Theory -> Sort -> Theory
+relateSortToUniverse th s
+  | sortKind s == SortKindUniverse = th
+  | otherwise =
+      let u = theoryUniverse th
+      in addFactToTh (addFactToTh th
+           (mkSortLimitFact (sortMin u) "≤" (sortMin s)))
+           (mkSortLimitFact (sortMax s) "≤" (sortMax u))
+
+-- | Emit the metafact that relates a sort to Prop:
+--   ℙ#max ≤ sort#min
+--   (Skip for universe and for prop itself, mirroring the Go checks.)
+relateSortToProp :: Theory -> Sort -> Theory
+relateSortToProp th s
+  | sortKind s == SortKindUniverse = th
+  | sortKind s == SortKindProp     = th
+  | otherwise = addFactToTh th (mkSortLimitFact (sortMax (theoryProp th)) "≤" (sortMin s))
+
+-- | Add a sort to a theory: register the sort entity, register its min/max objects,
+--   and emit the sort-limit metafacts (relateSortToProp + relateSortToUniverse).
+--   This mirrors Go's createNamedSort behaviour.
+addSortToTh :: Theory -> Sort -> Theory
+addSortToTh th s =
+  let th1 = addEntityToTh th  (EntitySort s)
+      th2 = addEntityToTh th1 (EntityMereological (sortMin s))
+      th3 = addEntityToTh th2 (EntityMereological (sortMax s))
+      th4 = relateSortToProp    th3 s
+      th5 = relateSortToUniverse th4 s
+  in th5
+
+-- | Build a sort that stands in a relational position to an existing sort.
+--   Returns just the Sort record; the caller is responsible for adding it to the theory
+--   (via addSortToTh) and emitting any relationship facts.
+mkRelatedSort :: Theory -> String -> Sort
+mkRelatedSort th nm = mkSort th SortKindFromSignature nm FromSignature
+
+-- | Emit the min/max comparison facts for a relational sort declaration.
+relationalSortFacts :: Theory -> String -> Sort -> Sort -> Theory
+relationalSortFacts th rel newS parentS = case rel of
+  "subsort" ->
+    addFactToTh (addFactToTh th
+      (mkSortLimitFact (sortMin newS) "=" (sortMin parentS)))
+      (mkSortLimitFact (sortMax newS) "≤" (sortMax parentS))
+  "quotient" ->
+    addFactToTh (addFactToTh th
+      (mkSortLimitFact (sortMin parentS) "≤" (sortMin newS)))
+      (mkSortLimitFact (sortMax newS) "=" (sortMax parentS))
+  "subquotient" ->
+    addFactToTh (addFactToTh th
+      (mkSortLimitFact (sortMin parentS) "≤" (sortMin newS)))
+      (mkSortLimitFact (sortMax newS) "≤" (sortMax parentS))
+  _ -> th
 
 mkRelation :: Theory -> String -> [Sort] -> Origin -> Relation
 mkRelation th nm argSorts orig =
@@ -535,12 +661,13 @@ mkRelation th nm argSorts orig =
         , sortOrigin           = orig
         , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "#dom#min") domSort orig
         , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "#dom#max") domSort orig
-        , sortName             = ""
+        , sortName             = nm ++ "#dom"
         , sortComponentSorts   = argSorts
         , sortAssociatedEntity = Just (EntityRelation rel)
+        , sortReflectedFrom    = Nothing
         }
-      domArg = mkMereo th MereologicalEntityKindIndividual (nm ++ "#arg") domSort orig
-      assocSet = mkMereo th MereologicalEntityKindSet nm (head argSorts) orig
+      domArg   = mkMereo th MereologicalEntityKindIndividual (nm ++ "#arg") domSort orig
+      assocSet = mkMereo th MereologicalEntityKindSet        (nm ++ "#set") (head argSorts) orig
       rel = Relation
         { relOrigin        = orig
         , relKind          = MereologicalEntityKindSet
@@ -552,21 +679,205 @@ mkRelation th nm argSorts orig =
                                               (nm ++ "#" ++ show i) s orig) argSorts [1..]
         , relArgument      = domArg
         , relAssociatedSet = assocSet
+        , relReflectedFrom = Nothing
         }
   in rel
+
+-- ---------------------------------------------------------------------------
+-- Reflection: entity kind transformation
+-- ---------------------------------------------------------------------------
+
+-- | Transform an entity from a reflection subtheory as it is propagated to the parent.
+-- SOL functions → FOL functions; sorts → SortKindFromReflection;
+-- mereological sets → individuals.  Everything else is marked as reflected.
+reflectEntity :: Entity -> Entity
+reflectEntity (EntityFunction f) =
+  if funcKind f == FunctionKindSOLFunctionFromTheory
+    then EntityFunction (f { funcKind         = FunctionKindFOLFunctionFromTheory
+                           , funcReflectedFrom = Just (funcTheory f) })
+    else EntityFunction (f { funcReflectedFrom = Just (funcTheory f) })
+reflectEntity (EntitySort s) =
+  EntitySort (s { sortKind          = SortKindFromReflection
+                , sortReflectedFrom = Just (sortTheory s) })
+reflectEntity (EntityMereological m) =
+  let newKind = case mereoKind m of
+        MereologicalEntityKindSet -> MereologicalEntityKindIndividual
+        k                        -> k
+  in EntityMereological (m { mereoKind           = newKind
+                            , mereoReflectedFrom  = Just (mereoTheory m) })
+reflectEntity (EntityRelation r) =
+  EntityRelation (r { relReflectedFrom = Just (relTheory r) })
+reflectEntity e = e
+
+-- ---------------------------------------------------------------------------
+-- Subtheory propagation (Gap 7)
+-- ---------------------------------------------------------------------------
+
+-- | After a subtheory has been built, propagate its entities to the parent theory.
+--
+-- Rules (mirroring Go's addEntityToTheory):
+--   * implicit subtheory (name ""):  entity is added under its own name (no prefix)
+--   * named subtheory:               entity is added under "subName.entityName"
+--   * reflection subtheory:          entity is first transformed (reflectEntity),
+--                                    then added under "subName.entityName"
+--
+-- The propagated names are inserted into the parent's objectsByName map only
+-- (not into theoryObjects, which lists only locally-declared entities).
+propagateSubtheory :: Theory -> String -> Bool -> [Entity] -> Theory
+propagateSubtheory parentTh subName isReflection entities =
+  foldr addOne parentTh entities
+  where
+    addOne ent th =
+      let transformed = if isReflection then reflectEntity ent else ent
+          key = if null subName
+                then entityName transformed
+                else subName ++ "." ++ entityName transformed
+      in th { theoryObjectsByName =
+                Map.insertWith (++) key [transformed] (theoryObjectsByName th) }
 
 -- ---------------------------------------------------------------------------
 -- Mereological translations (pass 4)
 -- ---------------------------------------------------------------------------
 
+-- | Determine the operation prefix to use for mereological operations.
+-- If the theory has a reflection ancestor, operations are qualified with its name.
+mereoOpPrefix :: Theory -> String
+mereoOpPrefix th = case theoryClosestReflectionAncestor th of
+  Just anc -> theoryFullyQualifiedName anc ++ "."
+  Nothing  -> ""
+
 -- | Produce the mereological translation of a fact (assertions and facts only).
+-- Mirrors translateAxiom / translateIdentity in translate.go.
 mereologicalTranslation :: Theory -> Fact -> [Fact]
-mereologicalTranslation _th fact = case factKind fact of
+mereologicalTranslation th fact = case factKind fact of
   FactKindAssertion ->
-    [ fact { factIsMereologicalTranslation = True } ]
+    [ fact { factIsMereologicalTranslation = True
+           , factPropExpr = translatePropExpr th (factPropExpr fact) } ]
   FactKindFact ->
+    -- Go's translateIdentity is currently a no-op (returns assertion unchanged)
     [ fact { factIsMereologicalTranslation = True } ]
   _ -> []
+
+-- | Translate a resolved proposition into its mereological equivalent.
+-- Logical connectives become mereological operations:
+--   ↔  →  ∸   (symmetric difference)
+--   →  →  ⇒   (reverse difference)
+--   ←  →  -   (difference)
+--   ∨  →  ×   (product)
+--   ∧  →  +   (sum)
+--   ¬  →  ⊥ - x
+--   =, ∈, ⊆, ≤  →  ∸ / -
+translatePropExpr :: Theory -> ResolvedPropExpr -> ResolvedPropExpr
+translatePropExpr th (ResolvedPropBicond left rests) =
+  -- ↔ becomes a chain of ∸ (sym diff) at the term level
+  -- We embed the whole thing as a single term via the first operand;
+  -- additional rests become ∸-separated terms.
+  -- Since ResolvedPropExpr must stay in its grammar, we preserve structure
+  -- but swap the operators.
+  let left'  = translateRightImpl th left
+      rests' = map (\(ResolvedPropRest _op r) ->
+                      ResolvedPropRest (mereoOpPrefix th ++ "∸") (translateRightImpl th r))
+                   rests
+  in ResolvedPropBicond left' rests'
+
+translateRightImpl :: Theory -> ResolvedRightImpl -> ResolvedRightImpl
+translateRightImpl th (ResolvedRightImpl left mbRight) =
+  let left' = translateLeftImpl th left
+      mbRight' = fmap (\(_op, r) -> (mereoOpPrefix th ++ "⇒", translateRightImpl th r)) mbRight
+  in ResolvedRightImpl left' mbRight'
+
+translateLeftImpl :: Theory -> ResolvedLeftImpl -> ResolvedLeftImpl
+translateLeftImpl th (ResolvedLeftImpl left rests) =
+  let left'  = translateDisj th left
+      rests' = map (\(ResolvedLeftImplRest _op d) ->
+                      ResolvedLeftImplRest (mereoOpPrefix th ++ "-") (translateDisj th d))
+                   rests
+  in ResolvedLeftImpl left' rests'
+
+translateDisj :: Theory -> ResolvedDisj -> ResolvedDisj
+translateDisj th (ResolvedDisj left rests) =
+  let left'  = translateConj th left
+      rests' = map (\(ResolvedDisjRest _op c) ->
+                      ResolvedDisjRest (mereoOpPrefix th ++ "×") (translateConj th c))
+                   rests
+  in ResolvedDisj left' rests'
+
+translateConj :: Theory -> ResolvedConj -> ResolvedConj
+translateConj th (ResolvedConj left rests) =
+  let left'  = translateNeg th left
+      rests' = map (\(ResolvedConjRest _op n) ->
+                      ResolvedConjRest (mereoOpPrefix th ++ "+") (translateNeg th n))
+                   rests
+  in ResolvedConj left' rests'
+
+translateNeg :: Theory -> ResolvedNeg -> ResolvedNeg
+translateNeg th (ResolvedNegNot inner) =
+  -- ¬x  →  ⊥ - x  (we keep as NegNot since the outer layer handles the op;
+  -- a future pass can lower this to a term)
+  ResolvedNegNot (translateNeg th inner)
+translateNeg th (ResolvedNegChild q) =
+  ResolvedNegChild (translateQuantified th q)
+
+translateQuantified :: Theory -> ResolvedQuantified -> ResolvedQuantified
+translateQuantified th (ResolvedQuantified qs atomic) =
+  ResolvedQuantified qs (translateAtomicProp th atomic)
+
+translateAtomicProp :: Theory -> ResolvedAtomicProp -> ResolvedAtomicProp
+translateAtomicProp th (ResolvedAtomicTermPair tp) =
+  ResolvedAtomicTermPair (translateTermPair th tp)
+translateAtomicProp _th other = other
+
+-- | Translate "=", "∈", "⊆", "≤" to mereological ops, mirroring translateTermPair in Go.
+translateTermPair :: Theory -> ResolvedTermPair -> ResolvedTermPair
+translateTermPair th (ResolvedTermPair left rights ty) =
+  let left'   = translateTerm th left
+      rights' = map (translateRFT th) rights
+  in ResolvedTermPair left' rights' ty
+
+translateRFT :: Theory -> ResolvedRelationFollowedByTerm -> ResolvedRelationFollowedByTerm
+translateRFT th (ResolvedRelationFollowedByTerm path op mbSort right) =
+  let newOp = case op of
+        "="  -> mereoOpPrefix th ++ "∸"
+        "∈"  -> mereoOpPrefix th ++ "-"
+        "⊆"  -> mereoOpPrefix th ++ "-"
+        "≤"  -> mereoOpPrefix th ++ "-"
+        _    -> op     -- pass through any other operator unchanged
+  in ResolvedRelationFollowedByTerm path newOp mbSort (translateTerm th right)
+
+translateTerm :: Theory -> ResolvedTerm -> ResolvedTerm
+translateTerm th (ResolvedTerm left rights ty) =
+  let left'   = translateFactor th left
+      rights' = map (\(ResolvedOperationFollowedByFactor p op f) ->
+                       ResolvedOperationFollowedByFactor p op (translateFactor th f))
+                    rights
+  in ResolvedTerm left' rights' ty
+
+translateFactor :: Theory -> ResolvedFactor -> ResolvedFactor
+translateFactor th (ResolvedFactor base suffixes ty) =
+  ResolvedFactor (translateBaseTerm th base) suffixes ty
+
+translateBaseTerm :: Theory -> ResolvedBaseTerm -> ResolvedBaseTerm
+translateBaseTerm th bt = case bt of
+  ResolvedBTParen inner ->
+    ResolvedBTParen (translatePropExpr th inner)
+  ResolvedBTSingleton t ->
+    ResolvedBTSingleton (translateTerm th t)
+  ResolvedBTEvaluationInTheory (ResolvedEvaluationInTheory path subTh inner) ->
+    ResolvedBTEvaluationInTheory
+      (ResolvedEvaluationInTheory path subTh (translatePropExpr subTh inner))
+  ResolvedBTProjectionToSort (ResolvedProjectionToSort s operand) ->
+    -- Projection to sort [S](t) becomes [S#min, S#max](t) at a lower level;
+    -- for now keep structure but translate the operand.
+    ResolvedBTProjectionToSort (ResolvedProjectionToSort s (translateTerm th operand))
+  ResolvedBTProjectionToInterval (ResolvedProjectionToInterval lo hi operand) ->
+    ResolvedBTProjectionToInterval
+      (ResolvedProjectionToInterval (translateTerm th lo)
+                                    (translateTerm th hi)
+                                    (translateTerm th operand))
+  ResolvedBTGeneralizedSumOrProduct (ResolvedGeneralizedSumOrProduct sym var operand) ->
+    ResolvedBTGeneralizedSumOrProduct
+      (ResolvedGeneralizedSumOrProduct sym var (translateTerm th operand))
+  ResolvedBTAtomic _ -> bt   -- atomic constants are left unchanged
 
 -- ---------------------------------------------------------------------------
 -- Lookup helpers

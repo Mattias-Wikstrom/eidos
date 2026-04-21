@@ -151,4 +151,4 @@ instance MonadExternalRefResolver (Reader FnResolver) where
 -- Helper fold
 foldM :: (Monad m) => (b -> a -> m b) -> b -> [a] -> m b
 foldM _ z [] = return z
-foldM f z (x:xs) = f z x >>= \z' -> foldM f z' xs
+foldM f z (x:xs) = f z x >>= \z' -> Eidos.BuildMonad.foldM f z' xs

@@ -105,6 +105,7 @@ data Sort = Sort
   , sortName             :: String
   , sortComponentSorts   :: [Sort]
   , sortAssociatedEntity :: Maybe Entity
+  , sortReflectedFrom    :: Maybe Theory   -- ^ Just originalTheory when this is a reflected copy
   }
 
 instance Show Sort where
@@ -127,6 +128,7 @@ data Function = Function
   , funcArgument     :: Maybe MereologicalObject
   , funcDirectImage  :: Maybe Function
   , funcInverseImage :: Maybe Function
+  , funcReflectedFrom :: Maybe Theory   -- ^ Just originalTheory when this is a reflected copy
   }
 
 instance Show Function where
@@ -143,6 +145,7 @@ data MereologicalObject = MereologicalObject
   , mereoName         :: String
   , mereoSort         :: Sort
   , mereoLimitForSort :: Maybe Sort
+  , mereoReflectedFrom :: Maybe Theory   -- ^ Just originalTheory when this is a reflected copy
   }
 
 instance Show MereologicalObject where
@@ -162,6 +165,7 @@ data Relation = Relation
   , relArgObjects    :: [MereologicalObject]
   , relArgument      :: MereologicalObject
   , relAssociatedSet :: MereologicalObject
+  , relReflectedFrom :: Maybe Theory   -- ^ Just originalTheory when this is a reflected copy
   }
 
 instance Show Relation where
