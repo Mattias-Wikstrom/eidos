@@ -22,7 +22,8 @@ import           Data.Void              (Void)
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import Data.List (sort, group, intercalate)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, isNothing)
+import Control.Monad (when)
 
 import           Eidos.AST
 import           Eidos.Lexer
@@ -262,6 +263,8 @@ pSubtheoryItem :: Parser SubtheoryItem
 pSubtheoryItem = do
   qual <- optional (void lbrack *> pGroupKeyword <* void rbrack)
   name <- optional (try (ident <* colon))
+  when (isNothing name) $
+    fail "All subtheories must have a name"
   def  <- pSubtheoryDef
   return $ SubtheoryItem qual name def
 

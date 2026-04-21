@@ -86,7 +86,7 @@ main = hspec $ do
 
     describe "Subtheories" $ do
       it "parses implicit subtheory block" $
-        parseString "{ subtheories { implicit { { signature { sort Q; } } } } }" `shouldSatisfy` isRight
+        parseString "{ subtheories { implicit { sub: { signature { sort Q; } } } } }" `shouldSatisfy` isRight
       
       it "parses named subtheory block" $
         parseString "{ subtheories { named { sub: @dir.ext } } }" `shouldSatisfy` isRight
@@ -95,20 +95,24 @@ main = hspec $ do
         parseString "{ subtheories { reflection { sub2: { signature { sort Z; } } } } }" `shouldSatisfy` isRight
       
       it "parses multiple subtheories in implicit block" $
-        parseString "{ subtheories { implicit { { signature { sort Q; } } { signature { sort R; } } } } }" `shouldSatisfy` isRight
+        parseString "{ subtheories { implicit { sub1: { signature { sort Q; } } sub2: { signature { sort R; } } } } }" `shouldSatisfy` isRight
       
       it "parses multiple subtheories in named block" $
         parseString "{ subtheories { named { sub1: [[ext1]] sub2: [[ext2]] } } }" `shouldSatisfy` isRight
       
       it "parses mixed subtheory blocks" $
-        parseString "{ subtheories { implicit { { signature { sort Q; } } } named { sub: [[ext]] } reflection { sub2: { signature { sort Z; } } } } }" `shouldSatisfy` isRight
+        parseString "{ subtheories { implicit { sub1: { signature { sort Q; } } } named { sub2: [[ext]] } reflection { sub3: { signature { sort Z; } } } } }" `shouldSatisfy` isRight
       
       it "parses subtheory with inline body" $
-        parseString "{ subtheories { implicit { { signature { sort Q; } } } } }" `shouldSatisfy` isRight
+        parseString "{ subtheories { implicit { sub: { signature { sort Q; } } } } }" `shouldSatisfy` isRight
       
       it "parses subtheory with external reference" $
         parseString "{ subtheories { named { sub: [[external]] } } }" `shouldSatisfy` isRight
       
+      it "rejects implicit subtheory without a name" $
+        parseString "{ subtheories { implicit { { signature { sort Q; } } } } }"
+          `shouldSatisfy` isLeft
+          
       it "parses complete example from documentation" $
         parseString [r|{
             signature {
@@ -146,7 +150,7 @@ main = hspec $ do
             },
             subtheories {
                 implicit {
-                    {
+                    sub3: {
                         signature {
                             sort Q;
                         }
@@ -283,7 +287,7 @@ main = hspec $ do
           `shouldSatisfy` isLeft
 
       it "accepts mixed distinct sections" $
-        parseString "{ subtheories { implicit { { } } named { sub1: {} } reflection { sub2: {} } } }"
+        parseString "{ subtheories { implicit { sub: { } } named { sub1: {} } reflection { sub2: {} } } }"
           `shouldSatisfy` isRight
                 
       it "rejects repeated subtheory names for subtheories of the same kind" $

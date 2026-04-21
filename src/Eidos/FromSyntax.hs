@@ -132,7 +132,9 @@ processItem kw (th, subs) item = do
   let subName = case kw of
         "implicit" -> fromMaybe "" (itemName item)   -- Keep the name if provided
         _ -> fromMaybe "" (itemName item)
-  
+
+  when (subName == "") $
+    throwError "All subtheories must have names."
   when (kw == "implicit" && subName /= "") $
     return ()   -- implicit subtheories CAN have names (for disambiguation)
   when (kw /= "implicit" && subName == "") $
@@ -727,17 +729,18 @@ propagateSubtheory parentTh subName isImplicit isReflection entities =
   where
     addOne ent th =
       let transformed = if isReflection then reflectEntity ent else ent
-          th1 = if isImplicit && not (null subName)
-                then -- Add unqualified name for implicit subtheories with names
+          qualifiedName = subName ++ "." ++ entityName transformed
+          th1 = if isImplicit
+                then -- Add both unqualified and qualified
+                     let thA = th { theoryObjectsByName =
+                                     Map.insertWith (++) (entityName transformed) [transformed] (theoryObjectsByName th) }
+                     in thA { theoryObjectsByName =
+                               Map.insertWith (++) qualifiedName [transformed] (theoryObjectsByName thA) }
+                else -- Add only qualified
                      th { theoryObjectsByName =
-                           Map.insertWith (++) (entityName transformed) [transformed] (theoryObjectsByName th) }
-                else th
-          key = if null subName
-                then entityName transformed
-                else subName ++ "." ++ entityName transformed
-      in th1 { theoryObjectsByName =
-                Map.insertWith (++) key [transformed] (theoryObjectsByName th1) }
-
+                           Map.insertWith (++) qualifiedName [transformed] (theoryObjectsByName th) }
+      in th1
+      
 -- ---------------------------------------------------------------------------
 -- Mereological translations (pass 4)
 -- ---------------------------------------------------------------------------

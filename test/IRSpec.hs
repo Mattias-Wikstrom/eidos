@@ -209,7 +209,7 @@ main = hspec $ do
 
     it "propagates implicit subtheory sort without prefix" $ do
       th <- buildStr [r|{
-        subtheories { implicit { { signature { sort Q; } } } }
+        subtheories { implicit { sub: { signature { sort Q; } } } }
       }|]
       lookupInParentByName th "Q" `shouldSatisfy` isJust
 
