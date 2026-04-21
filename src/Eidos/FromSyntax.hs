@@ -130,11 +130,11 @@ processItem kw (th, subs) item = do
   baseContext <- ask
   
   let subName = case kw of
-        "implicit" -> ""
+        "implicit" -> fromMaybe "" (itemName item)   -- Keep the name if provided
         _ -> fromMaybe "" (itemName item)
   
   when (kw == "implicit" && subName /= "") $
-    throwError "Implicit subtheories cannot have names."
+    return ()   -- implicit subtheories CAN have names (for disambiguation)
   when (kw /= "implicit" && subName == "") $
     throwError "Non-implicit subtheories must have names."
   
@@ -154,8 +154,9 @@ processItem kw (th, subs) item = do
   sub <- local (const subContext) $ 
     decorateTheoryBody subBody (Just th) finalName isRefl
   -- Propagate sub's entities to the parent theory
+  let isImplicit = kw == "implicit"
   let th' = addSubtheoryToTheory th sub
-      th'' = propagateSubtheory th' finalName isRefl (theoryObjects sub)
+      th'' = propagateSubtheory th' finalName isImplicit isRefl (theoryObjects sub)
   return (th'', subs ++ [sub])
 
 -- | Resolve a subtheory definition using the resolver from the monad
@@ -700,11 +701,8 @@ reflectEntity (EntitySort s) =
   EntitySort (s { sortKind          = SortKindFromReflection
                 , sortReflectedFrom = Just (sortTheory s) })
 reflectEntity (EntityMereological m) =
-  let newKind = case mereoKind m of
-        MereologicalEntityKindSet -> MereologicalEntityKindIndividual
-        k                        -> k
-  in EntityMereological (m { mereoKind           = newKind
-                            , mereoReflectedFrom  = Just (mereoTheory m) })
+  EntityMereological (m { mereoKind           = MereologicalEntityKindIndividual
+                        , mereoReflectedFrom  = Just (mereoTheory m) })
 reflectEntity (EntityRelation r) =
   EntityRelation (r { relReflectedFrom = Just (relTheory r) })
 reflectEntity e = e
@@ -723,17 +721,22 @@ reflectEntity e = e
 --
 -- The propagated names are inserted into the parent's objectsByName map only
 -- (not into theoryObjects, which lists only locally-declared entities).
-propagateSubtheory :: Theory -> String -> Bool -> [Entity] -> Theory
-propagateSubtheory parentTh subName isReflection entities =
+propagateSubtheory :: Theory -> String -> Bool -> Bool -> [Entity] -> Theory
+propagateSubtheory parentTh subName isImplicit isReflection entities =
   foldr addOne parentTh entities
   where
     addOne ent th =
       let transformed = if isReflection then reflectEntity ent else ent
+          th1 = if isImplicit && not (null subName)
+                then -- Add unqualified name for implicit subtheories with names
+                     th { theoryObjectsByName =
+                           Map.insertWith (++) (entityName transformed) [transformed] (theoryObjectsByName th) }
+                else th
           key = if null subName
                 then entityName transformed
                 else subName ++ "." ++ entityName transformed
-      in th { theoryObjectsByName =
-                Map.insertWith (++) key [transformed] (theoryObjectsByName th) }
+      in th1 { theoryObjectsByName =
+                Map.insertWith (++) key [transformed] (theoryObjectsByName th1) }
 
 -- ---------------------------------------------------------------------------
 -- Mereological translations (pass 4)

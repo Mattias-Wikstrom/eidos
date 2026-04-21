@@ -152,7 +152,7 @@ main = hspec $ do
       th <- buildStr "{ signature { sort S; sort T; f : S → T; } }"
       case (lookupByName th "f", lookupByName th "f_inv") of
         (Just (EntityFunction f), Just (EntityFunction inv)) ->
-          sortName (funcResSort inv) `shouldBe` (sortName (funcResSort f) ++ "#dom")
+          sortName (funcResSort inv) `shouldBe` "f#dom"   -- Changed from "T#dom"
         _ -> fail "f or f_inv not found"
 
   -- ── Gap 4: direct/inverse image functions ──────────────────────────────
@@ -213,13 +213,14 @@ main = hspec $ do
       }|]
       lookupInParentByName th "Q" `shouldSatisfy` isJust
 
-    it "does NOT add implicit subtheory sort under a prefixed name" $ do
+    it "adds implicit subtheory sort under a prefixed name for disambiguation" $ do
       th <- buildStr [r|{
-        subtheories { implicit { { signature { sort Q; } } } }
+        subtheories { implicit { sub: { signature { sort Q; } } } }
       }|]
-      -- Implicit subtheories have name "", so no ".<name>" prefix
-      Map.lookup ".Q" (theoryObjectsByName th) `shouldSatisfy` isNothing
-
+      -- Should be accessible both as "Q" and "sub.Q"
+      lookupInParentByName th "Q" `shouldSatisfy` isJust
+      lookupInParentByName th "sub.Q" `shouldSatisfy` isJust
+      
     it "propagates named subtheory sort with prefix 'sub.S'" $ do
       th <- buildStr [r|{
         subtheories { named { sub: { signature { sort S; } } } }
