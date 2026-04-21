@@ -69,9 +69,6 @@ ioResolver :: (FilePath -> IO Bool) -> FilePath -> Maybe String -> String -> IO 
 ioResolver fileExists rootDir _baseContext ref = do
   let components = splitReference ref
       allCandidates = generateCandidates rootDir components
-  putStrLn $ "DEBUG: Looking for ref: " ++ ref
-  putStrLn $ "DEBUG: rootDir: " ++ rootDir
-  putStrLn $ "DEBUG: candidates:"
   mapM_ (\(tt, path) -> putStrLn $ "  " ++ show tt ++ ": " ++ path) allCandidates
   -- Check existence for all candidates, deduplicate by path (keeping the first theory type)
   existing <- forM allCandidates $ \(tt, path) -> do

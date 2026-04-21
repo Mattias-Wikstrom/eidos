@@ -127,6 +127,7 @@ isEmptyAxiomsSection :: AxiomsSection -> Bool
 isEmptyAxiomsSection (AxAssertions (AssertionsSection [])) = True
 isEmptyAxiomsSection (AxFacts (FactsSection [])) = True
 isEmptyAxiomsSection (AxMetafacts (MetafactsSection [])) = True
+isEmptyAxiomsSection _ = False  -- Catch any other case
 
 -- Create a simple placeholder proposition expression
 factToPropExpr :: Fact -> PropExpr
@@ -166,7 +167,7 @@ isEmptySection (SectionSubtheories (SubtheoriesSection [])) = True
 isEmptySection (SectionBareAxioms (AxAssertions (AssertionsSection []))) = True
 isEmptySection (SectionBareAxioms (AxFacts (FactsSection []))) = True
 isEmptySection (SectionBareAxioms (AxMetafacts (MetafactsSection []))) = True
-isEmptySection _ = False
+isEmptySection _ = False  -- Catch any other case
 
 -- ---------------------------------------------------------------------------
 -- Section pretty-printing
@@ -434,3 +435,208 @@ prettyFact f =
      FactKindMetafactsFact -> "metafact: "
      FactKindSortLimitation -> "sort limit: ") ++
   "<resolved expression>"
+
+  -- Add to Pretty.hs
+
+-- | Pretty-print a resolved proposition expression
+prettyResolvedPropExpr :: ResolvedPropExpr -> Doc
+prettyResolvedPropExpr (ResolvedPropBicond left rests) =
+  prettyResolvedRightImpl left ++
+  concatMap (\(ResolvedPropRest op right) -> " " ++ op ++ " " ++ prettyResolvedRightImpl right) rests
+
+prettyResolvedRightImpl :: ResolvedRightImpl -> Doc
+prettyResolvedRightImpl (ResolvedRightImpl left mbRight) =
+  prettyResolvedLeftImpl left ++
+  case mbRight of
+    Nothing -> ""
+    Just (op, right) -> " " ++ op ++ " " ++ prettyResolvedRightImpl right
+
+prettyResolvedLeftImpl :: ResolvedLeftImpl -> Doc
+prettyResolvedLeftImpl (ResolvedLeftImpl left rests) =
+  prettyResolvedDisj left ++
+  concatMap (\(ResolvedLeftImplRest op d) -> " " ++ op ++ " " ++ prettyResolvedDisj d) rests
+
+prettyResolvedDisj :: ResolvedDisj -> Doc
+prettyResolvedDisj (ResolvedDisj left rests) =
+  prettyResolvedConj left ++
+  concatMap (\(ResolvedDisjRest op c) -> " " ++ op ++ " " ++ prettyResolvedConj c) rests
+
+prettyResolvedConj :: ResolvedConj -> Doc
+prettyResolvedConj (ResolvedConj left rests) =
+  prettyResolvedNeg left ++
+  concatMap (\(ResolvedConjRest op n) -> " " ++ op ++ " " ++ prettyResolvedNeg n) rests
+
+prettyResolvedNeg :: ResolvedNeg -> Doc
+prettyResolvedNeg (ResolvedNegNot inner) = "¬ " ++ prettyResolvedNeg inner
+prettyResolvedNeg (ResolvedNegChild q) = prettyResolvedQuantified q
+
+prettyResolvedQuantified :: ResolvedQuantified -> Doc
+prettyResolvedQuantified (ResolvedQuantified qs atomic) =
+  concatMap prettyResolvedQuantifier qs ++ " " ++ prettyResolvedAtomicProp atomic
+
+prettyResolvedQuantifier :: ResolvedQuantifier -> Doc
+prettyResolvedQuantifier (ResolvedQForall vd) = "∀" ++ prettyResolvedVarDecl vd
+prettyResolvedQuantifier (ResolvedQExists vd) = "∃" ++ prettyResolvedVarDecl vd
+
+prettyResolvedVarDecl :: ResolvedVarDecl -> Doc
+prettyResolvedVarDecl vd =
+  "[" ++ resolvedVarName vd ++
+  (if resolvedVarIsSet vd then " ⊆ " else " : ") ++
+  sortName (resolvedVarSort vd) ++ "]"
+
+prettyResolvedAtomicProp :: ResolvedAtomicProp -> Doc
+prettyResolvedAtomicProp (ResolvedAtomicConstant ref) = prettyResolvedConstantRef ref
+prettyResolvedAtomicProp (ResolvedAtomicTermPair tp) = prettyResolvedTermPair tp
+
+prettyResolvedConstantRef :: ResolvedConstantRef -> Doc
+prettyResolvedConstantRef ref = resolvedConstRefName ref
+
+prettyResolvedTermPair :: ResolvedTermPair -> Doc
+prettyResolvedTermPair (ResolvedTermPair left rights _) =
+  prettyResolvedTerm left ++
+  concatMap (\(ResolvedRelationFollowedByTerm _ op _ right) -> " " ++ op ++ " " ++ prettyResolvedTerm right) rights
+
+prettyResolvedTerm :: ResolvedTerm -> Doc
+prettyResolvedTerm (ResolvedTerm left rights _) =
+  prettyResolvedFactor left ++
+  concatMap (\(ResolvedOperationFollowedByFactor _ op right) -> " " ++ op ++ " " ++ prettyResolvedFactor right) rights
+
+prettyResolvedFactor :: ResolvedFactor -> Doc
+prettyResolvedFactor (ResolvedFactor base suffixes _) =
+  prettyResolvedBaseTerm base ++ concatMap prettyResolvedSuffix suffixes
+
+prettyResolvedBaseTerm :: ResolvedBaseTerm -> Doc
+prettyResolvedBaseTerm bt = case bt of
+  ResolvedBTAtomic ref -> prettyResolvedConstantRef ref
+  ResolvedBTParen inner -> "(" ++ prettyResolvedPropExpr inner ++ ")"
+  ResolvedBTSingleton t -> "{" ++ prettyResolvedTerm t ++ "}"
+  ResolvedBTEvaluationInTheory (ResolvedEvaluationInTheory path _ inner) ->
+    "<<" ++ intercalate "." path ++ ">>(" ++ prettyResolvedPropExpr inner ++ ")"
+  ResolvedBTProjectionToSort (ResolvedProjectionToSort s operand) ->
+    "<" ++ sortName s ++ ">(" ++ prettyResolvedTerm operand ++ ")"
+  ResolvedBTProjectionToInterval (ResolvedProjectionToInterval lo hi operand) ->
+    "<" ++ prettyResolvedTerm lo ++ ", " ++ prettyResolvedTerm hi ++ ">(" ++ prettyResolvedTerm operand ++ ")"
+  ResolvedBTGeneralizedSumOrProduct (ResolvedGeneralizedSumOrProduct sym var operand) ->
+    sym ++ (case var of Left vd -> prettyResolvedVarDecl vd; Right vid -> vid) ++
+    "(" ++ prettyResolvedTerm operand ++ ")"
+
+prettyResolvedSuffix :: ResolvedTermSuffix -> Doc
+prettyResolvedSuffix (ResolvedSuffixDotAttr attr) = "." ++ attr
+prettyResolvedSuffix (ResolvedSuffixCall args) = "(" ++ intercalate ", " (map prettyResolvedTerm args) ++ ")"
+prettyResolvedSuffix (ResolvedSuffixSpecialOp op) = "#" ++ op
+
+-- ---------------------------------------------------------------------------
+-- IR Pretty-printing (Resolved expressions)
+-- ---------------------------------------------------------------------------
+
+-- | Pretty-print a resolved proposition expression with options
+prettyResolvedPropExprWithOpts :: PrettyOptions -> ResolvedPropExpr -> Doc
+prettyResolvedPropExprWithOpts opts (ResolvedPropBicond left rests) =
+  prettyResolvedRightImplWithOpts opts left ++
+  concatMap (\(ResolvedPropRest op right) -> " " ++ op ++ " " ++ prettyResolvedRightImplWithOpts opts right) rests
+
+prettyResolvedRightImplWithOpts :: PrettyOptions -> ResolvedRightImpl -> Doc
+prettyResolvedRightImplWithOpts opts (ResolvedRightImpl left mbRight) =
+  prettyResolvedLeftImplWithOpts opts left ++
+  case mbRight of
+    Nothing -> ""
+    Just (op, right) -> " " ++ op ++ " " ++ prettyResolvedRightImplWithOpts opts right
+
+prettyResolvedLeftImplWithOpts :: PrettyOptions -> ResolvedLeftImpl -> Doc
+prettyResolvedLeftImplWithOpts opts (ResolvedLeftImpl left rests) =
+  prettyResolvedDisjWithOpts opts left ++
+  concatMap (\(ResolvedLeftImplRest op d) -> " " ++ op ++ " " ++ prettyResolvedDisjWithOpts opts d) rests
+
+prettyResolvedDisjWithOpts :: PrettyOptions -> ResolvedDisj -> Doc
+prettyResolvedDisjWithOpts opts (ResolvedDisj left rests) =
+  prettyResolvedConjWithOpts opts left ++
+  concatMap (\(ResolvedDisjRest op c) -> " " ++ op ++ " " ++ prettyResolvedConjWithOpts opts c) rests
+
+prettyResolvedConjWithOpts :: PrettyOptions -> ResolvedConj -> Doc
+prettyResolvedConjWithOpts opts (ResolvedConj left rests) =
+  prettyResolvedNegWithOpts opts left ++
+  concatMap (\(ResolvedConjRest op n) -> " " ++ op ++ " " ++ prettyResolvedNegWithOpts opts n) rests
+
+prettyResolvedNegWithOpts :: PrettyOptions -> ResolvedNeg -> Doc
+prettyResolvedNegWithOpts opts (ResolvedNegNot inner) = "¬ " ++ prettyResolvedNegWithOpts opts inner
+prettyResolvedNegWithOpts opts (ResolvedNegChild q) = prettyResolvedQuantifiedWithOpts opts q
+
+prettyResolvedQuantifiedWithOpts :: PrettyOptions -> ResolvedQuantified -> Doc
+prettyResolvedQuantifiedWithOpts opts (ResolvedQuantified qs atomic) =
+  concatMap prettyResolvedQuantifierWithOpts qs ++ " " ++ prettyResolvedAtomicPropWithOpts opts atomic
+
+prettyResolvedQuantifierWithOpts :: PrettyOptions -> ResolvedQuantifier -> Doc
+prettyResolvedQuantifierWithOpts opts (ResolvedQForall vd) = "∀" ++ prettyResolvedVarDeclWithOpts opts vd
+prettyResolvedQuantifierWithOpts opts (ResolvedQExists vd) = "∃" ++ prettyResolvedVarDeclWithOpts opts vd
+
+prettyResolvedVarDeclWithOpts :: PrettyOptions -> ResolvedVarDecl -> Doc
+prettyResolvedVarDeclWithOpts opts vd =
+  let name = resolvedVarName vd
+      sortName = sortName (resolvedVarSort vd)
+      typeInfo = if poShowTypes opts then " : " ++ show (resolvedVarSort vd) else ""
+  in "[" ++ name ++ (if resolvedVarIsSet vd then " ⊆ " else " : ") ++ sortName ++ typeInfo ++ "]"
+
+prettyResolvedAtomicPropWithOpts :: PrettyOptions -> ResolvedAtomicProp -> Doc
+prettyResolvedAtomicPropWithOpts opts (ResolvedAtomicConstant ref) = 
+  prettyResolvedConstantRefWithOpts opts ref
+prettyResolvedAtomicPropWithOpts opts (ResolvedAtomicTermPair tp) = 
+  prettyResolvedTermPairWithOpts opts tp
+
+prettyResolvedConstantRefWithOpts :: PrettyOptions -> ResolvedConstantRef -> Doc
+prettyResolvedConstantRefWithOpts opts ref =
+  let name = resolvedConstRefName ref
+      fullName = if poShowFQN opts
+                 then case resolvedConstEntity ref of
+                        EntitySort s -> sortName s
+                        EntityFunction f -> funcName f
+                        EntityMereological m -> mereoName m
+                        EntityRelation r -> relName r
+                        EntityTheory t -> theoryName t
+                 else name
+      typeInfo = if poShowTypes opts
+                 then " : " ++ show (resolvedConstType ref)
+                 else ""
+  in fullName ++ typeInfo
+
+prettyResolvedTermPairWithOpts :: PrettyOptions -> ResolvedTermPair -> Doc
+prettyResolvedTermPairWithOpts opts (ResolvedTermPair left rights _) =
+  prettyResolvedTermWithOpts opts left ++
+  concatMap (\(ResolvedRelationFollowedByTerm _ op mbSort right) ->
+               " " ++ op ++ 
+               (case mbSort of Nothing -> ""; Just (ResolvedOptionalSortExpr ind s) -> ind ++ sortName s) ++
+               " " ++ prettyResolvedTermWithOpts opts right) rights
+
+prettyResolvedTermWithOpts :: PrettyOptions -> ResolvedTerm -> Doc
+prettyResolvedTermWithOpts opts (ResolvedTerm left rights _) =
+  prettyResolvedFactorWithOpts opts left ++
+  concatMap (\(ResolvedOperationFollowedByFactor _ op right) -> " " ++ op ++ " " ++ prettyResolvedFactorWithOpts opts right) rights
+
+prettyResolvedFactorWithOpts :: PrettyOptions -> ResolvedFactor -> Doc
+prettyResolvedFactorWithOpts opts (ResolvedFactor base suffixes _) =
+  prettyResolvedBaseTermWithOpts opts base ++ concatMap (prettyResolvedSuffixWithOpts opts) suffixes
+
+prettyResolvedBaseTermWithOpts :: PrettyOptions -> ResolvedBaseTerm -> Doc
+prettyResolvedBaseTermWithOpts opts bt = case bt of
+  ResolvedBTAtomic ref -> prettyResolvedConstantRefWithOpts opts ref
+  ResolvedBTParen inner -> "(" ++ prettyResolvedPropExprWithOpts opts inner ++ ")"
+  ResolvedBTSingleton t -> "{" ++ prettyResolvedTermWithOpts opts t ++ "}"
+  ResolvedBTEvaluationInTheory (ResolvedEvaluationInTheory path _ inner) ->
+    "<<" ++ intercalate "." path ++ ">>(" ++ prettyResolvedPropExprWithOpts opts inner ++ ")"
+  ResolvedBTProjectionToSort (ResolvedProjectionToSort s operand) ->
+    "<" ++ sortName s ++ ">(" ++ prettyResolvedTermWithOpts opts operand ++ ")"
+  ResolvedBTProjectionToInterval (ResolvedProjectionToInterval lo hi operand) ->
+    "<" ++ prettyResolvedTermWithOpts opts lo ++ ", " ++ prettyResolvedTermWithOpts opts hi ++ ">(" ++
+    prettyResolvedTermWithOpts opts operand ++ ")"
+  ResolvedBTGeneralizedSumOrProduct (ResolvedGeneralizedSumOrProduct sym var operand) ->
+    sym ++ (case var of Left vd -> prettyResolvedVarDeclWithOpts opts vd; Right vid -> vid) ++
+    "(" ++ prettyResolvedTermWithOpts opts operand ++ ")"
+
+prettyResolvedSuffixWithOpts :: PrettyOptions -> ResolvedTermSuffix -> Doc
+prettyResolvedSuffixWithOpts opts (ResolvedSuffixDotAttr attr) = "." ++ attr
+prettyResolvedSuffixWithOpts opts (ResolvedSuffixCall args) = 
+  "(" ++ intercalate ", " (map (prettyResolvedTermWithOpts opts) args) ++ ")"
+prettyResolvedSuffixWithOpts opts (ResolvedSuffixSpecialOp op) = "#" ++ op
+
+-- | Pretty-print a resolved proposition expression (with default options)
+prettyResolvedPropExpr :: ResolvedPropExpr -> Doc
+prettyResolvedPropExpr = prettyResolvedPropExprWithOpts defaultPrettyOptions

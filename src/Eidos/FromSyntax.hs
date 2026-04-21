@@ -725,27 +725,26 @@ reflectEntity e = e
 --
 -- The propagated names are inserted into the parent's objectsByName map only
 -- (not into theoryObjects, which lists only locally-declared entities).
-propagateSubtheory :: Theory -> String -> Bool -> Bool -> Theory -> Theory
 propagateSubtheory parentTh subName isImplicit isReflection subTh =
   let addAll th (name, entities) =
         let transformed = if isReflection then map reflectEntity entities else entities
             -- Always add qualified name
             qualifiedName = if null subName then name else subName ++ "." ++ name
             th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
-            -- For implicit subtheories, also add unqualified name and equality facts for built-ins
+            -- For implicit subtheories, handle unqualified name
             th2 = if isImplicit
-                  then let thWithUnqual = foldl (\t e -> addEntityToParent t name e) th1 transformed
-                       in if name `elem` builtInNames
-                          then case ( Map.lookup name (theoryObjectsByName parentTh)
-                                    , Map.lookup qualifiedName (theoryObjectsByName thWithUnqual) ) of
-                                 (Just (parentEntity:_), Just (subEntity:_)) ->
-                                   addEqualityFact thWithUnqual parentEntity subEntity
-                                 _ -> thWithUnqual
-                          else thWithUnqual
+                  then foldl (\t e -> 
+                         case Map.lookup name (theoryObjectsByName t) of
+                           Just (existing:_) -> 
+                             -- Add equality fact between existing and new entity
+                             addEqualityFact t existing e
+                           Nothing -> 
+                             addEntityToParent t name e
+                       ) th1 transformed
                   else th1
         in th2
   in foldl addAll parentTh (Map.toList (theoryObjectsByName subTh))
-
+  
 -- Built-in entity names that should be merged via equality facts
 builtInNames :: [String]
 builtInNames = ["𝔻", "ℙ", "𝕌", "⊤", "⊥", "+", "×", "-", "⇒", "∸"]
