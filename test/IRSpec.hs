@@ -9,6 +9,7 @@ import Data.List            (find)
 import Data.Maybe           (isJust, isNothing, mapMaybe)
 import qualified Data.Map.Strict as Map
 import Text.RawString.QQ    (r)
+import Control.Exception (try, evaluate, SomeException, displayException)
 
 import Eidos.Parser         (parseString)
 import Eidos.FromSyntax     (buildTheoryPure)
@@ -69,8 +70,9 @@ lookupByName th nm = case Map.lookup nm (theoryObjectsByName th) of
 
 lookupInParentByName :: Theory -> String -> Maybe Entity
 lookupInParentByName th nm = case Map.lookup nm (theoryObjectsByName th) of
-  Just (e:_) -> Just e
-  _          -> Nothing
+  Just [e] -> Just e
+  Just (_:_) -> Nothing   -- ambiguous, return Nothing
+  _ -> Nothing
 
 -- ---------------------------------------------------------------------------
 -- Main
@@ -288,3 +290,111 @@ main = hspec $ do
             Just (EntityFunction f) ->
               funcKind f `shouldBe` FunctionKindSOLFunctionFromTheory
             _ -> fail "F not found in subtheory or wrong kind"
+
+  describe "Naming conflict resolution" $ do
+
+    it "allows two implicit subtheories to define the same entity name with disambiguation" $ do
+      let input = [r|{
+        subtheories {
+          implicit {
+            sub1: { signature { sort S; } }
+            sub2: { signature { sort S; } }
+          }
+        }
+      }|]
+      -- Should parse successfully (no duplicate declaration error)
+      th <- buildStr input
+      -- Unqualified lookup should be ambiguous
+      case lookupInParentByName th "S" of
+        Just _ -> fail "Expected ambiguous unqualified lookup (multiple matches)"
+        Nothing -> return ()
+      -- Qualified lookups should work
+      lookupInParentByName th "sub1.S" `shouldSatisfy` isJust
+      lookupInParentByName th "sub2.S" `shouldSatisfy` isJust
+
+    it "no error when two implicit subtheories define same name" $ do
+      let input = [r|{
+        subtheories {
+          implicit {
+            sub1: { signature { sort S; } }
+            sub2: { signature { sort S; } }
+          }
+        }
+        axioms {
+          assertions {
+            sub1.S = sub2.S;
+          }
+        }
+      }|]
+      th <- buildStr input
+      return ()
+
+    it "rejects name conflict when parent and implicit subtheory both declare S" $ do
+      let input = [r|{
+        signature { sort S; }
+        subtheories {
+          implicit {
+            sub: { signature { sort S; } }
+          }
+        }
+      }|]
+      result <- buildStrEither input
+      case result of
+        Left err -> err `shouldContain` "Name conflict"
+        Right _ -> fail "Expected build error"
+
+    it "allows explicit qualification to access shadowed entity" $ do
+      let input = [r|{
+        signature { sort ParentS; }
+        subtheories {
+          implicit {
+            sub: { signature { sort ChildS; } }
+          }
+        }
+        axioms {
+          assertions {
+            sub.ChildS = ParentS;
+          }
+        }
+      }|]
+      -- Use different names to avoid conflict, test qualification
+      th <- buildStr input
+      return ()
+
+    it "reports duplicate alias when two implicit subtheories have same name" $ do
+      let input = [r|{
+        subtheories {
+          implicit {
+            sub: { signature { sort S; } }
+            sub: { signature { sort T; } }
+          }
+        }
+      }|]
+      result <- buildStrEither input
+      case result of
+        Left err -> err `shouldContain` "Duplicate subtheory alias(es): sub"
+        Right _ -> fail "Expected duplicate alias error"
+
+    it "rejects duplicate sort name when implicit subtheory conflicts with parent entity" $ do
+      let input = [r|{
+        signature { sort S; }
+        subtheories {
+          implicit {
+            sub: { signature { sort S; } }
+          }
+        }
+      }|]
+      result <- buildStrEither input
+      case result of
+        Left err -> err `shouldContain` "Name conflict"
+        Right _ -> fail "Expected duplicate declaration error"
+
+-- | Parse and build, returning Either String for error testing
+buildStrEither :: String -> IO (Either String Theory)
+buildStrEither input = do
+  case parseString input of
+    Left err -> return (Left (show err))
+    Right ast -> case buildTheoryPure emptyPureResolver Nothing ast of
+      Left err -> return (Left err)
+      Right th -> return (Right th)
+

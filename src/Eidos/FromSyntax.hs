@@ -206,70 +206,81 @@ buildSignatureSection _ th _ = return th
 buildSignatureItem
   :: forall m. (MonadExternalRefResolver m)
   => Theory -> Theory -> SignatureItem -> BuildM m Theory
-buildSignatureItem th0 th item = case item of
+buildSignatureItem th0 th item = do
+  -- Local helper for name conflict checking
+  let checkNameConflict name = do
+        case Map.lookup name (theoryObjectsByName th) of
+          Nothing -> return ()
+          Just _ -> throwError $ "Name conflict: '" ++ name ++ "' already refers to a different entity"
 
-  SigSimpleSort (SimpleSortDeclaration nm) ->
-    case Map.lookup nm (theoryObjectsByName th) of
-      Just _  -> throwError ("duplicate sort declaration: " ++ nm)
-      Nothing -> do
-        let s = mkSort th SortKindFromSignature nm FromSignature
-        return (addSortToTh th s)
+  case item of
 
-  SigRelationalSort (RelationalSortDeclaration nm rel sortExprAST) -> do
-    parentSort <- either throwError return $
-      lookupSort th (sortConstant (sortRef sortExprAST))
-    let s   = mkRelatedSort th nm
-        th1 = addSortToTh th s
-        th2 = relationalSortFacts th1 rel s parentSort
-    return th2
+    SigSimpleSort (SimpleSortDeclaration nm) -> do
+      checkNameConflict nm
+      let s = mkSort th SortKindFromSignature nm FromSignature
+      return (addSortToTh th s)
 
-  SigFunction (FunctionDeclaration nm domainExprs codomainExpr) -> do
-    argSorts <- mapM (liftLookup (lookupSortByExpr th)) domainExprs
-    resSort <- either throwError return $ lookupSortByExpr th codomainExpr
-    if firstLetterIsUppercase nm
-      then do
-        -- SOL function (uppercase name)
-        let f = mkSOLFunction th nm FunctionKindSOLFunctionFromTheory argSorts resSort FromSignature
-        return (addEntityToTh th (EntityFunction f))
-      else do
-        -- FOL function (lowercase name): also create domain sort, inverse, image functions
-        let (f, domSort, invFn, dirImg, invImg) =
-              mkFOLFunction th nm argSorts resSort FromSignature
-        -- Add domain sort (product sort) + its limits
-        let th1 = addEntityToTh th  (EntitySort domSort)
-            th2 = addEntityToTh th1 (EntityMereological (sortMin domSort))
-            th3 = addEntityToTh th2 (EntityMereological (sortMax domSort))
-        -- Add inverse domain sort + limits
-        let invDomSort = case funcDomain invFn of { Just d -> d; Nothing -> domSort }
-            th4 = addEntityToTh th3 (EntitySort invDomSort)
-            th5 = addEntityToTh th4 (EntityMereological (sortMin invDomSort))
-            th6 = addEntityToTh th5 (EntityMereological (sortMax invDomSort))
-        -- Add main function and companions
-        let th7 = addEntityToTh th6 (EntityFunction f)
-            th8 = addEntityToTh th7 (EntityFunction invFn)
-            th9 = addEntityToTh th8 (EntityFunction dirImg)
-            th10= addEntityToTh th9 (EntityFunction invImg)
-        return th10
+    SigRelationalSort (RelationalSortDeclaration nm rel sortExprAST) -> do
+      checkNameConflict nm
+      parentSort <- either throwError return $
+        lookupSort th (sortConstant (sortRef sortExprAST))
+      let s   = mkRelatedSort th nm
+          th1 = addSortToTh th s
+          th2 = relationalSortFacts th1 rel s parentSort
+      return th2
 
-  SigIndividual (IndividualDeclaration nm sortExprAST) -> do
-    s <- either throwError return $ lookupSortByExpr th sortExprAST
-    let mo = mkMereo th MereologicalEntityKindIndividual nm s FromSignature
-    return (addEntityToTh th (EntityMereological mo))
-
-  SigSet (SetDeclaration nm domainExprs) -> case domainExprs of
-    [sexpr] -> do
-      s <- either throwError return $ lookupSortByExpr th sexpr
-      let mo = mkMereo th MereologicalEntityKindSet nm s FromSignature
-      return (addEntityToTh th (EntityMereological mo))
-    _ -> do
+    SigFunction (FunctionDeclaration nm domainExprs codomainExpr) -> do
+      checkNameConflict nm
       argSorts <- mapM (liftLookup (lookupSortByExpr th)) domainExprs
+      resSort <- either throwError return $ lookupSortByExpr th codomainExpr
+      if firstLetterIsUppercase nm
+        then do
+          -- SOL function (uppercase name)
+          let f = mkSOLFunction th nm FunctionKindSOLFunctionFromTheory argSorts resSort FromSignature
+          return (addEntityToTh th (EntityFunction f))
+        else do
+          -- FOL function (lowercase name): also create domain sort, inverse, image functions
+          let (f, domSort, invFn, dirImg, invImg) =
+                mkFOLFunction th nm argSorts resSort FromSignature
+          -- Add domain sort (product sort) + its limits
+          let th1 = addEntityToTh th  (EntitySort domSort)
+              th2 = addEntityToTh th1 (EntityMereological (sortMin domSort))
+              th3 = addEntityToTh th2 (EntityMereological (sortMax domSort))
+          -- Add inverse domain sort + limits
+          let invDomSort = case funcDomain invFn of { Just d -> d; Nothing -> domSort }
+              th4 = addEntityToTh th3 (EntitySort invDomSort)
+              th5 = addEntityToTh th4 (EntityMereological (sortMin invDomSort))
+              th6 = addEntityToTh th5 (EntityMereological (sortMax invDomSort))
+          -- Add main function and companions
+          let th7 = addEntityToTh th6 (EntityFunction f)
+              th8 = addEntityToTh th7 (EntityFunction invFn)
+              th9 = addEntityToTh th8 (EntityFunction dirImg)
+              th10= addEntityToTh th9 (EntityFunction invImg)
+          return th10
+
+    SigIndividual (IndividualDeclaration nm sortExprAST) -> do
+      checkNameConflict nm
+      s <- either throwError return $ lookupSortByExpr th sortExprAST
+      let mo = mkMereo th MereologicalEntityKindIndividual nm s FromSignature
+      return (addEntityToTh th (EntityMereological mo))
+
+    SigSet (SetDeclaration nm domainExprs) -> case domainExprs of
+      [sexpr] -> do
+        checkNameConflict nm
+        s <- either throwError return $ lookupSortByExpr th sexpr
+        let mo = mkMereo th MereologicalEntityKindSet nm s FromSignature
+        return (addEntityToTh th (EntityMereological mo))
+      _ -> do
+        checkNameConflict nm
+        argSorts <- mapM (liftLookup (lookupSortByExpr th)) domainExprs
+        let rel = mkRelation th nm argSorts FromSignature
+        return (addEntityToTh th (EntityRelation rel))
+
+    SigRelation (RelationDeclaration nm first rest) -> do
+      checkNameConflict nm
+      argSorts <- mapM (liftLookup (lookupSortByExpr th)) (first : rest)
       let rel = mkRelation th nm argSorts FromSignature
       return (addEntityToTh th (EntityRelation rel))
-
-  SigRelation (RelationDeclaration nm first rest) -> do
-    argSorts <- mapM (liftLookup (lookupSortByExpr th)) (first : rest)
-    let rel = mkRelation th nm argSorts FromSignature
-    return (addEntityToTh th (EntityRelation rel))
 
 -- Helper to lift lookup functions into BuildM
 liftLookup
@@ -740,7 +751,7 @@ propagateSubtheory parentTh subName isImplicit isReflection entities =
                      th { theoryObjectsByName =
                            Map.insertWith (++) qualifiedName [transformed] (theoryObjectsByName th) }
       in th1
-      
+
 -- ---------------------------------------------------------------------------
 -- Mereological translations (pass 4)
 -- ---------------------------------------------------------------------------
@@ -918,8 +929,9 @@ lookupSortByExpr th sexpr = do
 -- | Look up any entity by name in a theory
 lookupEntity :: Theory -> String -> Either BuildError Entity
 lookupEntity th nm = case Map.lookup nm (theoryObjectsByName th) of
-  Just (e:_) -> Right e
-  _          -> Left $ "Unknown reference: '" ++ nm ++ "' in theory '" ++ theoryName th ++ "'"
+  Just [e] -> Right e
+  Just (_:_) -> Left $ "Ambiguous name: '" ++ nm ++ "'"
+  Nothing -> Left $ "Unknown reference: '" ++ nm ++ "' in theory '" ++ theoryName th ++ "'"
 
 lookupEntityInPath :: Theory -> [String] -> String -> Either BuildError Entity
 lookupEntityInPath th [] nm   = lookupEntity th nm
