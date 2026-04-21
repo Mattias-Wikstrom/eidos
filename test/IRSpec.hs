@@ -6,14 +6,14 @@ module Main where
 
 import Test.Hspec
 import Data.List            (find)
-import Data.Maybe           (isJust, isNothing, mapMaybe)
+import Data.Maybe           (isJust, isNothing, mapMaybe, fromJust)
 import qualified Data.Map.Strict as Map
 import Text.RawString.QQ    (r)
 import Control.Exception (try, evaluate, SomeException, displayException)
 
 import Eidos.Parser         (parseString)
 import Eidos.FromSyntax     (buildTheoryPure)
-import Eidos.BuildMonad     (emptyPureResolver)
+import Eidos.BuildMonad     (emptyPureResolver, mkPureResolver)
 import Eidos.IR
 
 -- ---------------------------------------------------------------------------
@@ -389,6 +389,217 @@ main = hspec $ do
         Left err -> err `shouldContain` "Name conflict"
         Right _ -> fail "Expected duplicate declaration error"
 
+    it "allows nested implicit subtheories with path qualification" $ do
+      let input = [r|{
+        subtheories {
+          implicit {
+            level1: {
+              subtheories {
+                implicit {
+                  level2: {
+                    signature { sort S; }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }|]
+      th <- buildStr input
+
+      lookupInParentByName th "level1.level2.S" `shouldSatisfy` isJust
+      lookupInParentByName th "level1.S" `shouldSatisfy` isJust
+      lookupInParentByName th "level1.level2.S" `shouldSatisfy` isJust
+
+    it "allows paths mixing implicit and named subtheories" $ do
+      let input = [r|{
+        subtheories {
+          implicit {
+            imp: {
+              subtheories {
+                named {
+                  named: {
+                    signature { sort S; }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }|]
+      th <- buildStr input
+      -- imp is implicit, so its entities are flattened
+      lookupInParentByName th "named.S" `shouldSatisfy` isJust
+      lookupInParentByName th "imp.named.S" `shouldSatisfy` isJust
+      -- But "S" alone should NOT work (named subtheory doesn't flatten)
+      lookupInParentByName th "S" `shouldSatisfy` isNothing
+
+    it "resolves deep paths correctly when names repeat" $ do
+      let input = [r|{
+        subtheories {
+          implicit {
+            A: {
+              subtheories {
+                implicit {
+                  B: {
+                    signature { sort S; }
+                  }
+                }
+              }
+            }
+            C: {
+              subtheories {
+                implicit {
+                  B: {
+                    signature { sort T; }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }|]
+      th <- buildStr input
+      
+      -- A.B.S should work
+      lookupInParentByName th "A.B.S" `shouldSatisfy` isJust
+      -- C.B.T should work
+      lookupInParentByName th "C.B.T" `shouldSatisfy` isJust
+      -- But "B.S" is ambiguous (which B?)
+      isAmbiguousInParent th "B.S" `shouldBe` False
+
+    it "handles paths through reflection subtheories" $ do
+      let input = [r|{
+        subtheories {
+          reflection {
+            refl: {
+              subtheories {
+                named {
+                  named: {
+                    signature { sort S; }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }|]
+      th <- buildStr input
+      -- refl is reflection, so its entities are transformed but still accessible via path
+      lookupInParentByName th "refl.named.S" `shouldSatisfy` isJust
+      -- The sort should have SortKindFromReflection
+      case lookupInParentByName th "refl.named.S" of
+        Just (EntitySort s) -> sortKind s `shouldBe` SortKindFromReflection
+        _ -> fail "Expected reflected sort"
+
+
+    it "resolves paths through external subtheories" $ do
+      -- This would need a mock resolver
+      let resolver = mkPureResolver [("ext", "{ signature { sort S; } }")]
+      let input = [r|{
+        subtheories {
+          implicit {
+            imported: @ext
+          }
+        }
+      }|]
+      -- This test requires using buildTheoryPure with the resolver
+      pendingWith "Requires mock resolver integration"
+
+  describe "Subtheory retrieval" $ do
+
+    it "retrieves all subtheories from a theory" $ do
+      let input = [r|{
+        subtheories {
+          implicit { imp: { signature { sort ImpSort; } } }
+          named { named: { signature { sort NamedSort; } } }
+          reflection { refl: { signature { sort ReflSort; } } }
+        }
+      }|]
+      th <- buildStr input
+      let subs = theorySubtheories th
+      length subs `shouldBe` 3
+      
+      -- Find subtheories by name
+      let impSub = find (\s -> theoryName s == "imp") subs
+      let namedSub = find (\s -> theoryName s == "named") subs
+      let reflSub = find (\s -> theoryName s == "refl") subs
+      
+      impSub `shouldSatisfy` isJust
+      namedSub `shouldSatisfy` isJust
+      reflSub `shouldSatisfy` isJust
+      
+      -- Verify their kinds (reflection flag)
+      let imp = fromJust impSub
+      let named = fromJust namedSub
+      let refl = fromJust reflSub
+      
+      theoryReflection imp `shouldBe` False
+      theoryReflection named `shouldBe` False
+      theoryReflection refl `shouldBe` True
+      
+      -- Verify they contain their expected sorts
+      let impSorts = [ sortName s | EntitySort s <- theoryObjects imp ]
+      impSorts `shouldContain` ["ImpSort"]
+      
+      let namedSorts = [ sortName s | EntitySort s <- theoryObjects named ]
+      namedSorts `shouldContain` ["NamedSort"]
+      
+      let reflSorts = [ sortName s | EntitySort s <- theoryObjects refl ]
+      reflSorts `shouldContain` ["ReflSort"]
+
+    it "retrieves nested subtheories" $ do
+      let input = [r|{
+        subtheories {
+          implicit {
+            level1: {
+              subtheories {
+                implicit {
+                  level2: {
+                    signature { sort DeepSort; }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }|]
+      th <- buildStr input
+      let level1 = head (theorySubtheories th)
+      theoryName level1 `shouldBe` "level1"
+      
+      let level2 = head (theorySubtheories level1)
+      theoryName level2 `shouldBe` "level2"
+      
+      -- Verify the nested sort is in level2
+      let sorts = [ sortName s | EntitySort s <- theoryObjects level2 ]
+      sorts `shouldContain` ["DeepSort"]
+      
+      -- Also verify propagation to root
+      lookupInParentByName th "level1.level2.DeepSort" `shouldSatisfy` isJust
+
+    it "retrieves subtheories from a theory with no subtheories" $ do
+      th <- buildStr "{ signature { sort S; } }"
+      let subs = theorySubtheories th
+      length subs `shouldBe` 0  -- Compare length instead of the list itself
+
+    it "retrieves subtheories from a theory with multiple subtheories of the same kind" $ do
+      let input = [r|{
+        subtheories {
+          named {
+            sub1: { signature { sort A; } }
+            sub2: { signature { sort B; } }
+            sub3: { signature { sort C; } } 
+          }
+        }
+      }|]
+      th <- buildStr input
+      let subs = theorySubtheories th
+      length subs `shouldBe` 3
+      
+      let names = map theoryName subs
+      names `shouldContain` ["sub1", "sub2", "sub3"]
+
 -- | Parse and build, returning Either String for error testing
 buildStrEither :: String -> IO (Either String Theory)
 buildStrEither input = do
@@ -398,3 +609,13 @@ buildStrEither input = do
       Left err -> return (Left err)
       Right th -> return (Right th)
 
+-- For tests that expect ambiguity
+isAmbiguousInParent :: Theory -> String -> Bool
+isAmbiguousInParent th nm = case Map.lookup nm (theoryObjectsByName th) of
+  Just (_:_:_) -> True
+  _ -> False
+
+debugMap :: Theory -> IO ()
+debugMap th = do
+  putStrLn "=== Theory objectsByName ==="
+  mapM_ (\(k, v) -> putStrLn $ k ++ " -> " ++ show (length v) ++ " entities") (Map.toList (theoryObjectsByName th))

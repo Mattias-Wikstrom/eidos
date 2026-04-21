@@ -259,10 +259,19 @@ pSubtheoryGroup = do
 pGroupKeyword :: Parser String
 pGroupKeyword = try kwImplicit <|> try kwNamed <|> kwReflection
 
+-- | Subtheory alias - like ident but allows structural keywords
+-- This is used for subtheory names (aliases) which may be any identifier,
+-- including keywords like "named", "implicit", "reflection".
+subtheoryAlias :: Parser String
+subtheoryAlias = lexeme $ try $ do
+  h <- letterChar <|> char '_'
+  t <- many (alphaNumChar <|> char '_')
+  return (h : t)  -- No keyword rejection
+
 pSubtheoryItem :: Parser SubtheoryItem
 pSubtheoryItem = do
   qual <- optional (void lbrack *> pGroupKeyword <* void rbrack)
-  name <- optional (try (ident <* colon))
+  name <- optional (try (subtheoryAlias <* colon))  -- Changed from ident to subtheoryAlias
   when (isNothing name) $
     fail "All subtheories must have a name"
   def  <- pSubtheoryDef

@@ -5,7 +5,7 @@ import           System.Exit        (exitFailure, exitSuccess)
 import qualified System.IO          as IO
 
 import           Eidos.Parser       (parseFile)
-import           Eidos.FromSyntax   (buildTheoryIO, buildTheoryPure)
+import           Eidos.FromSyntax   (buildTheoryIO, buildTheoryFromFile, buildTheoryPure)
 import           Eidos.BuildMonad   (mkPureResolver)
 import           Eidos.Pretty       (prettyTheory, prettyTheoryDecl)
 
@@ -22,7 +22,7 @@ main = do
           exitFailure
         Right ast -> do
           -- Build the IR using IO resolver (reads files from disk)
-          irResult <- buildTheoryIO ast
+          irResult <- buildTheoryFromFile filePath ast
           case irResult of
             Left buildErr -> do
               IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)

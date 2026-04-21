@@ -11,7 +11,7 @@ import           Control.Monad        (forM_, when, foldM)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Data.Char            (isUpper)
-import           Data.List            (find, isPrefixOf)
+import           Data.List            (find, isPrefixOf, intercalate)
 import qualified Data.Map.Strict      as Map
 import           Data.Maybe           (fromMaybe, isJust, isNothing, mapMaybe)
 import           System.FilePath      (takeDirectory)
@@ -120,45 +120,36 @@ processEntry (th, subs) entry = case entry of
     let kw = fromMaybe "named" (itemQualifier item)
     processItem kw (th, subs) item
 
-processItem
-  :: forall m. (MonadExternalRefResolver m)
-  => String
-  -> (Theory, [Theory])
-  -> SubtheoryItem
-  -> BuildM m (Theory, [Theory])
 processItem kw (th, subs) item = do
   baseContext <- ask
   
   let subName = case kw of
-        "implicit" -> fromMaybe "" (itemName item)   -- Keep the name if provided
+        "implicit" -> fromMaybe "" (itemName item)
         _ -> fromMaybe "" (itemName item)
 
   when (subName == "") $
     throwError "All subtheories must have names."
-  when (kw == "implicit" && subName /= "") $
-    return ()   -- implicit subtheories CAN have names (for disambiguation)
-  when (kw /= "implicit" && subName == "") $
-    throwError "Non-implicit subtheories must have names."
   
   let isRefl = kw == "reflection"
+      isImplicit = kw == "implicit"
   
   (subBody, extInfo) <- resolveSubtheoryBody baseContext item
   
   let finalName = case extInfo of
-        Just (extId, _) -> subName -- never use extId here; always use the alias given in the theory
+        Just (extId, _) -> subName
         Nothing -> subName
   
   let subContext = case extInfo of
-        Just (_, FileSystemSource _) -> baseContext  -- Keep same context, content will be read via resolver
+        Just (_, FileSystemSource _) -> baseContext
         Just (_, MemorySource _) -> baseContext
         Nothing -> baseContext
   
   sub <- local (const subContext) $ 
     decorateTheoryBody subBody (Just th) finalName isRefl
-  -- Propagate sub's entities to the parent theory
-  let isImplicit = kw == "implicit"
+  
   let th' = addSubtheoryToTheory th sub
-      th'' = propagateSubtheory th' finalName isImplicit isRefl (theoryObjects sub)
+      th'' = propagateSubtheory th' finalName isImplicit isRefl sub
+
   return (th'', subs ++ [sub])
 
 -- | Resolve a subtheory definition using the resolver from the monad
@@ -734,23 +725,76 @@ reflectEntity e = e
 --
 -- The propagated names are inserted into the parent's objectsByName map only
 -- (not into theoryObjects, which lists only locally-declared entities).
-propagateSubtheory :: Theory -> String -> Bool -> Bool -> [Entity] -> Theory
-propagateSubtheory parentTh subName isImplicit isReflection entities =
-  foldr addOne parentTh entities
-  where
-    addOne ent th =
-      let transformed = if isReflection then reflectEntity ent else ent
-          qualifiedName = subName ++ "." ++ entityName transformed
-          th1 = if isImplicit
-                then -- Add both unqualified and qualified
-                     let thA = th { theoryObjectsByName =
-                                     Map.insertWith (++) (entityName transformed) [transformed] (theoryObjectsByName th) }
-                     in thA { theoryObjectsByName =
-                               Map.insertWith (++) qualifiedName [transformed] (theoryObjectsByName thA) }
-                else -- Add only qualified
-                     th { theoryObjectsByName =
-                           Map.insertWith (++) qualifiedName [transformed] (theoryObjectsByName th) }
-      in th1
+propagateSubtheory :: Theory -> String -> Bool -> Bool -> Theory -> Theory
+propagateSubtheory parentTh subName isImplicit isReflection subTh =
+  let addAll th (name, entities) =
+        let transformed = if isReflection then map reflectEntity entities else entities
+            -- Always add qualified name
+            qualifiedName = if null subName then name else subName ++ "." ++ name
+            th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
+            -- For implicit subtheories, also add unqualified name and equality facts for built-ins
+            th2 = if isImplicit
+                  then let thWithUnqual = foldl (\t e -> addEntityToParent t name e) th1 transformed
+                       in if name `elem` builtInNames
+                          then case ( Map.lookup name (theoryObjectsByName parentTh)
+                                    , Map.lookup qualifiedName (theoryObjectsByName thWithUnqual) ) of
+                                 (Just (parentEntity:_), Just (subEntity:_)) ->
+                                   addEqualityFact thWithUnqual parentEntity subEntity
+                                 _ -> thWithUnqual
+                          else thWithUnqual
+                  else th1
+        in th2
+  in foldl addAll parentTh (Map.toList (theoryObjectsByName subTh))
+
+-- Built-in entity names that should be merged via equality facts
+builtInNames :: [String]
+builtInNames = ["𝔻", "ℙ", "𝕌", "⊤", "⊥", "+", "×", "-", "⇒", "∸"]
+
+-- Add an equality fact between two entities
+addEqualityFact :: Theory -> Entity -> Entity -> Theory
+addEqualityFact th parentEntity subEntity =
+  let -- Create a fact: parentEntity = subEntity
+      fact = mkEqualityFact parentEntity subEntity
+  in addFactToTh th fact
+
+-- Create an equality fact between two entities
+mkEqualityFact :: Entity -> Entity -> Fact
+mkEqualityFact e1 e2 =
+  -- Build a ResolvedPropExpr representing e1 = e2
+  let leftTerm = termFromEntity e1
+      rightTerm = termFromEntity e2
+      relation = ResolvedRelationFollowedByTerm [] "=" Nothing rightTerm
+      termPair = ResolvedTermPair leftTerm [relation] (termTypeMereological Nothing Nothing)
+      atomicProp = ResolvedAtomicTermPair termPair
+      quantified = ResolvedQuantified [] atomicProp
+      neg = ResolvedNegChild quantified
+      conj = ResolvedConj neg []
+      disj = ResolvedDisj conj []
+      leftImpl = ResolvedLeftImpl disj []
+      rightImpl = ResolvedRightImpl leftImpl Nothing
+  in Fact
+    { factIsMereologicalTranslation = False
+    , factIsInherited = False
+    , factKind = FactKindAssertion  -- or FactKindFact? Assertion is appropriate
+    , factPropExpr = ResolvedPropBicond rightImpl []
+    }
+
+-- Helper to create a ResolvedTerm from an Entity
+termFromEntity :: Entity -> ResolvedTerm
+termFromEntity entity =
+  let constRef = ResolvedConstantRef
+        { resolvedConstRefName = entityName entity
+        , resolvedConstEntity = entity
+        , resolvedConstType = entityToExprType entity
+        }
+      factor = ResolvedFactor (ResolvedBTAtomic constRef) [] (entityToExprType entity)
+  in ResolvedTerm factor [] (entityToExprType entity)
+
+
+-- Add an entity to a theory's name map only (not to theoryObjects)
+addEntityToParent :: Theory -> String -> Entity -> Theory
+addEntityToParent th name entity =
+  th { theoryObjectsByName = Map.insertWith (++) name [entity] (theoryObjectsByName th) }
 
 -- ---------------------------------------------------------------------------
 -- Mereological translations (pass 4)
@@ -928,10 +972,28 @@ lookupSortByExpr th sexpr = do
 
 -- | Look up any entity by name in a theory
 lookupEntity :: Theory -> String -> Either BuildError Entity
-lookupEntity th nm = case Map.lookup nm (theoryObjectsByName th) of
-  Just [e] -> Right e
-  Just (_:_) -> Left $ "Ambiguous name: '" ++ nm ++ "'"
-  Nothing -> Left $ "Unknown reference: '" ++ nm ++ "' in theory '" ++ theoryName th ++ "'"
+lookupEntity th nm =
+  let parts = splitOn '.' nm
+  in case parts of
+    [] -> Left "Empty name"
+    [single] -> case Map.lookup single (theoryObjectsByName th) of
+      Just [e] -> Right e
+      Just (_:_) -> Left $ "Ambiguous name: '" ++ single ++ "'"
+      Nothing -> Left $ "Unknown reference: '" ++ nm ++ "'"
+    (first:rest) ->
+      -- Find subtheories with name 'first'
+      let matchingSubs = filter (\sub -> theoryName sub == first) (theorySubtheories th)
+      in case matchingSubs of
+        [] -> Left $ "Unknown subtheory: '" ++ first ++ "'"
+        [_] -> lookupEntity (head matchingSubs) (intercalate "." rest)
+        _ -> Left $ "Ambiguous path: '" ++ first ++ "' refers to multiple subtheories"
+
+-- Helper
+splitOn :: Char -> String -> [String]
+splitOn _ "" = []
+splitOn c s = case break (== c) s of
+  (part, []) -> [part]
+  (part, _:rest) -> part : splitOn c rest
 
 lookupEntityInPath :: Theory -> [String] -> String -> Either BuildError Entity
 lookupEntityInPath th [] nm   = lookupEntity th nm
