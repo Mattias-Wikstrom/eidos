@@ -33,4 +33,39 @@ So how exactly are symbols/expressions of different kinds reinterpreted when ref
 * Eidos treats 'FOL relations' as subsets of product sets. This determines what happens to it after reflection, but this follows automatically.
 
 
+Example:
+{
+  signature {
+    sort T;
+    t1 : T;
+    t2 : T;
+  },
+  axioms {
+    assertions {
+      T = sub.S; /* The individuals in T correspond to subsets of the original sort S */
+      t1 = sub.pred; /* Since pred has been reflected into an individual, equating it with t1 is fine */
+      sub.F(t1, t2) = sub.pred; /* sub.F has been reflected into a FOL function and is applied to individuals */
+    }
+  },
+  subtheories {
+    reflection {
+      sub: {
+        signature {
+          sort S;
+          i : S;
+          pred ⊆ S;
+          F: S, S → S;
+        },
+        axioms {
+          assertions {
+          }
+        },
+        subtheories {
+        }
+      },
+    }
+  }
+}
+
+
 
