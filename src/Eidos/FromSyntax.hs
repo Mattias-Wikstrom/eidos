@@ -151,7 +151,7 @@ processItem kw (th, subs) item = do
     decorateTheoryBody subBody (Just th) finalName isRefl
   
   let th' = addSubtheoryToTheory th sub
-      th'' = propagateSubtheory th' finalName isImplicit isRefl sub
+  th'' <- either throwError return $ propagateSubtheory th' finalName isImplicit isRefl sub
 
   return (th'', subs ++ [sub])
 
@@ -744,23 +744,22 @@ reflectEntity e = e
 --
 -- The propagated names are inserted into the parent's objectsByName map only
 -- (not into theoryObjects, which lists only locally-declared entities).
-propagateSubtheory :: Theory -> String -> Bool -> Bool -> Theory -> Theory
+propagateSubtheory :: Theory -> String -> Bool -> Bool -> Theory -> Either BuildError Theory
 propagateSubtheory parentTh subName isImplicit isReflection subTh =
-  foldl addEntry parentTh (Map.toList (theoryObjectsByName subTh))
+  foldM addEntry parentTh (Map.toList (theoryObjectsByName subTh))
   where
-    addEntry th (name, entities) =
+    addEntry th (name, entities) = do
       let transformed = if isReflection then map reflectEntity entities else entities
           qualifiedName = if null subName then name else subName ++ "." ++ name
 
           -- Step 1: always register the qualified name.
           th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
 
-          -- Step 2: for implicit subtheories, also handle the unqualified name —
-          -- but only for "plain" names (no '#').
-          th2 = if isImplicit && not (isInternalName name)
-                then foldl (addUnqualified name qualifiedName) th1 transformed
-                else th1
-      in th2
+      -- Step 2: for implicit subtheories, also handle the unqualified name —
+      -- but only for plain names (no '#' — those are internal artefacts).
+      if isImplicit && not (isInternalName name)
+        then foldM (addUnqualified name qualifiedName) th1 transformed
+        else Right th1
 
 -- | Create a ResolvedTerm from an entity with a custom display name
 termFromEntityWithName :: String -> Entity -> ResolvedTerm
@@ -807,27 +806,26 @@ isBuiltIn name = name `elem` builtInNames
     -- | Decide what to do when we encounter `entity` (from the sub) for the
     --   unqualified slot `name`.  `qualifiedName` is the already-registered
     --   "sub.entity" key we can look up to produce well-formed equality facts.
-addUnqualified :: String -> String -> Theory -> Entity -> Theory
+addUnqualified :: String -> String -> Theory -> Entity -> Either BuildError Theory
 addUnqualified name qualifiedName th entity
   -- Built-ins: parent already owns the slot. Add equality fact only.
   | isBuiltIn name =
       case ( Map.lookup name (theoryObjectsByName th)
            , Map.lookup qualifiedName (theoryObjectsByName th) ) of
         (Just (parentEntity:_), Just (subEntity:_)) ->
-          addEqualityFactNamed th name qualifiedName parentEntity subEntity
-        _ -> th
+          Right $ addEqualityFactNamed th name qualifiedName parentEntity subEntity
+        _ -> Right th
   -- Slot empty: first time this name appears
   | Nothing <- Map.lookup name (theoryObjectsByName th) =
       let canonical = createCanonicalEntity entity
           th1 = addEntityToParent th name canonical
-      in addEqualityFactNamed th1 name qualifiedName canonical entity
-  -- Slot occupied: existing canonical entity
+      in Right $ addEqualityFactNamed th1 name qualifiedName canonical entity
+  -- Slot occupied: check compatibility
   | Just (canonical : _) <- Map.lookup name (theoryObjectsByName th) =
-      let compatible = entitiesCompatible canonical entity
-      in if compatible
-         then addEqualityFactNamed th name qualifiedName canonical entity
-         else error $ "Name conflict: '" ++ name ++ "' refers to incompatible entities"
-  | otherwise = th
+      if entitiesCompatible canonical entity
+        then Right $ addEqualityFactNamed th name qualifiedName canonical entity
+        else Left $ "Name conflict: '" ++ name ++ "' is defined in multiple implicit subtheories with incompatible signatures"
+  | otherwise = Right th
   
 -- | Create a canonical entity that serves as the merged representative
 -- for user-defined entities from implicit subtheories.

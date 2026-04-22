@@ -293,7 +293,7 @@ main = hspec $ do
 
   describe "Naming conflict resolution" $ do
 
-    it "allows two implicit subtheories to define the same entity name with disambiguation" $ do
+    it "allows two implicit subtheories to define the same entity name" $ do
       let input = [r|{
         subtheories {
           implicit {
@@ -302,15 +302,51 @@ main = hspec $ do
           }
         }
       }|]
-      -- Should parse successfully (no duplicate declaration error)
       th <- buildStr input
-      -- Unqualified lookup should be ambiguous
-      case lookupInParentByName th "S" of
-        Just _ -> fail "Expected ambiguous unqualified lookup (multiple matches)"
-        Nothing -> return ()
-      -- Qualified lookups should work
+      -- Unqualified S should resolve (merged)
+      lookupInParentByName th "S" `shouldSatisfy` isJust
+      -- Qualified lookups should also work
       lookupInParentByName th "sub1.S" `shouldSatisfy` isJust
       lookupInParentByName th "sub2.S" `shouldSatisfy` isJust
+        
+    it "rejects functions with same name but different arities" $ do
+      let input = [r|{
+        subtheories {
+          implicit {
+            sub1: { 
+              signature { 
+                sort D; 
+                f : D → D; 
+              } 
+            }
+            sub2: { 
+              signature { 
+                sort D; 
+                f : D, D → D; 
+              } 
+            }
+          }
+        }
+      }|]
+      result <- buildStrEither input
+      case result of
+        Left err -> err `shouldContain` "incompatible"
+        Right _ -> fail "Expected error for different arities"
+
+    it "merges compatible entities with the same name" $ do
+      let input = [r|{
+        subtheories {
+          implicit {
+            sub1: { signature { sort S; } }
+            sub2: { signature { sort S; } }
+          }
+        }
+      }|]
+      th <- buildStr input
+      -- Should have one entry for S (merged)
+      case Map.lookup "S" (theoryObjectsByName th) of
+        Just [e] -> return ()  -- exactly one entity
+        _ -> fail "Expected merged entity"
 
     it "no error when two implicit subtheories define same name" $ do
       let input = [r|{
