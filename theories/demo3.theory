@@ -1,4 +1,4 @@
-/* Theory that demonstrates how references work when there are subtheories marked with [implicit] */
+/* Theory that demonstrates how references work when there are implicit subtheories */
 {
   signature {
     sort DemoSortD;
