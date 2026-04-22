@@ -24,6 +24,9 @@ import           Eidos.IR
 import           Eidos.Parser         (parseString)
 import           Eidos.TypeCheck
 
+import Debug.Trace (trace)
+
+
 -- ---------------------------------------------------------------------------
 -- Public entry points
 -- ---------------------------------------------------------------------------
@@ -717,51 +720,67 @@ reflectEntity e = e
 
 -- | After a subtheory has been built, propagate its entities to the parent theory.
 --
--- Rules (mirroring Go's addEntityToTheory):
---   * implicit subtheory (name ""):  entity is added under its own name (no prefix)
---   * named subtheory:               entity is added under "subName.entityName"
---   * reflection subtheory:          entity is first transformed (reflectEntity),
---                                    then added under "subName.entityName"
+-- Rules:
+--   * All subtheories: every entity is added under the qualified name "subName.entityName".
+--     Internal structural entities (names containing '#') are only added qualified.
+--   * Named/reflection subtheories: no unqualified names are added.
+--   * Implicit subtheories: for each entity with a "plain" name (no '#'):
+--       - Built-ins (𝔻, ℙ, 𝕌, ⊤, ⊥, +, ×, -, ⇒, ∸): the parent already owns the
+--         unqualified slot.  Add an equality fact  parent_entity = sub.entity
+--         using the qualified entity (already registered above).
+--       - User-defined, unqualified name not yet in parent: add normally.
+--       - User-defined, unqualified name already in parent from another implicit
+--         subtheory, and the two entities are structurally compatible (same kind /
+--         arity / argument sorts / result sort): add an equality fact merging them,
+--         and also store the new entity under the unqualified key so the slot becomes
+--         ambiguous (multiple entries → lookupInParentByName returns Nothing).
+--         The equality facts serve as proof-level witnesses of the identification.
+--       - User-defined, same name, NOT structurally compatible: just accumulate
+--         (the lookup becomes ambiguous, which is the correct error signal).
+--
+-- "Internal" means the name contains '#' — these are bookkeeping artefacts
+-- (sort limits, domain sorts, image functions, …) and must not pollute the
+-- parent's unqualified namespace.
 --
 -- The propagated names are inserted into the parent's objectsByName map only
 -- (not into theoryObjects, which lists only locally-declared entities).
+propagateSubtheory :: Theory -> String -> Bool -> Bool -> Theory -> Theory
 propagateSubtheory parentTh subName isImplicit isReflection subTh =
-  let addAll th (name, entities) =
-        let transformed = if isReflection then map reflectEntity entities else entities
-            -- Always add qualified name
-            qualifiedName = if null subName then name else subName ++ "." ++ name
-            th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
-            -- For implicit subtheories, handle unqualified name
-            th2 = if isImplicit
-                  then foldl (\t e -> 
-                         case Map.lookup name (theoryObjectsByName t) of
-                           Just (existing:_) -> 
-                             -- Add equality fact between existing and new entity
-                             addEqualityFact t existing e
-                           Nothing -> 
-                             addEntityToParent t name e
-                       ) th1 transformed
-                  else th1
-        in th2
-  in foldl addAll parentTh (Map.toList (theoryObjectsByName subTh))
-  
--- Built-in entity names that should be merged via equality facts
-builtInNames :: [String]
-builtInNames = ["𝔻", "ℙ", "𝕌", "⊤", "⊥", "+", "×", "-", "⇒", "∸"]
+  foldl addEntry parentTh (Map.toList (theoryObjectsByName subTh))
+  where
+    addEntry th (name, entities) =
+      let transformed = if isReflection then map reflectEntity entities else entities
+          qualifiedName = if null subName then name else subName ++ "." ++ name
 
--- Add an equality fact between two entities
-addEqualityFact :: Theory -> Entity -> Entity -> Theory
-addEqualityFact th parentEntity subEntity =
-  let -- Create a fact: parentEntity = subEntity
-      fact = mkEqualityFact parentEntity subEntity
-  in addFactToTh th fact
+          -- Step 1: always register the qualified name.
+          th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
 
--- Create an equality fact between two entities
-mkEqualityFact :: Entity -> Entity -> Fact
-mkEqualityFact e1 e2 =
-  -- Build a ResolvedPropExpr representing e1 = e2
-  let leftTerm = termFromEntity e1
-      rightTerm = termFromEntity e2
+          -- Step 2: for implicit subtheories, also handle the unqualified name —
+          -- but only for "plain" names (no '#').
+          th2 = if isImplicit && not (isInternalName name)
+                then foldl (addUnqualified name qualifiedName) th1 transformed
+                else th1
+      in th2
+
+-- | Create a ResolvedTerm from an entity with a custom display name
+termFromEntityWithName :: String -> Entity -> ResolvedTerm
+termFromEntityWithName displayName entity =
+  let constRef = ResolvedConstantRef
+        { resolvedConstRefName = displayName
+        , resolvedConstEntity  = entity
+        , resolvedConstType    = entityToExprType entity
+        }
+      factor = ResolvedFactor (ResolvedBTAtomic constRef) [] (entityToExprType entity)
+  in ResolvedTerm factor [] (entityToExprType entity)
+
+-- | Convenience wrapper using the entity's own name as the display name.
+termFromEntity :: Entity -> ResolvedTerm
+termFromEntity e = termFromEntityWithName (entityName e) e
+
+addEqualityFactNamed :: Theory -> String -> String -> Entity -> Entity -> Theory
+addEqualityFactNamed th lhsName rhsName lhsEntity rhsEntity =
+  let leftTerm = termFromEntityWithName lhsName lhsEntity
+      rightTerm = termFromEntityWithName rhsName rhsEntity
       relation = ResolvedRelationFollowedByTerm [] "=" Nothing rightTerm
       termPair = ResolvedTermPair leftTerm [relation] (termTypeMereological Nothing Nothing)
       atomicProp = ResolvedAtomicTermPair termPair
@@ -771,26 +790,128 @@ mkEqualityFact e1 e2 =
       disj = ResolvedDisj conj []
       leftImpl = ResolvedLeftImpl disj []
       rightImpl = ResolvedRightImpl leftImpl Nothing
+  in addFactToTh th (Fact
+        { factIsMereologicalTranslation = False
+        , factIsInherited = False
+        , factKind = FactKindAssertion
+        , factPropExpr = ResolvedPropBicond rightImpl []
+        })
+
+-- | Built-in entity names that every theory already owns
+builtInNames :: [String]
+builtInNames = ["𝔻", "ℙ", "𝕌", "+", "×", "-", "⇒", "∸", "⊤", "⊥"]
+
+isBuiltIn :: String -> Bool
+isBuiltIn name = name `elem` builtInNames
+
+    -- | Decide what to do when we encounter `entity` (from the sub) for the
+    --   unqualified slot `name`.  `qualifiedName` is the already-registered
+    --   "sub.entity" key we can look up to produce well-formed equality facts.
+addUnqualified :: String -> String -> Theory -> Entity -> Theory
+addUnqualified name qualifiedName th entity
+  -- Built-ins: parent already owns the slot. Add equality fact only.
+  | isBuiltIn name =
+      case ( Map.lookup name (theoryObjectsByName th)
+           , Map.lookup qualifiedName (theoryObjectsByName th) ) of
+        (Just (parentEntity:_), Just (subEntity:_)) ->
+          addEqualityFactNamed th name qualifiedName parentEntity subEntity
+        _ -> th
+  -- Slot empty: first time this name appears
+  | Nothing <- Map.lookup name (theoryObjectsByName th) =
+      let canonical = createCanonicalEntity entity
+          th1 = addEntityToParent th name canonical
+      in addEqualityFactNamed th1 name qualifiedName canonical entity
+  -- Slot occupied: existing canonical entity
+  | Just (canonical : _) <- Map.lookup name (theoryObjectsByName th) =
+      let compatible = entitiesCompatible canonical entity
+      in if compatible
+         then addEqualityFactNamed th name qualifiedName canonical entity
+         else error $ "Name conflict: '" ++ name ++ "' refers to incompatible entities"
+  | otherwise = th
+  
+-- | Create a canonical entity that serves as the merged representative
+-- for user-defined entities from implicit subtheories.
+-- The canonical entity is a copy of the subtheory's entity but with
+-- ReflectedFrom set to Nothing, indicating it's the canonical merged version.
+createCanonicalEntity :: Entity -> Entity
+createCanonicalEntity (EntitySort s) =
+  EntitySort (s { sortReflectedFrom = Nothing })
+createCanonicalEntity (EntityFunction f) =
+  EntityFunction (f { funcReflectedFrom = Nothing })
+createCanonicalEntity (EntityMereological m) =
+  EntityMereological (m { mereoReflectedFrom = Nothing })
+createCanonicalEntity (EntityRelation r) =
+  EntityRelation (r { relReflectedFrom = Nothing })
+createCanonicalEntity e = e  -- fallback (should not happen)
+
+-- | True for names that are internal structural artefacts produced automatically
+--   by the IR builder (sort limits, domain sorts, image functions, etc.).
+--   These contain '#' (e.g. "S#min", "f#dom", "f#dir_img") and must not be
+--   propagated as bare unqualified names.
+isInternalName :: String -> Bool
+isInternalName = ('#' `elem`)
+
+-- | Structural compatibility check — mirrors C++ overload/override resolution.
+--   Two entities are compatible (and thus candidates for an equality-fact merge)
+--   iff they could represent the same mathematical concept:
+--   same constructor family, same arity, and (for functions/relations) the same
+--   sort names for arguments and result.
+--
+--   We compare sort *names* rather than sort identity because sorts from
+--   different theories are distinct Haskell values even when they refer to the
+--   same mathematical concept.
+--
+--   Sorts: we do NOT treat two arbitrary sorts as compatible just because they
+--   share a name.  An `S` in `sub1` and an `S` in `sub2` are unrelated unless
+--   they came from a shared ancestor, which cannot be determined here.  For
+--   sorts we therefore require the same originating theory (same fully-qualified
+--   name) before issuing an equality fact.  Two truly independent `sort S`
+--   declarations remain ambiguous (no spurious fact) while a sort propagated up
+--   through a chain of implicit subtheories correctly stays as one concept.
+entitiesCompatible :: Entity -> Entity -> Bool
+entitiesCompatible (EntitySort s1) (EntitySort s2) =
+  sortName s1 == sortName s2
+  --theoryFullyQualifiedName (sortTheory s1) == theoryFullyQualifiedName (sortTheory s2)
+entitiesCompatible (EntityFunction f1) (EntityFunction f2) =
+  length (funcArgSorts f1) == length (funcArgSorts f2) &&
+  sortName (funcResSort f1) == sortName (funcResSort f2) &&
+  and (zipWith (\a b -> sortName a == sortName b) (funcArgSorts f1) (funcArgSorts f2))
+entitiesCompatible (EntityRelation r1) (EntityRelation r2) =
+  length (relArgSorts r1) == length (relArgSorts r2) &&
+  and (zipWith (\a b -> sortName a == sortName b) (relArgSorts r1) (relArgSorts r2))
+entitiesCompatible (EntityMereological m1) (EntityMereological m2) =
+  mereoKind m1 == mereoKind m2 &&
+  sortName (mereoSort m1) == sortName (mereoSort m2)
+entitiesCompatible _ _ = False   -- different constructors → incompatible
+
+-- | Add an equality fact  e1 = e2  to the theory.
+addEqualityFact :: Theory -> Entity -> Entity -> Theory
+addEqualityFact th e1 e2 = addFactToTh th (mkEqualityFact e1 e2)
+
+-- | Build a 'Fact' asserting e1 = e2.
+mkEqualityFact :: Entity -> Entity -> Fact
+mkEqualityFact e1 e2 =
+  let leftTerm  = termFromEntity e1
+      rightTerm = termFromEntity e2
+      relation  = ResolvedRelationFollowedByTerm [] "=" Nothing rightTerm
+      termPair  = ResolvedTermPair leftTerm [relation] (termTypeMereological Nothing Nothing)
+      atomicProp = ResolvedAtomicTermPair termPair
+      quantified = ResolvedQuantified [] atomicProp
+      neg        = ResolvedNegChild quantified
+      conj       = ResolvedConj neg []
+      disj       = ResolvedDisj conj []
+      leftImpl   = ResolvedLeftImpl disj []
+      rightImpl  = ResolvedRightImpl leftImpl Nothing
   in Fact
     { factIsMereologicalTranslation = False
-    , factIsInherited = False
-    , factKind = FactKindAssertion  -- or FactKindFact? Assertion is appropriate
-    , factPropExpr = ResolvedPropBicond rightImpl []
+    , factIsInherited               = False
+    , factKind                      = FactKindAssertion
+    , factPropExpr                  = ResolvedPropBicond rightImpl []
     }
 
--- Helper to create a ResolvedTerm from an Entity
-termFromEntity :: Entity -> ResolvedTerm
-termFromEntity entity =
-  let constRef = ResolvedConstantRef
-        { resolvedConstRefName = entityName entity
-        , resolvedConstEntity = entity
-        , resolvedConstType = entityToExprType entity
-        }
-      factor = ResolvedFactor (ResolvedBTAtomic constRef) [] (entityToExprType entity)
-  in ResolvedTerm factor [] (entityToExprType entity)
+-- | Build a minimal 'ResolvedTerm' wrapping a single entity constant.
 
-
--- Add an entity to a theory's name map only (not to theoryObjects)
+-- | Add an entity to a theory's name map only (not to theoryObjects).
 addEntityToParent :: Theory -> String -> Entity -> Theory
 addEntityToParent th name entity =
   th { theoryObjectsByName = Map.insertWith (++) name [entity] (theoryObjectsByName th) }

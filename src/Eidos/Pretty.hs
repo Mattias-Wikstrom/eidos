@@ -514,21 +514,14 @@ prettyResolvedAtomicPropWithOpts opts (ResolvedAtomicConstant ref) =
 prettyResolvedAtomicPropWithOpts opts (ResolvedAtomicTermPair tp) = 
   prettyResolvedTermPairWithOpts opts tp
 
+-- FIXED: Always use resolvedConstRefName for display, ignore poShowFQN for constants
 prettyResolvedConstantRefWithOpts :: PrettyOptions -> ResolvedConstantRef -> Doc
 prettyResolvedConstantRefWithOpts opts ref =
   let name = resolvedConstRefName ref
-      fullName = if poShowFQN opts
-                 then case resolvedConstEntity ref of
-                        IR.EntitySort s -> IR.sortName s
-                        IR.EntityFunction f -> IR.funcName f
-                        IR.EntityMereological m -> IR.mereoName m
-                        IR.EntityRelation r -> IR.relName r
-                        IR.EntityTheory t -> IR.theoryName t
-                 else name
       typeInfo = if poShowTypes opts
                  then " : " ++ show (resolvedConstType ref)
                  else ""
-  in fullName ++ typeInfo
+  in name ++ typeInfo
 
 prettyResolvedTermPairWithOpts :: PrettyOptions -> ResolvedTermPair -> Doc
 prettyResolvedTermPairWithOpts opts (ResolvedTermPair left rights _) =
@@ -573,7 +566,7 @@ prettyResolvedSuffixWithOpts opts (ResolvedSuffixSpecialOp op) = "#" ++ op
 
 -- | Pretty-print a resolved proposition expression (with default options)
 prettyResolvedPropExpr :: ResolvedPropExpr -> Doc
-prettyResolvedPropExpr = prettyResolvedPropExprWithOpts defaultPrettyOptions
+prettyResolvedPropExpr = prettyResolvedPropExprWithOpts defaultPrettyOptions { poShowFQN = True }
 
 -- | Pretty-print a fact with full IR details (for debugging)
 prettyFactDebug :: Fact -> Doc
