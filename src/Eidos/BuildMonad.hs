@@ -27,7 +27,7 @@ import qualified Data.Map as Map
 import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import Data.Maybe (fromMaybe, catMaybes)
-import Control.Monad (forM, when)
+import Control.Monad (forM)
 
 import Eidos.ExternalRef
 
@@ -148,3 +148,4 @@ instance MonadExternalRefResolver (Reader FnResolver) where
   readExternalContent (MemorySource content) = return content
   readExternalContent (FileSystemSource path) =
     error $ "Cannot read from FileSystemSource in FnResolver: " ++ path
+

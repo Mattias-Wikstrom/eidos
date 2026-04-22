@@ -8,11 +8,11 @@ module Eidos.ExternalRef
     -- * File system utilities (pure)
   , generateCandidates
   , splitReference
+  , splitOn
   , extractIdentifier
   , theoryTypeToExtension
   , theoryTypeToSuffix
   , allTheoryTypes
-  , splitOn
     -- * Test helpers
   , mockResolver
   ) where

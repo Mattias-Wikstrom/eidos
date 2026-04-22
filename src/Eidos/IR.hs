@@ -23,26 +23,33 @@ data Origin
   deriving (Show, Eq)
 
 data EntityKind
-  = SortKindFromSignature
-  | SortKindUniverse
-  | SortKindDomain
-  | SortKindProp
-  | SortKindProduct
-  | SortKindFromReflection
-  | FunctionKindFOLFunctionFromTheory
-  | FunctionKindSOLFunctionFromTheory
-  | FunctionKindFOLFunctionFromReflection
-  | FunctionKindDirectImageFunction
-  | FunctionKindInverseImageFunction
-  | FunctionKindMereologicalOperation
-  | MereologicalEntityKindMereological
-  | MereologicalEntityKindIndividual
-  | MereologicalEntityKindSet
-  | MereologicalEntityKindProposition
-  | MereologicalEntityKindUpperLimitForSort
-  | MereologicalEntityKindLowerLimitForSort
-  | MereologicalEntityKindResultOfSOLFunction
-  | MereologicalEntityKindArgumentOfSOLFunction
+  -- Sort kinds
+  = SortKindFromSignature          -- ^ User-declared sort from a @sort@ declaration
+  | SortKindUniverse               -- ^ The built-in universe sort 𝕌
+  | SortKindDomain                 -- ^ The built-in domain sort 𝔻
+  | SortKindProp                   -- ^ The built-in proposition sort ℙ
+  | SortKindProduct                -- ^ Product sort generated for FOL function domains
+  | SortKindFromReflection         -- ^ Marker: sort was produced by @reflectEntity@.
+                                   --   This variant is set in 'sortKind' but is currently
+                                   --   a pure marker — no code path branches on it after
+                                   --   construction.  It is reserved for future type-checking
+                                   --   passes that may need to distinguish reflected sorts.
+  -- Function kinds
+  | FunctionKindFOLFunctionFromTheory      -- ^ User-declared FOL (lowercase) function
+  | FunctionKindSOLFunctionFromTheory      -- ^ User-declared SOL (uppercase) function
+  | FunctionKindFOLFunctionFromReflection  -- ^ FOL function produced by reflection
+  | FunctionKindDirectImageFunction        -- ^ Auto-generated direct-image SOL function f#dir_img
+  | FunctionKindInverseImageFunction       -- ^ Auto-generated inverse-image SOL function f#inv_img
+  | FunctionKindMereologicalOperation      -- ^ Built-in mereological op (+, ×, -, ⇒, ∸)
+  -- Mereological object kinds
+  | MereologicalEntityKindMereological          -- ^ Bare mereological object (no subtype)
+  | MereologicalEntityKindIndividual            -- ^ An individual element of a sort
+  | MereologicalEntityKindSet                   -- ^ A set of individuals
+  | MereologicalEntityKindProposition           -- ^ A proposition (lives in ℙ)
+  | MereologicalEntityKindUpperLimitForSort      -- ^ The S#max limit object for sort S
+  | MereologicalEntityKindLowerLimitForSort      -- ^ The S#min limit object for sort S
+  | MereologicalEntityKindResultOfSOLFunction    -- ^ The f#res result object of an SOL function
+  | MereologicalEntityKindArgumentOfSOLFunction  -- ^ The f#N argument object of an SOL function
   deriving (Show, Eq)
 
 data FactKind
@@ -78,19 +85,29 @@ entityName (EntityMereological m) = mereoName m
 entityName (EntityRelation r)     = relName r
 entityName (EntityTheory t)       = theoryName t
 
+-- | Return the 'EntityKind' of an entity.
+--
+-- __Partial__: throws a runtime error for 'EntityTheory' because theories do
+-- not carry an 'EntityKind'.  Call sites should pattern-match on 'Entity'
+-- directly when 'EntityTheory' is a possible case, or guard with
+-- @classifyLevel1 e /= L1Theory@.
 entityKind :: Entity -> EntityKind
 entityKind (EntitySort s)         = sortKind s
 entityKind (EntityFunction f)     = funcKind f
 entityKind (EntityMereological m) = mereoKind m
 entityKind (EntityRelation r)     = relKind r
-entityKind (EntityTheory _)       = error "Theories don't have an EntityKind"
+entityKind (EntityTheory _)       = error "entityKind: EntityTheory has no EntityKind"
 
+-- | Return the 'Origin' of an entity.
+--
+-- __Partial__: throws a runtime error for 'EntityTheory' — same rationale as
+-- 'entityKind'.
 entityOrigin :: Entity -> Origin
 entityOrigin (EntitySort s)         = sortOrigin s
 entityOrigin (EntityFunction f)     = funcOrigin f
 entityOrigin (EntityMereological m) = mereoOrigin m
 entityOrigin (EntityRelation r)     = relOrigin r
-entityOrigin (EntityTheory _)       = error "Theories don't have an Origin"
+entityOrigin (EntityTheory _)       = error "entityOrigin: EntityTheory has no Origin"
 
 -- ---------------------------------------------------------------------------
 -- Sort
@@ -158,6 +175,11 @@ instance Show MereologicalObject where
 data Relation = Relation
   { relOrigin        :: Origin
   , relKind          :: EntityKind
+    -- ^ Always 'MereologicalEntityKindSet' in the current implementation.
+    -- Relations are represented as sets of tuples; this field exists for
+    -- symmetry with the other entity records but carries no additional
+    -- discriminating information.  It is kept so that 'entityKind' works
+    -- uniformly across all non-theory entities.
   , relTheory        :: Theory
   , relName          :: String
   , relArgSorts      :: [Sort]
@@ -184,6 +206,14 @@ data Theory = Theory
   , theorySubtheories               :: [Theory]
   , theoryObjects                   :: [Entity]
   , theoryObjectsByName             :: Map.Map String [Entity]
+    -- ^ Maps each declared name to the list of entities that share it.
+    -- A singleton list is the normal case.  A list with more than one entry
+    -- signals an ambiguous name (e.g. the same name imported from two
+    -- incompatible implicit subtheories).  Lookup helpers such as
+    -- 'lookupEntity' treat multi-entry lists as "ambiguous" and return
+    -- @Left "Ambiguous name: …"@; they do /not/ silently pick one.
+    -- Callers that need all bindings (e.g. equality-fact propagation) iterate
+    -- over the list directly.
   , theoryFacts                     :: [Fact]
   , theoryUniverse                  :: Sort
   , theoryDomain                    :: Sort

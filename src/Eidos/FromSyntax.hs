@@ -11,15 +11,15 @@ import           Control.Monad        (forM_, when, foldM)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Data.Char            (isUpper)
-import           Data.List            (find, isPrefixOf, intercalate)
+import           Data.List            (find, intercalate)
 import qualified Data.Map.Strict      as Map
-import           Data.Maybe           (fromMaybe, isJust, isNothing, mapMaybe)
+import           Data.Maybe           (fromMaybe, mapMaybe)
 import           System.FilePath      (takeDirectory)
 
 import           Eidos.AST            hiding (theoryBody, theoryName, funcName, funcDomain, relName)
 import qualified Eidos.AST            as AST
 import           Eidos.BuildMonad
-import           Eidos.ExternalRef (splitOn)
+import           Eidos.ExternalRef    hiding (mockResolver)
 import           Eidos.IR
 import           Eidos.Parser         (parseString)
 import           Eidos.TypeCheck
@@ -123,32 +123,27 @@ processEntry (th, subs) entry = case entry of
 processItem kw (th, subs) item = do
   baseContext <- ask
   
-  let subName = case kw of
-        "implicit" -> fromMaybe "" (itemName item)
-        _ -> fromMaybe "" (itemName item)
-
+  let subName = fromMaybe "" (itemName item)
+  
   when (subName == "") $
     throwError "All subtheories must have names."
   
-  let isRefl = kw == "reflection"
+  let isRefl     = kw == "reflection"
       isImplicit = kw == "implicit"
   
   (subBody, extInfo) <- resolveSubtheoryBody baseContext item
   
-  let finalName = case extInfo of
-        Just (extId, _) -> subName
-        Nothing -> subName
-  
-  let subContext = case extInfo of
-        Just (_, FileSystemSource _) -> baseContext
-        Just (_, MemorySource _) -> baseContext
-        Nothing -> baseContext
+  -- extInfo carries external-ref metadata (identifier + source) when the
+  -- subtheory body was loaded from an outside file; for inline bodies it is
+  -- Nothing.  In either case the subName drives the qualified name and the
+  -- baseContext is used unchanged for recursive resolution.
+  let subContext = baseContext
   
   sub <- local (const subContext) $ 
-    decorateTheoryBody subBody (Just th) finalName isRefl
+    decorateTheoryBody subBody (Just th) subName isRefl
   
   let th' = addSubtheoryToTheory th sub
-  th'' <- either throwError return $ propagateSubtheory th' finalName isImplicit isRefl sub
+  th'' <- either throwError return $ propagateSubtheory th' subName isImplicit isRefl sub
 
   return (th'', subs ++ [sub])
 
@@ -190,6 +185,9 @@ addSubtheoryToTheory th sub =
 buildSignatureSection
   :: forall m. (MonadExternalRefResolver m)
   => Theory -> Theory -> Section -> BuildM m Theory
+-- NOTE: th0 is the initial theory snapshot (with built-in sorts + subtheories)
+-- passed to buildSignatureItem so that each item can look up sorts that were
+-- already declared.  th is the accumulator that grows as items are processed.
 buildSignatureSection th0 th (SectionSignature (SignatureSection items)) = do
   foldM (buildSignatureItem th0) th items
 buildSignatureSection _ th _ = return th
@@ -295,6 +293,11 @@ buildAxiomsSection _ th _ = return th
 buildAxSection
   :: forall m. (MonadExternalRefResolver m)
   => Theory -> Theory -> AxiomsSection -> BuildM m Theory
+-- NOTE: th0 is the signature snapshot captured before any axioms are added.
+-- It is passed to resolvePropExprInclVars so that name resolution always
+-- operates against the completed signature, never against an axiom-by-axiom
+-- accumulation.  th is the theory being accumulated with new Fact entries;
+-- it is the value returned at the end of each fold step.
 buildAxSection th0 th axSec = case axSec of
   AxAssertions (AssertionsSection props) ->
     foldM (addPropFact th0 FactKindAssertion) th props
@@ -326,32 +329,6 @@ addPropFact th0 fk th prop = do
         , factPropExpr                  = resolvedExpr
         }
   return (th { theoryFacts = theoryFacts th ++ [fact] })
-
--- ---------------------------------------------------------------------------
--- Theory skeleton construction (pure, no monad needed)
--- ---------------------------------------------------------------------------
-
--- ... (keep all the existing pure functions: createTheory, mkSort, mkMereo, 
---     mkSOLFunction, mkFOLFunction, mkSortLimitFact, twoTermPropExpr,
---     addEntityToTh, mkRelatedSort, mkRelation, lookupSort, lookupSortByExpr,
---     lookupEntity, lookupEntityInPath, lookupInPath, findSubtheoryByPath,
---     entityToExprType, firstLetterIsUppercase, and all the name resolution
---     functions from the original file) ...
-
--- The following functions from your original file remain unchanged:
--- createTheory, mkSort, mkMereo, mkSOLFunction, mkFOLFunction, mkSortLimitFact,
--- twoTermPropExpr, addEntityToTh, mkRelatedSort, mkRelation, lookupSort,
--- lookupSortByExpr, lookupEntity, lookupEntityInPath, lookupInPath,
--- findSubtheoryByPath, entityToExprType, firstLetterIsUppercase,
--- resolvePropExprInclVars, resolvePropExpr, resolvePropExprRest,
--- resolveRightImpl, resolveLeftImpl, resolveDisj, resolveConj, resolveNeg,
--- resolveQuantified, resolveVarDecl, resolveAtomicProp, resolveTermPair,
--- resolveRFT, resolveTerm, resolveOFF, resolveFactor, resolveBaseTerm,
--- resolveSuffix, resolveConstantRef, validateAllTermPairs,
--- validateRightImplTermPairs, validateLeftImplTermPairs, validateDisjTermPairs,
--- validateConjTermPairs, validateNegTermPairs, validateQuantifiedTermPairs,
--- validateAtomicPropTermPairs, validateTermPairSemantics, getResolvedTermType
-
 
 -- ---------------------------------------------------------------------------
 -- Theory skeleton construction
@@ -435,37 +412,42 @@ createTheory parentMaybe name isRefl =
 -- Smart constructors for IR entities
 -- ---------------------------------------------------------------------------
 
+-- | Construct a 'Sort' together with its min/max limit objects.
+-- A recursive @let@ is used so that @sortMin@ and @sortMax@ can reference
+-- the same @s@ value rather than calling @mkSort@ recursively (which would
+-- create an infinite chain of fresh allocations).
 mkSort :: Theory -> EntityKind -> String -> Origin -> Sort
-mkSort th k nm orig = Sort
-  { sortKind              = k
-  , sortTheory            = th
-  , sortOrigin            = orig
-  , sortMin               = mkSortMin
-  , sortMax               = mkSortMax
-  , sortName              = nm
-  , sortComponentSorts    = []
-  , sortAssociatedEntity  = Nothing
-  , sortReflectedFrom     = Nothing
-  }
-  where
-    mkSortMin = MereologicalObject
-      { mereoKind          = MereologicalEntityKindLowerLimitForSort
-      , mereoOrigin        = orig
-      , mereoTheory        = th
-      , mereoName          = nm ++ "#min"
-      , mereoSort          = mkSort th k nm orig
-      , mereoLimitForSort  = Just (mkSort th k nm orig)
-      , mereoReflectedFrom = Nothing
-      }
-    mkSortMax = MereologicalObject
-      { mereoKind          = MereologicalEntityKindUpperLimitForSort
-      , mereoOrigin        = orig
-      , mereoTheory        = th
-      , mereoName          = nm ++ "#max"
-      , mereoSort          = mkSort th k nm orig
-      , mereoLimitForSort  = Just (mkSort th k nm orig)
-      , mereoReflectedFrom = Nothing
-      }
+mkSort th k nm orig =
+  let s = Sort
+        { sortKind             = k
+        , sortTheory           = th
+        , sortOrigin           = orig
+        , sortMin              = sMin
+        , sortMax              = sMax
+        , sortName             = nm
+        , sortComponentSorts   = []
+        , sortAssociatedEntity = Nothing
+        , sortReflectedFrom    = Nothing
+        }
+      sMin = MereologicalObject
+        { mereoKind          = MereologicalEntityKindLowerLimitForSort
+        , mereoOrigin        = orig
+        , mereoTheory        = th
+        , mereoName          = nm ++ "#min"
+        , mereoSort          = s
+        , mereoLimitForSort  = Just s
+        , mereoReflectedFrom = Nothing
+        }
+      sMax = MereologicalObject
+        { mereoKind          = MereologicalEntityKindUpperLimitForSort
+        , mereoOrigin        = orig
+        , mereoTheory        = th
+        , mereoName          = nm ++ "#max"
+        , mereoSort          = s
+        , mereoLimitForSort  = Just s
+        , mereoReflectedFrom = Nothing
+        }
+  in s
 
 mkMereo :: Theory -> EntityKind -> String -> Sort -> Origin -> MereologicalObject
 mkMereo th k nm s orig = MereologicalObject
@@ -879,33 +861,6 @@ entitiesCompatible (EntityMereological m1) (EntityMereological m2) =
   sortName (mereoSort m1) == sortName (mereoSort m2)
 entitiesCompatible _ _ = False   -- different constructors → incompatible
 
--- | Add an equality fact  e1 = e2  to the theory.
-addEqualityFact :: Theory -> Entity -> Entity -> Theory
-addEqualityFact th e1 e2 = addFactToTh th (mkEqualityFact e1 e2)
-
--- | Build a 'Fact' asserting e1 = e2.
-mkEqualityFact :: Entity -> Entity -> Fact
-mkEqualityFact e1 e2 =
-  let leftTerm  = termFromEntity e1
-      rightTerm = termFromEntity e2
-      relation  = ResolvedRelationFollowedByTerm [] "=" Nothing rightTerm
-      termPair  = ResolvedTermPair leftTerm [relation] (termTypeMereological Nothing Nothing)
-      atomicProp = ResolvedAtomicTermPair termPair
-      quantified = ResolvedQuantified [] atomicProp
-      neg        = ResolvedNegChild quantified
-      conj       = ResolvedConj neg []
-      disj       = ResolvedDisj conj []
-      leftImpl   = ResolvedLeftImpl disj []
-      rightImpl  = ResolvedRightImpl leftImpl Nothing
-  in Fact
-    { factIsMereologicalTranslation = False
-    , factIsInherited               = False
-    , factKind                      = FactKindAssertion
-    , factPropExpr                  = ResolvedPropBicond rightImpl []
-    }
-
--- | Build a minimal 'ResolvedTerm' wrapping a single entity constant.
-
 -- | Add an entity to a theory's name map only (not to theoryObjects).
 addEntityToParent :: Theory -> String -> Entity -> Theory
 addEntityToParent th name entity =
@@ -1103,7 +1058,7 @@ lookupEntity th nm =
         [_] -> lookupEntity (head matchingSubs) (intercalate "." rest)
         _ -> Left $ "Ambiguous path: '" ++ first ++ "' refers to multiple subtheories"
 
--- Helper
+
 lookupEntityInPath :: Theory -> [String] -> String -> Either BuildError Entity
 lookupEntityInPath th [] nm   = lookupEntity th nm
 lookupEntityInPath th path nm = do
