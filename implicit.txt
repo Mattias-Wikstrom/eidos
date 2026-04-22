@@ -1,0 +1,223 @@
+==============================
+Named and Implicit Subtheories
+==============================
+
+Eidos allows a theory to have subtheories of three different kinds that are labelled through the keywords 'named', 'implicit', and 'reflection'.
+
+This example illustrates all three:
+{
+    signature { sort Y; },
+    axioms {
+        assertions
+        {
+
+        }
+    },
+    subtheories {
+        named {
+            sub1: { signature { sort S; } }
+            sub2: { signature { sort T; } }
+        },
+        implicit {
+            sub3: { signature { sort U; } }
+            sub4: { signature { sort V; } }
+        },
+        reflection {
+            sub5: { signature { sort W; } }
+            sub6: { signature { sort X; } }
+        }
+    }
+}
+
+Named subtheories involve the simplest rules. The main theory gets to include everything from the subtheory, but the name of the subtheory must always appear explicitly when you want to refer to things in a named subtheory. In the example above, the main theory can refer to sub1.S and sub2.T, but it cannot abbreviate 'sub1.S' into 'S' or 'sub2.T' into 'T'.
+
+By contrast, implicit subtheories make it /optional/ to include the name of the subtheory. In the example above, 'sub3.U' may be abbreviated into 'U' and 'sub4.V' may be abbreviated into 'V'.
+
+Named subtheories would quickly become inconvenient in practice were it not for the support that Eidos provides for 'equating' things. The following example illustrates this:
+{
+    signature { sort U; sort V; g : U -> U;},
+    axioms {
+        facts
+        {
+            /* Note: Identifications of this kind should arguably be in signatures and not in facts sections. A decision is needed on this matter. */
+            U = sub1.S; /* U will be an alias for sub1.S */
+            V = sub2.T; /* V will be an alias for sub2.T */
+            g = f; /* g will be an alias for sub1.f */
+        }
+        assertions
+        {
+            
+        }
+    },
+    subtheories {
+        named {
+            sub1: { signature { sort S; f: S -> S; } }
+            sub2: { signature { sort T; } }
+        },
+    }
+}
+
+Note that implicit subtheories do have names even if you are allowed to omit them. The intent behind this design decision was 1) to make it possible to 'elaborate' theories by making all subtheory names explicit and 2) to make it possible to disambiguate things when the same name appears in more than one theory.
+
+The current design decision is, however, to disallow ambiguities: If the same name gets implicitly from more than it is assumed that the name is meant to refer to the same thing in both place. A compilation error is generated if the types do not match (for example, a sort cannot be equated with a function, a FOL function cannot be equated with a SOL function, and two functions cannot be equated unless their sorts match).
+
+[Reflection is its own subject and is not covered here. A subtheory that is imported by reflection is not 'included' in the main theory in the same direct way that other subtheories get included in the main theory. In addition, everything in the reflected subtheory gets 'reflected': Mereological objects become individuals after reflection, SOL functions become FOL functions, etc.]
+
+It is possible to place subtheories in external files, but this does not affect the semantics in any way. As with #include in C/C++, it is much as if the external file had been inserted into the file that references is. Here is an example:
+{
+    signature { sort Y; },
+    subtheories {
+        named {
+            sub1: @file1
+            sub2: @file2
+        },
+        implicit {
+            sub3: @file3
+            sub4: { signature { sort V; } }
+        },
+        reflection {
+            sub5: @file5
+            sub6: { signature { sort X; } }
+        }
+    }
+}
+
+Note that things in a subtheory is referenced by the label that appears in front of the subtheory, never by filename. sub1.S would be used in the example above to refer to a sort S defined in file1.theory (or file1.coh.theory, file1.reg.theory, file1.eq.theory, etc.; Eidos allows several alternative file endings that have different meanings).
+
+A few symbols appear in all theories: 𝔻, ℙ, 𝕌, ⊤, ⊥, +, ×, -, . The general rule is that these mean /different/ things in different theories.
+
+To be more exact, 𝔻 and ℙ are such that they get included in a theory only if they are used. 𝔻 is 'the domain' in theories that want that and ℙ is 'the sort for propositions' in theories that want that. But using 𝔻 and/or ℙ is optional.
+
+It is very common for 𝔻 to include more things than sub.𝔻 (where sub is a subtheory). sub.𝔻 can be a subsort of 𝔻.
+
+It is common for ℙ to be the same thing as sub.ℙ, but it is also perfectly possible for these to be different. Classical logic could hold in one and not in the other.
+
+⊤ is the same thing as ℙ#min and ⊥ is the same thing as ℙ#max.
+
+𝕌 includes everything in a theory (even propositions). It is the 'universe'. It is common for sub.𝕌#max to be less than 𝕌#max and for sub.𝕌#min to be greater than 𝕌#min. The universe of the main theory can be an 'expansion' of the universe of the subtheory.
+
+Each theory comes with a part-whole relation. Except in the case of reflection, the part-whole relation of a subtheory is the restriction of the part-whole relation of the main theory to the universe of the subtheory.
+
++, ×, and - for a theory are characterized by their order-theoretical properties relative to the part-whole relation of the theory. + expresses meets, × expresses joins, and - expresses co-Heyting complements.
+
+Although the general rule is that 𝔻, ℙ, 𝕌, ⊤, ⊥, +, ×, -, etc. mean different things in different theories, this is not the case with implicit subtheories. This is a consequence of the more general rule that ambiguous names are forbidden. F and sub.F need to be the same thing when sub is implicit and so must 𝕌 and sub.𝕌.
+
+The Eidos implementation will 'promote' things from subtheories into their parent theories. For example, if a subtheory sub includes a FOL function f then the data structure for the main theory will contain an object labelled 'sub.f' which corresponds to the object labelled 'f' in the theory sub.
+
+Although this could be considered an implementation choice, it helps enforce the right rules and will simplify code generation.
+
+A good way to think of this is to see 'sub.f' in the main theory and 'f' in the theory sub as really being two different things that need to be 'identified' with each other. The generated Lean 4 code can use different data structures for different theories and then include 'identifications' among theories.
+
+'sub.f' in the main theory may thus be best thought of as a 'copy' of 'f' in the subtheory sub.
+
+If sub is implicit then the main theory gets 'f' as well, with an identification between 'f' and 'sub.f'.
+
+Note that there could be an additional identification between 'f' and 'sub2.f', where sub2 is another implicit subtheory. The compiler is supposed in this case to make sure that the types match (for example, sub.f and sub2.f must not be functions of different arities).
+
+When resolving the expression 'sub.f' in the main theory, the correct approach is to look for 'sub.f' in the data structure for the main theory, /not/ to look for 'f' within the data structure for the theory sub. The result might normally be the same, but this is not so in the case where sub is imported by reflection. 'sub.f' in the main theory will then be a reflected version of 'f' in the subtheory sub.
+
+Eidos does support the following construct for evaluating things in subtheories:
+-- | <<th1.th2>>(expr)
+pEvaluationInTheory :: Parser EvaluationInTheory
+pEvaluationInTheory = do
+  void doubleLt
+  n   <- pTheoryName
+  ns  <- many (dot *> pTheoryName)
+  void doubleGt
+  op  <- between lparen rparen pPropExpr
+  return $ EvaluationInTheory (n:ns) op
+
+For example, <<sub>>(f(i)) will look in sub instead of the main theory when evatuating 'f(i)'.
+
+
+
+
+
+
+
+
+From a conversation with an AI:
+"'And distributive_lattice.reg.theory imports lattice, which imports lower_semi_lattice and upper_semi_lattice, which import partial_order, which imports preorder. Both partial_order and preorder define lessThanOrEq, causing ambiguity.'
+
+
+This raises the question of 
+You've raised a profound point about the philosophy of the language. In mathematics, ≤ in a preorder and ≤ in a partial order are the same concept (reflexive, transitive) – the partial order just adds antisymmetry. So having both define lessThanOrEq is not ambiguous; it's refinement.
+The design principle
+In Eidos, when an implicit subtheory defines an entity with the same name as an entity already present (from another implicit subtheory or the parent), we have two options:
+Ambiguity error – treat them as different entities that happen to have the same name
+Merge – treat them as the same entity (the subtheory is refining/adding axioms to the existing concept)
+For mathematical theories, option 2 (merge) is almost always what you want. A lattice is a partial order with additional structure. The ≤ from the partial order and the ≤ from the lattice should be the same relation.
+The current implementation
+Currently, when propagating entities from implicit subtheories, propagateSubtheory adds the unqualified name regardless of whether it already exists. Then lookupEntity detects multiple entities with the same name and reports ambiguity.
+This is too strict for mathematical theories.
+"
+
+"We already have a merge solution for 𝔻 and ℙ. So maybe that should be extended to all names.
+Exactly! The same merge logic we have for built-ins (𝔻, ℙ, 𝕌, ⊤, ⊥, +, ×, etc.) should apply to all names when propagating from implicit subtheories."
+
+"But what we did with 𝔻 was to allow 𝔻 (from the parent) and sub.𝔻 (from the subtheory) to both be present in the parent theory, and to add an identity that effectively merges them."
+
+Same thing with ℙ and with 𝕌.
+
+"It preserves the distinction (they come from different theories)
+The equality can be used in proofs
+It works for both built-ins and user-defined entities"
+
+"When partial_order tries to add its lessThanOrEq, we add an equality fact: preorder.lessThanOrEq = partial_order.lessThanOrEq"
+
+"This would lead, though, to a lack of symmetry.
+What is needed instead is one identity for each propagation:
+lessThanOrEq = preorder.lessThanOrEq 
+lessThanOrEq = partial_order.lessThanOrEq
+You're absolutely correct. The equality should be between the unqualified name (which resolves to the parent's entity) and the qualified name (the subtheory's entity). This creates a chain of equalities:
+lessThanOrEq = preorder.lessThanOrEq
+lessThanOrEq = partial_order.lessThanOrEq
+From these, it follows that preorder.lessThanOrEq = partial_order.lessThanOrEq (by transitivity), but that's a derived fact, not an explicit one."
+
+"
+'If an entity exists and it's compatible → skip adding (merge)'
+
+An identity needs to be generated for a proper merge.
+
+A proper merge requires an explicit equality fact, not just skipping.
+
+When a compatible entity already exists, we should:
+Keep both entities in the map (unqualified name points to the existing one, qualified name points to the subtheory's version)
+Add an equality fact connecting them: existing = sub.entity
+"
+
+"The core problem
+We have two conflicting requirements:
+User-defined entities (like lessThanOrEq) should be merged when they refine the same concept (preorder → partial order)
+User-defined entities should not be merged when they are truly different concepts (two different sorts both named S)
+The current approach (adding unqualified names for all) treats lessThanOrEq from preorder and lessThanOrEq from partial_order as separate entities, causing ambiguity.
+The solution: Track entity identity
+We need to know when two entities are the "same concept" (should merge) vs different concepts (should cause ambiguity). For mathematical theories, entities with the same name from different theories in an inheritance chain should merge."
+
+"Maybe the code should check if they are 100% compatible and merge them in that case? 
+For example, lessThanOrEq could have different arities in different theories, and merge makes no sense in that case.
+You've identified the key insight. Two entities should be merged only if they are compatible:
+Same entity kind (both sorts, both functions, both relations)
+Same arity (for functions/relations)
+Same argument sorts (for functions/relations)
+Same result sort (for functions)
+If they are compatible, they represent the same concept and should be merged. If not, they are different concepts that happen to have the same name and should cause an ambiguity error.
+"
+
+"Since ℙ = sub.ℙ, the maxima (⊥) and minima (⊤) will also be equal. So what needs to be added is ℙ = sub.ℙ."
+
+"A fact of the form 𝔻 = sub.𝔻 is not trivial. Without it, 𝔻 in the main theory and 𝔻 in sub will be two different sorts."
+
+"Eidos is many-sorted, but the sort 𝔻 was added as a standard name for 'the domain' when you are dealing with single-sorted theories."
+"It could be, for example, that the subtheory uses ℙ and 𝔻 to specify what is meant by a 'division ring'... And the main theory could then go on and add the axioms needed for a field."
+"Named subtheories force you to explicitly equate 𝔻 in the main theory with 𝔻 in the subtheory, and similarly for ℙ. But implicit subtheories were meant to give you the extra convenience of making those identifications automatic."
+
+What is wrong with the current version of propagateSubtheory?
+
+It seems to be adding way too many identities for implicit subtheories. Those that suffice: 𝔻 = sub.𝔻, ℙ = sub.ℙ, 𝕌=sub.𝕌.
+The order in which subtheories are processed must not matter. The code is not allowed to make the first encounter of something 'win'. For this reason, something like the following may be needed: "The unqualified name should store a list of aliases (or sources) rather than a single entity. This captures the provenance and allows the system to know that lessThanOrEq came from multiple subtheories."
+Note that the system has a somewhat unusual design that 'propagates' things from subtheories to the parent theory. 
+
+Note also that all theories include 𝔻, ℙ, and 𝕌, but that these mean different things in different theories, with an exception in the case of implicit subtheories.  𝔻 in a subtheory may be a different domain from  𝔻 in the main theory. ℙ in a subtheory may satisfy classical logic while ℙ in the main theory only satisfies intuitionistic logic, or vice versa.
+
+There is a .md file that gives you the basic philosophy of the Eidos language.
