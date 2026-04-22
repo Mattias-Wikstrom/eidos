@@ -1,0 +1,36 @@
+==========
+Reflection
+==========
+
+Reflection in Eidos has similarities with reflection in Maude. Another comparison is with quotation in Lisp. The things in an Eidos theory get reflected/quoted.
+
+Another important analogy is with the powerset operation in topos theory. Subsets of a set A correspond to /elements/ of the powerset P(A). It is as if subsets of A get reflected/quoted into elements of the set P(A).
+
+In the Eidos case, the reflection of a sort may be thought of as the powerset of the original sort: A set of the original sort gets reflected into an individual of the new sort.
+
+This kind of transformation happens systematically for everything in a theory in Eidos that is imported using reflection. For example, a second-order logic (SOL) function gets reflected into a first-order logic (FOL) function.
+
+At the most basic level, what happens is that the part-whole relation in the original theory gets reflected into an ordinary order relation. The algebraic properties are preserved, but the mereological properties are not. (Compare this with how the powerset operation maps the relation 'is a subset of' among subsets into an order relation among elements.)
+
+While Maude and Lisp provide a 'quoting' operation that take you from an object to its reflection, Eidos will instead provide new meanings to old expressions when a theory is imported by reflection. For example, a symbol 'F' that originally stood for an n-ary SOL function will stand for an n-ary FOL function after reflection. 
+
+A operator does exist, however, for evaluating an expression within the context of a subtheory. This allows you to regain the meanings that symbols had before reflection. Writing <<th1>>(expr) will evaluate expr within the subtheory th1.
+
+Note that it is impossible to combine implicit imports with imports by reflection. Things imported through reflection will therefore always be prefixed with the name of the subtheory. For example, th1.S could refer to the reflection of a sort S that appeared in the theory th1.
+
+One way to think about reflection is to see it as allowing you to reason about the 'syntax' of a theory. The theory that imports another theory by reflection becomes like a 'meta theory' for the latter (in a stronger sense than what is ordinarily the case with subtheories). The two theories are not 'connected' in the way that is ordinarily the case with subtheories in Eidos (for example, the expressions "⊤" and "⊥" will often (in practice) have the same meanings in a theory and its subtheories, but this is never the case when a subtheory is imported by reflection).
+
+So how exactly are symbols/expressions of different kinds reinterpreted when reflection is used?
+* Sorts are reflected into sorts (and the name remains the same, as always with reflection in Eidos), but the new sort is essentially the powerset of the old sort. Subsets/monadic predicates/properties of the old sort become individuals of the new sort.
+* SOL functions are reflected into FOL functions. Although its ordinarily the case that Uppercase letters for functions signify SOL functions, that rule gets an exception here (the function retains its name even as its interpretation changes from a SOL function into a FOL function). The argument sorts and the sort of the function result are all reflected along with the function.
+* FOL functions are reflected into FOL functions, but the argument sorts and the sort of the function result are all reflected. One may think of how the powerset functor in topos theory transforms an arrow.
+* Mereological objects (including sets, individuals, and propositions; these may all be viewed as mereological objects in Eidos) are reflected into into individuals.
+* The part-whole relation is reflected into an order relation (one that is defined among individuals; a 'FOL relation' rather than the kind of relation that requires second-order logic for its expression).
+* The operations +, ×, -, and ∸ get reflected in such a way that their order-theoretic properties are preserved (for example, + will still express binary meets (but no longer with respect to the part-whole relation; what was the part-whole relation in the subtheory has been reflection into an order relation <= that one must not confuse with the part-whole relation)). They are reflected into FOL functions.
+* ⊆ is the part-whole relation restricted to sets (at least according to Eidos). This determines what happens to it after reflection, but this follows automatically.
+* → is the converse part-whole relation restricted to propositions (at least according to Eidos). This determines what happens to it after reflection, but this follows automatically.
+* Eidos treats 'SOL relations' as special cases of SOL functions. More exactly, a 'SOL relation' is simply a SOL function whose result sort is ℙ. This determines what happens to it after reflection, but this follows automatically.
+* Eidos treats 'FOL relations' as subsets of product sets. This determines what happens to it after reflection, but this follows automatically.
+
+
+
