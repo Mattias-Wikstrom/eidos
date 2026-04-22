@@ -148,8 +148,3 @@ instance MonadExternalRefResolver (Reader FnResolver) where
   readExternalContent (MemorySource content) = return content
   readExternalContent (FileSystemSource path) =
     error $ "Cannot read from FileSystemSource in FnResolver: " ++ path
-
--- Helper fold
-foldM :: (Monad m) => (b -> a -> m b) -> b -> [a] -> m b
-foldM _ z [] = return z
-foldM f z (x:xs) = f z x >>= \z' -> Eidos.BuildMonad.foldM f z' xs

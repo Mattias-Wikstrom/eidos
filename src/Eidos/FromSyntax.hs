@@ -19,13 +19,10 @@ import           System.FilePath      (takeDirectory)
 import           Eidos.AST            hiding (theoryBody, theoryName, funcName, funcDomain, relName)
 import qualified Eidos.AST            as AST
 import           Eidos.BuildMonad
-import           Eidos.ExternalRef
+import           Eidos.ExternalRef (splitOn)
 import           Eidos.IR
 import           Eidos.Parser         (parseString)
 import           Eidos.TypeCheck
-
-import Debug.Trace (trace)
-
 
 -- ---------------------------------------------------------------------------
 -- Public entry points
@@ -1107,12 +1104,6 @@ lookupEntity th nm =
         _ -> Left $ "Ambiguous path: '" ++ first ++ "' refers to multiple subtheories"
 
 -- Helper
-splitOn :: Char -> String -> [String]
-splitOn _ "" = []
-splitOn c s = case break (== c) s of
-  (part, []) -> [part]
-  (part, _:rest) -> part : splitOn c rest
-
 lookupEntityInPath :: Theory -> [String] -> String -> Either BuildError Entity
 lookupEntityInPath th [] nm   = lookupEntity th nm
 lookupEntityInPath th path nm = do

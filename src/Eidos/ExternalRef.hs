@@ -12,6 +12,7 @@ module Eidos.ExternalRef
   , theoryTypeToExtension
   , theoryTypeToSuffix
   , allTheoryTypes
+  , splitOn
     -- * Test helpers
   , mockResolver
   ) where
