@@ -1,0 +1,1154 @@
+\documentclass[12pt]{book}
+\usepackage{graphicx}
+\usepackage{lmodern}
+\usepackage{verbatim}
+\usepackage{chngcntr}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{mathabx}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+\usetikzlibrary{calc}
+\usetikzlibrary{positioning}
+\usetikzlibrary{patterns}
+\usetikzlibrary{shapes}
+\usetikzlibrary{shapes.geometric}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc} % Load both encodings
+\usepackage[russian,english]{babel}
+\usepackage{textgreek}
+%\usepackage[backend=biber, sorting=none]{biblatex}
+%\addbibresource{bibliography-biblatex.bib}
+\usepackage[paperheight=29.7cm,paperwidth=21.0cm,left=2.54cm,right=2.54cm,top=2.54cm,bottom=2.54cm]{geometry}
+\usepackage[skip=10pt plus1pt, indent=40pt]{parskip}
+\usepackage{bm}
+\usepackage{appendix}
+\usepackage{mathrsfs}
+\usepackage{color}   %May be necessary if you want to color links
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true, %set true if you want colored links
+    linktoc=all,     %set to all if you want both sections and subsections linked
+    linkcolor=blue,  %choose some color if you want links to stand out
+}
+
+% This line creates a new environment called 'definition' that is numbered
+% sequentially like a chapter or section.
+\newtheorem{definition}{Definition}
+
+\setlength\parindent{15pt}
+\renewcommand{\arraystretch}{1.3}
+
+\newcommand{\referencedwork}[5]{#1 (#2), #3, #4, #5. \\}
+\newcommand{\referencedarticle}[6]{#1 (#2), #3, \textit{#4}, #5, #6. \\}
+\newcommand{\referencedarticleinbook}[4]{#1 (#2), #3, #4. \\}
+\newcommand{\ay}[2]{(#1, #2)}
+\newcommand{\aay}[2]{#1 (#2)}
+\newcommand{\Tau}{\mathrm{T}}
+
+\title{Mereological interpretation}
+\author{}
+
+\begin{document}
+
+\maketitle
+
+
+\chapter{A Mereological Interpretation of Propositional Logic} \label{interpretation_of_propositional_logic}
+
+The previous two chapters used the term ‘proposition’ for the objects that one deals with in (classical or intuitionistic) propositional logic. This chapter will discuss how propositions can be understood mereologically.
+
+We saw in Section \ref{order_theoretic} how the usual logical connectives $\wedge$, $\vee$, $\rightarrow$, etc., can be understood via their order-theoretic properties with respect to the relation of entailment. This still leaves the question, though, of how to understand the entailment relation and the objects that it relates (what we may refer to as `propositions'). Our view is that the entailment relation is the converse of the part-whole relation.
+
+The core of this chapter will be a formal translation of theories in propositional logic into the mereological framework M\textsubscript{D} that we are using. This translation suggests answers such as the following concerning what is part of what in propositional logic:
+\begin{itemize}
+	\item $A \wedge B$ contains $A$ as well as $B$ as parts,
+
+	\item a proposition $P$ which contains $A$ as well as $B$ as parts must also contain $A \wedge B$ as a part,
+
+	\item $A$ contains $A \vee B$ as a part,
+
+	\item $B$ contains $A \vee B$ as a part, and
+
+	\item a proposition $P$ that is part of $A$ as well as $B$ is also part of $A \vee B$.
+
+\end{itemize}
+
+Everything will make sense if one thinks of propositions as (factual) ‘pieces of information’ (cf. Section \ref{propositions_as_pieces_of_information}). For example, the information that $A \vee B$ holds is \textit{part} of the information that $A$ holds (anyone who possesses the information that $A$ holds will, after all, also be in possession of the information that $A \vee B$ holds). And the information that $A$ holds is in turn part of the information that $A \wedge B$ holds.
+
+We prefer, however, to understand propositions through what happens when they are added as axioms/treated as trivially true. One has, for example, that $A \vee B$ is \textit{part} of what becomes provable if $A$ is added as an axiom.
+
+Put another way, one cannot make $A$ hold without also making $A \vee B$ hold. In this sense, $A \vee B$ gets ‘included’ in $A$. $A \vee B$ is \textit{part} of what holds when $A$ holds.
+
+For a slightly less trivial example, one cannot have $A = B$ and $B = C$ without also having $A = C$. The mereological sum of $A = B$ and $B = C$ includes $A = C$ as a part.
+
+This chapter will largely proceed by dicussing how progressively more inclusive fragments of propositional logic can be understood mereologically. We begin in Section \ref{equational_fragment_of_propositional_logic} with a fragment that only includes identities. The trivially true proposition is the subject of Section \ref{parts_of_top} while conjunctions more generally is the subject of Section \ref{conjunctions_as_mereological_sums}. Disjunctions are discussed in Section \ref{disjunctions_as_mereological_products} and implications are discussed in Section \ref{interpretation_of_implications}. The actual translation from propositional logic to our mereological theory is described in Section \ref{translation_from_propositional_logic}.
+
+\section{From Parts in the Equational Fragment of Propositional Logic to Parts of Propositions} \label{equational_fragment_of_propositional_logic}
+By the \textit{equational fragment of propositional logic} we mean the fragment that only includes formulas of the form `$\Phi = \Psi$', where neither of the formulas $\Phi$ and $\Psi$ includes any propositional connectives.
+
+The equational fragment of propositional logic is clearly not very expressive, but it does include the inference from the formula `$P = Q$' to the formula `$Q = P$' as well as the inference from `$P = Q$' and `$Q = R$' to `$P = R$.' We find these inferences to be good starting points for a discussion on parts of propositions.
+
+Suppose that one is working with some axiom system and looking at how one can make more things hold by adding more axioms. One will then find that the addition of the axiom `$P = Q$' has exactly the same effect as the addition of the axiom `$Q = P$.' Exactly the same things will hold either way, and there will be no discernible difference from the viewpoint of one's reasoning. Different choices of axioms can result in one and the same possibility getting realized.
+
+Suppose now that one adds `$P = Q$' and `$Q = R$' as axioms. This will clearly have the effect of also making `$P = R$' hold. And one can think of this in mereological terms: Making `$P = R$' hold is \textit{part} of what one does as one is making `$P = Q$' and `$Q = R$' hold. `$P = R$' is \textit{part} of what holds when the identities `$P = Q$' and `$Q = R$' both hold.
+
+With full propositional logic, one can reason directly about `possibilities' of the kind just mentioned. For example, one can note that it is impossible to have $[(P = Q) \wedge (Q = R)] = \top$ without also having $(P = Q) = \top$.
+
+Here the identity/possibility $P = Q$ appears as an object in its own right, something that one may set equal to $\top$. This example additionally illustrates how the combination of two possibilities can be expressed as a single possibility: The possibility $(P = Q) \wedge (Q = R)$ obtains just in case the two possibilities $P = Q$ and $Q = R$ both obtain.
+
+But the objects reasoned about in propositional logic are known as `propositions' and so we have arrived here at a view on propositions and their parts.
+
+This view on propositions abstracts away from a lot. For example, no difference is recognized between what is denoted by `$P = Q$' and what is denoted by `$Q = P$': One has that $(P = Q) = (Q = P)$. There is indeed no difference between what becomes provable if `$P = Q$' is added as an axiom and what becomes provable if `$Q = P$' is added as an axiom.
+
+It appears to us that one gets a \textit{maximally} abstract view on propositions by only looking at what is said about propositions \textit{within propositional logic itself}. That means being able to observe, for example, that $\forall X.X \leftrightarrow [\forall Y. (X \rightarrow Y) \rightarrow Y]$ holds (in words, `every proposition holds just in case every proposition that follows from it holds'). There are some distinctions, though, such as the ones between `the proposition $P$,' `the possibility that $P$,' and `the information that $P$' that do not show up when propositions are reasoned about within propositional logic itself and we suggest understanding this as meaning that the distinctions in question are of a non-fundamental character.
+
+Note that we discussed the idea that propositions can be seen as possibilities already in Section \ref{propositions_as_possibilities} and that Chapter \ref{classical_and_intuitionistic} discussed how intuitionistic logic (rather than modal logic) can be used to reason about possibilities (cf. Section \ref{uses_of_intuitionistic_logic}).
+
+\section{Entailment as the Converse of the Part-Whole Relation} \label{entailment_as_converse}
+Implicit in what was said in the previous section is that a proposition $P$ entails a proposition $Q$ just in case $Q$ is part of $P$. $Q$ is part of what holds when $P$ holds, $Q$ is part of what needs to be made trivially true if $P$ is to be made trivially true.
+
+We found this mereological structure already in what we called `the equational fragment of propositional logic,' which one could think of as a fragment of equational logic (cf. Section \ref{interpretation_of_monadic_predicates}) and not just as a fragment of propositional logic. With \textit{any} axiom system whatever, one can consider how more things can be made to hold through the addition of axioms, and one such extension can include another.
+
+But $P$ entails $Q$ just in case $P \rightarrow Q$ holds, and so one can use the connective `$\rightarrow$' (implication) to talk about which proposition is part of which. For example, one can read $\forall X, Y, Z.[(X \rightarrow Y) \wedge (Y \rightarrow Z)] \rightarrow (X \rightarrow Z)$ as `for all propositions $X, Y, Z$, if $Y$ is part of $X$ and if $Z$ is part of $Y$ then $Z$ is part of $X$.'
+
+\section{Parts of $\top$} \label{parts_of_top}
+Since a proposition $P$ can be written in the form $P = \top$, $P$ will be provable just in case $P$ is provably identical to $\top$. $\top$ is not only always provable but it is also always the \textit{only} proposition that is provable.
+
+However, while any axiom system in classical or intuitionistic logic will see all of its provable propositions as indistinguishable from the proposition $\top$, things can look very different when one reasons about the axiom system `from the outside.' Something that appears trivially true from the viewpoint of the axiom system may appear to be a questionable assumption from the viewpoint of someone who is using the axiom system. This corresponds to the phenomenon that was discussed in Section \ref{trivially_true}: The meaning of `$\top$' (what is trivially true) can vary.
+
+We will accordingly \textit{not} get that what is referred to by `$\top$' is the object 0 that is part of everything. 
+
+That said, $\top$ still corresponds to `nothing' in the sense that no axioms need to be added to an axiom system in order for it to become able to prove $\top$.
+
+Section \ref{additional_part_whole_relations} discussed how one can get a perspective from which an object $o$ is nothing by using the part-whole relation $\le_o$ and the equivalence relation $\equiv_o$ in place of the ordinary part-whole relation (`$\le$') and the identity relation (`$=$'). By letting $o$ be $\top$, one will thus get a perspective from which $\top$ coincides with $0$ (one has $\top \le_\top 0$ as well as $0 \le_\top \top$ and hence $\top \equiv_\top 0$). What is important here is that the part-whole relation $\le_\top$ coincides with the ordinary part-whole relation $\le$ as long as one only reasons with propositions. But it additionally allows one to see $\top$ as being `nothing' (i.e., the object $0$ that is part of everything).
+
+\section{Conjunctions as Mereological Sums} \label{conjunctions_as_mereological_sums}
+For the present purposes, we will think of all of the following as different types of `conjunctions':\\
+i) $\top$ may be thought of as `the conjunction of 0 propositions,'\\
+ii) $\Phi \wedge \Psi$ is the conjunction of $\Phi$ and $\Psi$, and\\
+iii) $\forall X.\Phi$ may be thought of as `the conjunction of the propositions that have the form $\Phi[\Psi/X]$, for different choices of $\Psi$.'\footnote{Here $\Psi$ can be any of the propositions that are quantified over by the propositional quantifiers. A particular formal language may or may not be able to express $\Psi$.}
+
+These are all (given our conventions) order-theoretic meets\footnote{See the definition in Appendix \ref{definitions_of_algebraic_structures}} with respect to the entailment relation:\\
+I) $\top$ is the empty meet,\\
+II) $\Phi \wedge \Psi$ is the meet of $\Phi$ and $\Psi$, and\\
+III) $\forall X.\Phi$ is the meet of the propositions that have the form $\Phi[\Psi/X]$.
+
+So if the entailment relation is the converse of the part-whole relation (as we are claiming here) then i)-iii) need to be understood as expressing mereological sums. Mereological sums are, after all, order-theoretic joins (the opposite of meets) with respect to the part-whole relation (the converse of entailment; see Section \ref{entailment_as_converse}).
+
+There is a complication, though, in that there are two different domains of quantification involved here. The universal quantifier in propositional logic will quantify over all propositions in the domain of quantification, but the definition of `mereological sum' does not involve any restriction in what it quantifies over: The mereological sum of 0 objects is part of \textit{every} object. The next section will discuss this further.
+
+\section{Propositions As Objects That Are Parts of $\bot$ And That Contain $\top$ As a Part}
+Two axiom systems can differ not only in what they are treating as trivially true but also in what they are treating as trivially false: The meanings of `$\top$' and `$\bot$' are relative. We discussed this in the previous chapter (see Sections \ref{negation} and \ref{trivially_true}) and will not repeat the arguments here.
+
+For a theory $T$, we will write $\mathcal{T}_T$ for what $T$ treats as trivially true and $\mathcal{B}_T$ for what $T$ treats as trivially false. The denotations of `$\top$' and `$\bot$' will thus be $\mathcal{T}_T$ and $\mathcal{B}_T$, respectively, as long as one only needs to deal with the theory $T$. 
+
+We will also write $\mathcal{T}$ for what in a given context is treated as trivially true and $\mathcal{B}$ for what is treated as trivially false. The denotations of `$\top$' and `$\bot$' will then be $\mathcal{T}$ and $\mathcal{B}$, respectively.
+
+A question remains of whether every object $X$ needs to be a proposition as long as it is both the case that $\mathcal{T}$ is part of $X$ and that $X$ is part of $\mathcal{B}$. We answer this in the affirmative, since all objects of this kind have clear interpretations as propositions (it is clear, after all, exactly what they entail and what they are entailed by).
+\section{Restricted Quantification Over Propositions}
+Note that someone can say `all propositions' while only meaning the propositions that satisfy a certain predicate. One may, for example, restrict the quantifiers to propositions $X$ that satisfy $X = \neg \neg X$ or to propositions $X$ that satisfy $X \vee \neg X$. It is also possible to see the quantifiers as restricted to the propositions that are expressible in a certain theory.
+
+Consider, in particular, how a theory in first-order logic can be such that $\Phi \vee \neg \Phi$ holds for every formula $\Phi$ that is expressible in the theory. Such a theory is said to satisfy `classical logic' but can be thought of as being completely silent on whether $X \vee \neg X$ holds for \textit{every} proposition $X$ (as opposed to every proposition that is expressible in the theory; cf. Section \ref{when_is_lem_justified}).
+
+Our assumption here, though, is that any such restriction on the propositional quantifiers has been made explicit before the current account on parts of propositions is applied.
+
+\section{Disjunctions as Mereological Products}  \label{disjunctions_as_mereological_products}
+Disjunctions may be defined/characterized as follows:\\
+i) $\bot$ is the same thing as $\forall X.X$,\\
+ii) $\Phi \vee \Psi$ may be characterized by $\forall Y.[(\Phi \rightarrow Y) \wedge (\Psi \rightarrow Y)] \leftrightarrow [(\Phi \vee \Psi) \rightarrow Y]$, and\\
+iii) $\exists X.\Phi$  may be characterized by $\forall Y.[\forall X.(\Phi \rightarrow Y)] \leftrightarrow [(\exists X.\Phi) \rightarrow Y]$ (where $Y$ does not appear in $\Phi$).
+
+It matters here that the propositional quantifiers are unrestricted in the sense that they quantify over \textit{every} proposition which implies $\top$ ($\mathcal{T}$) and which is implied by $\bot$ ($\mathcal{B}$). The proposition $\neg (\neg P \wedge \neg Q)$ would qualify as `the disjunction of $P$ and $Q$' in the sense of `the strongest proposition that is implied by $P$ as well as by $Q$' if the only propositions that counted were propositions $X$ such that $X = \neg \neg X$.\footnote{
+The effect of this restriction on the quantifiers is to only include \textit{regular} elements (of the Heyting algebra that is formed by the propositions). Here an element in a Heyting algebra is said to be regular if it coincides with its own double-negation or, equivalently, if it is the negation of an element. The regular elements will always form a Boolean algebra where meets and negations are as in the original Heyting algebra, but the join of two elements $x$ and $y$ can be one element in the Boolean algebra and another element in the original Heyting algebra (cf. what was said in Section \ref{comparison_with_other_ways_of_understanding_classical_and_intuitionistic_logic} on the idea that `$P \vee Q$' means in classical logic what `$\neg (\neg P \wedge \neg Q)$' means in intuitionistic logic).}
+
+\section{The Interpretation of `$\rightarrow$' and `$\leftrightarrow$' (`$=$') through Mereological Differences} \label{interpretation_of_implications}
+As noted in Section \ref{entailment_as_converse}, since $\Phi \rightarrow \Psi$ holds just in case $\Phi$ entails $\Psi$ and since we are viewing the entailment relation as the converse of the part-whole relation, we have that $\Phi \rightarrow \Psi$ holds just in case $\Psi$ is part of $\Phi$.% One can thus reason in propositional logic itself about which proposition is part of which.
+
+Suppose now that $\Phi \rightarrow \Psi$ fails to be provable. In this case, $\Phi \rightarrow \Psi$ will not normally be $\bot$. It is, after all, normally possible to make $\Phi \rightarrow \Psi$ hold without making every proposition hold.
+
+One must instead make use of the order-theoretic characterization of $\Phi \rightarrow \Psi$ as the weakest proposition $X$ such that $\Phi \wedge X$ entails $\Psi$. This may appear to be the mereological difference $X - \Phi$, but the domain of quantification is once again important: $\Phi \rightarrow \Phi$ is $\mathcal{T}$ and not (necessarily) the object 0 that is part of everything.
+
+One finds, then, that $\Phi \rightarrow \Psi$ is $\mathcal{T} + (\Psi - \Phi)$. Informally, $\Phi \rightarrow \Psi$ is what needs to be added to $\Phi$ if one is to get $\Psi$, but only up to the level of fine-grainedness/coarse-grainedness that is given by the object $\mathcal{T}$ (cf. Section \ref{fine_grained_and_coarse_grained_views_on_propositions}). 
+
+$\Phi \leftrightarrow \Psi$ (which is the same thing as $\Phi = \Psi$ by the convention of Section \ref{logical_equivalence_as_identity}) may be handled by expressing it in the form $(\Phi \rightarrow \Psi) \wedge (\Psi \rightarrow \Phi)$. It must thus be $\mathcal{T} + (\Psi - \Phi) + \mathcal{T} + (\Phi - \Psi)$, which one may express more simply as $\mathcal{T} + (\Phi \dotdiv \Psi)$.
+
+\section{From Theories in Propositional Logic to Mereology} \label{translation_from_propositional_logic}
+We will now show how propositional logic can be translated into the mereological framework M\textsubscript{D} that we are using in a way that takes into account everything that has been said in this chapter. We begin by a translation $\mathrm{Tr_I}$ which is an `identity translation' in the sense that it makes the structure of (quantified, intuitionistic) propositional logic match exactly with the mereological framework M\textsubscript{D} that we are using:\\
+\indent $\mathrm{Tr_I}(U) = U$, where $U$ is any propositional constant,\\
+\indent $\mathrm{Tr_I}(\top) = 0$,\\
+\indent $\mathrm{Tr_I}(\Phi \wedge \Psi) = \mathrm{Tr_I}(\Phi) + \mathrm{Tr_I}(\Psi)$,\\
+\indent $\mathrm{Tr_I}(\forall X.\Phi) = \sum_{X}^{}{\mathrm{Tr_I}(\Phi)}$,\\
+\indent $\mathrm{Tr_I}(\bot) = 1$,\\
+\indent $\mathrm{Tr_I}(\Phi \vee \Psi) = \mathrm{Tr_I}(\Phi) \times \mathrm{Tr_I}(\Psi)$,\\
+\indent $\mathrm{Tr_I}(\exists X.\Phi) = \prod_{X}^{}{\mathrm{Tr_I}(\Phi)}$,\\
+\indent $\mathrm{Tr_I}(\Phi \rightarrow \Psi) = [\mathrm{Tr_I}(\Psi) - \mathrm{Tr_I}(\Phi)]$,\\
+\indent $\mathrm{Tr_I}(\neg \Phi) = 1 - \mathrm{Tr_I}(\Phi)$, and\\
+\indent $\mathrm{Tr_I}(\Phi \leftrightarrow \Psi) = [\mathrm{Tr_I}(\Phi) \dotdiv \mathrm{Tr_I}(\Psi)]$.
+
+The main purpose of the translation $\mathrm{Tr_I}$ is that it allows us to work with our mereological framework M\textsubscript{D} using the familiar syntax of (intuitionistic) propositional logic. We will now use it to define a second translation:\\
+\indent $\mathrm{Tr}(U) = ((U + \mathcal{T}) \times \mathcal{B})$, where $U$ is any propositional constant,\\
+\indent $\mathrm{Tr}(\top) = \mathcal{T}$,\\
+\indent $\mathrm{Tr}(\Phi \wedge \Psi) = \mathrm{Tr}(\Phi) + \mathrm{Tr}(\Psi)$,\\
+\indent $\mathrm{Tr}(\forall X.\Phi) = \mathrm{Tr_I}(\forall X.((X \rightarrow \mathcal{T}) \wedge (\mathcal{B} \rightarrow X)) \rightarrow Y)[\mathrm{Tr}(\Phi) / Y]$ (where $Y$ is a fresh variable),\\
+\indent $\mathrm{Tr}(\bot) = \mathcal{B}$,\\
+\indent $\mathrm{Tr}(\Phi \vee \Psi) = \mathrm{Tr}(\Phi) \times \mathrm{Tr}(\Psi)$,\\
+\indent $\mathrm{Tr}(\exists X.\Phi) = \mathrm{Tr_I}(\exists X.(X \rightarrow \mathcal{T}) \wedge (\mathcal{B} \rightarrow X) \wedge Y)[\mathrm{Tr}(\Phi) / Y]$ (where $Y$ is a fresh variable),\\
+\indent $\mathrm{Tr}(\Phi \rightarrow \Psi) = \mathcal{T} + [\mathrm{Tr}(\Psi) - \mathrm{Tr}(\Phi)]$,\\
+\indent $\mathrm{Tr}(\neg \Phi) = (\mathcal{B} - \mathrm{Tr}(\Phi)) + \mathcal{T}$, and\\
+\indent $\mathrm{Tr}(\Phi \leftrightarrow \Psi) = \mathcal{T} + [\mathrm{Tr}(\Phi) \dotdiv \mathrm{Tr}(\Psi)]$.
+
+We are here using the same alphabet of constants in the formal language that we are translating things into as in the language that we are translating from. That alphabet is to include the two constants $\mathcal{T}$ and $\mathcal{B}$.
+
+Note that $\mathrm{Tr}$ coincides with $\mathrm{Tr_I}$ if one sets $\mathcal{T} = 0$ and $\mathcal{B} = 1$. All that we generally want to assume is, however, that $\mathcal{T} \le \mathcal{B}$.
+
+As an illustration of how the translation $\mathrm{Tr}$ works, we may apply it to `$P \vee \neg P$' to get `$[(P + \mathcal{T}) \times \mathcal{B}] \times [\mathcal{B} - [(P + \mathcal{T}) \times \mathcal{B}]]$.' Here the disjunction has been translated into a merelogical product, the negation has been translated into a mereological difference that involves the proposition $\mathcal{B}$ that serves as the translation of `$\bot$,' and the propositional constant $P$ has been translated in such a way that the result lies between $\mathcal{T}$ and $\mathcal{B}$.
+
+
+\section{Comparison with Earlier Work}
+We discussed earlier work on mereology in Chapter \ref{mereology} but will now mention work specifically related to what we have argued in this chapter.
+
+Uwe Meixner writes as follows in (Burkhardt, Seibt, Imaguire \& Gerogiorgakis, 2017):
+\begin{quote}
+The mereology of propositions can
+be built on the notion of \textit{logical part},
+where proposition $p$ is a logical part
+of proposition $q$ if, and only if, $q$ logically entails $p$. (p. 26)
+\end{quote}
+
+That is of course in line with what we have argued for in the present chapter. The following quote is likewise something that we agree with:
+\begin{quote}
+The intended part-relation is [...]
+logical entailment broadly conceived;
+it is not logical entailment as codified
+in some logical system, say, firstorder predicate logic. (p. 26)
+\end{quote}
+
+What we have argued for in this chapter is also in line with a view expressed by Jon Barwise as follows in (Barwise, 1990):
+\begin{quote}
+The intuition is that the notion of logical consequence has to
+do with information containment, and that inference has to do with the
+extraction of logically implicit information. Here is an example. Suppose
+that Claire informs us that Laura, her new friend at school, has four sisters.
+Having four sisters logically entails having at least four siblings. Hence,
+Claire’s statement carries the information that Laura has at least four
+siblings. (pp. 6-7)
+\end{quote}
+
+\section{Summary}
+This chapter has discussed how propositional logic can be understood mereologically if each proposition is thought of as a possibility (cf. Section \ref{propositions_as_possibilities}). The basic idea has been that possibility $P$ entails possibility $Q$ just in case $Q$ is \textit{part} of what is realized when $Q$ is realized.
+
+We have shown how theories in propositional logic may be translated into the mereological framework M\textsubscript{D} in such a way that it becomes possible to see which proposition is part of which.
+
+As in the previous chapter, we have viewed the meanings of `$\top$' and `$\bot$' as relative to theories.
+
+\vspace{4\baselineskip}
+
+\newpage
+
+\chapter{A Mereological Interpretation of Predicate Logic} \label{interpretation_of_predicate_logic}
+We will now extend the mereological interpretation of logic given in the previous chapter from propositional logic to predicate logic, including first-order predicate logic as well as second-order predicate logic. Any mathematical axiom system that is expressible in one of these logics will thus get a mereological interpretation.
+
+Since it is more convenient and natural for our purposes, we will provide a mereological interpretation for \textit{many-sorted} predicate logic. For example, an axiom system in geometry could have sorts for points, lines, planes, line segments, vectors, triangles, polygons, angles, circles, sets of points, etc. An axiom system in number theory could similarly have sorts for natural numbers, integers, rational numbers, Gaussian integers, etc. We do \textit{not} exclude the possibility that two sorts may overlap (for example, a natural number is also an integer).
+
+It may be open to dispute whether many-sorted or single-sorted predicate logic corresponds best to how the average mathematician reasons, but in providing a mereological interpretation for many-sorted predicate logic we are of course also covering single-sorted predicate logic as a special case.
+
+We will see each sort as associated with two types of variables: First-order variables and second-order variables. The former correspond to individuals and the latter to collections/properties/monadic predicates.  For example, the axioms for `real numbers' use first-order quantification as well as second-order quantification when saying that every bounded set of real numbers has a greatest lower bound as well as a least upper bound.\footnote{There are works (see (Manzano, 1996)) which see (single-sorted) second-order logic as a special case of many-sorted first-order logic, with quantification over individuals and quantification over monadic predicates being regarded as first-order quantification over two different sorts. This is, however, not a viewpoint that we could adopt here. Far from reducing second-order quantification to first-order quantification, we will understand first-order logic via second-order logic. Here we are to some extent following the example of categorical logic (see [Ref.]).}
+
+Whether the objects quantified over by the second-order quantifiers are called `collections,' `properties (in extension),' `monadic predicates,' `sets,' or something else will not be important for our purposes. What matters is rather the mereological interpretation that we will provide. At the bottom of everything will be our mereological framework M\textsubscript{D}, not a theory of sets or a theory of properties.\footnote{Section \ref{sets} will discuss what happens when the mereological interpretation described here is applied to set theory. We will find that objects called `proper classes' in set theory may be among the objects called `sets' here. It is, however, a very familiar phenomenon from set theory that objects which are proper classes from one point of view can be sets from another point of view. This happens, more specifically, for any set model of the Zermelo-Fraenkel axioms.}
+
+For consistency, we will normally speak of `properties' but we will occasionally say `collections' as a reminder of the flexibility here. We will use notation and some terminology that one normally uses when speaking of `sets' or `classes':\\
+\indent* $M \subseteq N$ says that everything that has property $M$ has property $N$ as well.\\
+\indent* $M \cup N$ is the `union' of the two properties $M$ and $N$.\\
+\indent* $M \cap N$ is the `intersection' of the two properties $M$ and $N$.\\
+\indent* $\varnothing$ is the property that holds for nothing.\\
+\indent* $\mathcal{U}$ is the property that holds for everything.
+
+An $n$-ary relation can be viewed as a property of $n$-tuples. $n$-tuples can in turn be understood in a very natural way in many-sorted logic (see Section \ref{product_sorts}).\footnote{What we have said here applies to the properties and relations that one can \textit{quantify over} in second-order logic. Properties and relations of the kind that one can \textit{express} (as opposed to quantify over) in second-order logic will be discussed in Section \ref{second_order_relations_as_functions}.}
+
+We will next sketch the basic ideas that will allow us to understand predicate logic in mereological terms. The previous chapter made use of the idea that one can understand a proposition by looking at what happens if it is added as an axiom. For a non-proposition $o$, one can similarly look at what happens when $o$ is set equal to the object 0 that is part of everything (note here that adding a proposition as an axiom is equivalent to setting it equal to $\top$; cf. Section \ref{propositions_as_identifications}). Put another way, one can try to understand an object $o$ through what happens if $o$ is treated as ‘nothing.’
+
+This correspondence can be extended to collections of objects. For $n$ non-propositions $o_1, \ldots, o_n$, one can look at what happens if one adds $o_1 = 0 \,\wedge\, \ldots \,\wedge\, o_n = 0$ as an axiom. This is equivalent not just to adding $o_1 = 0$, ..., $o_n = 0$, as $n$ separate axioms but also to setting the mereological sum $o_1 + \ldots + o_n$ equal to 0.\footnote{Could not the addition of an axiom such as $o = 0$ lead to a contradiction? The answer will be `no' given how we do things here: $\neg o = 0$ will not be provable. But even if we add axioms that make $\neg o = 0$ provable, then it is still possible to explore what happens when $o$ is viewed as \textit{equivalent} to 0. Section \ref{additional_part_whole_relations} discussed how it is possible to take such a viewpoint when reasoning about parts.}
+
+In this way, we are able to handle the collections/properties that one can quantify over through monadic second-order logic in addition to the individual objects that one can quantify over through first-order logic.
+
+It is, in fact, the things that one can quantify over in monadic second-order logic (i.e., `properties') that will be primary as we do things here. An individual $o$ in first-order logic will be treated exactly like the property `being identical to $o$' (and this property is in turn the same thing for our purposes as the set $\{o\}$ whose only member is $o$).
+
+As we do things here, it will not matter what an individual constant ‘$o$’ is meant to refer to or what the parts are of the object that ‘$o$’ is meant to refer to. The present mereological interpretation of predicate logic is, however, only to be thought of as a minimum in this regard: It is left open that there may be more to be said about parts of objects than what follows from it.
+
+For example, in geometry it could be that ‘$o$’ is meant to stand for a point, a line, or some other geometrical object. What is done in this chapter will give no support for the idea that a line includes more parts than a point, but that is at the same time not excluded.\footnote{Note also that the mereological framework M\textsubscript{D} makes it very natural to speak of parts in different senses (in fact, we will have to do this at several places in this chapter). Section \ref{additional_part_whole_relations} discussed how every object $a$ gives rise to the part-whole relation expressed through ‘$x$ is an $a$-part of $y$’ (which is synonymous with ‘$x$ is a part of $a + y$’). There can thus be one sense in which a line includes its points as parts and another sense in which it does not.}
+
+Our relative silence here concerning what is part of what may be seen as reflecting a silence in predicate logic (and in mathematical theories built upon predicate logic) concerning what is part of what. Standard predicate logic does not, for example, include a part-whole relation alongside the identity relation.
+
+One may likewise see the fact that we are making no use of the referents of symbols as reflective of the fact that these do not matter for the purposes of reasoning in predicate logic (neither in general nor in the special case of mathematical theories). The objects one reasons about in a theory can be anything whatever as long as they are related to each other as the theory says they are.\footnote{Cf. the abstract understanding of logic that was developed in Chapter \ref{abstract_view_on_logic}.}
+
+In our mereological interpretation of predicate logic, we will interpret negation last. The reason for this is that we are taking the viewpoint that negation is to be viewed as something that is added on top of everything else. We will thus start with negation-free logic.
+
+For two collections/properties $M$ and $N$, the proposition $M = N$ will be interpreted mereologically just as logical equivalences were interpreted mereologically in the previous chapter. In other words, we will (except for one small complication) use the symmetric difference between $M$ and $N$ as our mereological interpretation of the proposition $M = N$. This account will be complicated slightly when we need to interpret negations (see below).
+
+In accordance with what was said above, we see a property $M$ as part of a property $N$ just in case everything that falls under $M$ also falls under $N$. That is, $M$ will be part of $N$ in exactly the cases where the first-order formula $\forall x.M(x) \rightarrow N(x)$ (or the second-order formula $M \subseteq N$) holds.
+
+As natural as this may seem, it does involve a ‘reversal’ of the arrow ‘$\rightarrow$’ when one considers that a proposition $A$ is part of a proposition $B$ just in case $B \rightarrow A$ (see the previous chapter). In that case, the part appears on the right of the arrow; this time, the part appears on the left of the arrow. This has to do with the fact that $B \rightarrow A$ is equivalent to $\forall X.(A \rightarrow X) \rightarrow (B \rightarrow X)$ in quantified propositional logic.
+
+Rather than downplaying variables, our informal exposition will treat them as first-class objects (cf. Section \ref{variables_as_first_class_objects}).\footnote{From a technical point of view, our mereological interpretation of predicate may be thought of as agnostic about the nature of variables: Free variables will be translated into free variables (as opposed to constants) in Section \ref{translation}.} A variable $x$ is for our purposes just as good an object as a constant $c$. We may reason about how a variable belongs to the domain (after all, one can prove ‘$\exists y.y=x$’ in first-order logic and one can prove analogous formulas for the different variable types that one gets in second-order logic) and how it fails to be provably identical to any particular object in the domain (except in the case when all objects in the domain are provably identical to each other).
+
+Variables can be used to illustrate what functions and relations do. For example, a 1-ary function $f$ may be discussed via a discussion of the relationship between the two objects $x$ and $f(x)$, where $x$ is a variable.
+
+To make the example more concrete, suppose that the theory deals with mathematical analysis and that $f$ is the sine function. The formula $y = f(x)$ will then have as consequences that $x = 0 \rightarrow y = 0$, that $x = \pi / 2 \rightarrow y = 1$, that $x = \pi \rightarrow y = 0$, etc. One can, in fact, recover $f$ if one knows the general relationship between $x$ and $y$: For any $z$, $f(z)$ is the number $w$ such that $x = z \rightarrow y = w$.
+
+This is the basic idea that we will use to interpret function and relation symbols mereologically here.\footnote{What we have just described concerns cases where a function/relation symbol is \textit{applied} to some arguments and it concerns function/relation symbols encountered in second-order logic as much as those encountered in first-order logic. We are providing mereological interpretation not to the function/relation symbols themselves but rather to expressions (e.g., `$f(z)$') that are built up from them. (That said, we do provide direct mereological interpretations for the functions/relations that one can quantify over using the quantifiers of second-order logic.)}
+
+Note, though, that there is a difference between a function/relation for which the arguments are individuals and a function/relation for which the arguments are properties. Following the approach of categorical logic\footnote{[Ref.]}, we will see functions/relations of the kind that are definable in first-order logic as really being defined for all properties, albeit in a way that constrains them. The idea may be illustrated in the case of an ordinary set-theoretic function $f: A \rightarrow B$: Such a function gives rise to a function $f_*: P(A) \rightarrow P(B)$ defined by $f_*(X) = \{y \in B: \exists x \in X.y = f(x)\}$. One may think of $f$ as a function defined for individuals and of $f_*$ as a function defined for properties.
+
+What is important for our purposes is that this approach avoids the use of negation. As mentioned above, we see negation as something that is added on top of a negation-free logic, and one needs negation in order to distinguish between properties that correspond to individuals and properties in general. Without negation there is no way to say of two properties that they are different and one cannot even exclude the case that all properties are identical to the property $\varnothing$.
+
+It is, of course, ultimately necessary to provide a mereological interpretation also for negation, and this can be done straightforwardly: All one needs is an object $\mathcal{B}$ that can interpret ‘$\bot$’. (The negation of a proposition $P$ will thus be the proposition $P \rightarrow \mathcal{B}$.) This requires us, however, to view $P$ and $P \vee \mathcal{B}$ as the same proposition (cf. Section \ref{negation} and Chapter \ref{interpretation_of_propositional_logic}).
+
+This means, in particular, that the interpretation of ‘$M = N$’ for two properties $M$ and $N$ gets weakened and that the proposition that interprets ‘$M = N$’ can hold without $M$ actually being the same thing as $N$.
+
+This may be counterintuitive, but note that a theory can be inconsistent and that every proposition expressible in the theory will hold in this case. It is only in the case of a consistent theory that it becomes reasonable to expect the holding of ‘$M = N$’ in the theory to be a guarantee that $M$ is identical to $N$. An inconsistent theory will prove not just $M=N$ but also $\neg M=N$ and one has no good reason in this case to expect it to actually be the case that $M=N$.
+
+A theory that seems to assert $P$ is never asserting more than ‘either $P$ holds or $\mathcal{B}$ holds,’ where $\mathcal{B}$ is the weakest proposition that implies every proposition that is expressible in the theory. Knowledge that a theory is consistent will, however, allow one to go from ‘either $P$ holds or $\mathcal{B}$ holds’ to $P$.
+
+We will thus start with a negation-free perspective from which every proposition looks as if it could hold and from which every object looks as if it could be the object $0$ that is part of everything, before adding negation on top of everything to get a second perspective from which a proposition may be false and from which any individual is known to be different from $0$.\footnote{We see these two perspectives as being implicit in mathematics in the concept of a `structure-preserving mapping': A mapping $m: S_1 \rightarrow S_2$ from a mathematical structure $S_1$ to a mathematical structure $S_2$ of the same kind (e.g., it may be that $S_1$ and $S_2$ are groups or it may be that $S_1$ and $S_2$ are graphs) can be called structure-preserving even in case where one has $\neg a_1 = a_2$ in combination with $m(a_1) = m(a_2)$ (by contrast, it would be impossible to have $a_1 = a_2$ in combination with $\neg m(a_1) = m(a_2)$). A structure-preserving needs to preserve `positive' properties, but $\neg a_1 = a_2$ is an example of a `negative' property (i.e., its expression requires the use of negation) and need not be preserved. [Ref.]}
+
+[TODO: Rewrite] We begin the chapter by elaborating on the most basic ideas that we will depend on. We then give technical details on the exact version of predicate logic that we will translate into our mereological framework M\textsubscript{D} (see Section \ref{system_for_predicate_logic}). This is followed by sections that discuss how specific aspects of predicate logic (function symbols, relation symbols, quantifiers, etc.) are handled by our mereological interpretation.
+
+[$\ldots$]
+
+\section{How Individuals And Properties May Be Interpreted Mereologically} \label{interpretation_of_monadic_predicates}
+The discussion in Section \ref{equational_fragment_of_propositional_logic} on how propositional logic can be understood mereologically began by considering what we called `the equational fragment of propositional logic' (the fragment where every formula has the form $P = Q$ for two propositional constants $P$ and $Q$). We may similarly begin our discussion on how predicate logic can be understood in mereological terms by focusing on the fragment where every formula has the form `$c=d$' for two individual constants $c$ and $d$.
+
+Some of the things that were said in Section \ref{equational_fragment_of_propositional_logic} apply equally well with individuals used in place of propositions: I) The proposition $c=d$ is identical to the proposition $d=c$, and II) the mereological sum of $c=d$ and $d=e$ contains $c=e$ as a part.
+
+There is no individual expression, though, that plays a role analogous to that of the propositional expression `$\top$' (not even in full predicate logic). Any proposition $P$ can be written as $P = \top$, but nothing analogous is available in predicate logic.
+
+This arguably changes as one considers variants of predicate logic where there is an individual contant $n$ that plays the role of a denotation for expressions such as `The present King of France' that one normally regard as non-denoting. $n$ could then be understood as being the object $0$ that is part of everything and one could explore the idea that an individual $c$ is/corresponds to the proposition $c = n$.
+
+But note that it suffices to change the setting from individuals to properties. An individual $c$ corresponds to the property $M_c$ defined by $M_c(x) \leftrightarrow x=c$ and in addition to properties of this form there is also the monadic predicate $\varnothing$ that is/corresponds to the empty set. The suggestion from the previous paragraph then becomes the suggestion that an individual $c$ corresponds not only to the property $M_c$ but also to the proposition $M_c = \varnothing$.\footnote{For further discussion of the idea that an individual $c$ corresponds to the property `being identical to $c$' and that a non-denoting term such as `Pegasus' corresponds to a property that fails to hold for any object, see (Quine, 1960, pp.).}
+
+The idea that any object can be viewed as a proposition is also supported by the mereological framework M\textsubscript{D} that we are using. It is, after all, essentially (quantified, intuitionistic) propositional logic reinterpreted as a mereological framework. Any object $o$ corresponds to the possibility of viewing $o$ as `nothing' by setting $o = 0$. $o$ determines and is determined by this possibility (cf. Sections \ref{propositions_as_possibilities} and \ref{equational_fragment_of_propositional_logic}).
+
+This all depends, though, on taking a view on things according to which $M_c = \varnothing$ is possible rather than impossible. And full predicate logic allows one to prove $\neg (M_c = \varnothing)$.
+
+Yet, one does get a view on things according to which $M_c = \varnothing$ is possible rather than impossible as long as one works with fragments of predicate logic that do not include $\neg$ and $\bot$. Without these in the logic, there is no way that $M_c = \varnothing$ could imply that $\bot$ holds. We will discuss in the next section how one can regard $\varnothing$ as a primitive rather than as something that is defined in terms of $\bot$.
+
+And one can get the view just discussed even with full predicate logic by using another equivalence relation in place of the identity relation. Having $\neg (M = \varnothing)$ does not preclude having $M \equiv \varnothing$ for an equivalence relation $\equiv$ other than the identity relation. 
+
+%For now we will keep things simple by working with negation-free fragments of predicate logic.
+
+\section{A Many-Sorted System for Predicate Logic} \label{system_for_predicate_logic}
+In order to simplify the discussion on how predicate logic can be understood mereologically, we will work with a non-standard system that is tailored to our needs. The distinguishing features are as follows\footnote{We will be somewhat informal in the presentation of this system since what actually matters is the mereological interpretation, not the system itself.}:\\
+a) The system permits second-order quantification over properties in addition to first-order quantification over individuals,\\
+b) two properties are identical if they hold for the same objects,\\
+c) the order relation $\subseteq$ among properties is treated as a primitive rather than something defined out of other things,\\
+d) the binary operations $\cap$ and $\cup$ among properties are likewise treated as primitives,\\
+e) the system is \textit{sorted} and there is second-order quantification as well as first-order quantification \textit{for each sort},\\
+f) there are first-order expressions as well as second-order expressions \textit{for each sort},\\
+g) for any sort $S$, $\varnothing^S$ (the property that holds for nothing) and $\mathcal{U}^S$ (the property that holds for everything) are primitives,\\
+h) sorts may overlap,\\
+i) there are first-order function symbols as well as second-order function symbols,\\
+j) there are first-order relation symbols as well as second-order relation symbols,\\
+k) sorts can be empty (i.e., $\varnothing^S = \mathcal{U}^S$ is permitted),\\
+l) the formula $x^S = \varnothing^S$ is not an absurdity and is even guaranteed to hold in the case where the sort $S$ is empty (in this respect, the system is a version of `free logic'),\\
+m) first-order quantification over a sort $S$ (as in `$\forall x^S.\Phi$' or `$\exists x^S.\Phi$') does not include $\varnothing^S$ in what is quantified over (in the spirit of free logic\footnote{A proposition of the form $\exists x^S.\Phi$ will thus be $\bot$ when the domain $S$ is empty. $\Phi [\tau^S/x]$ will, however, end up being $\top$ (\textit{not} $\bot$)
+
+Given the approach that we adopt here, the most straightforward way to analyze the sentences `Pegasus is a horse' and `Pegasus is a pig' would be to see them as synonymous with `For every object $x$, if $x$ is Pegasus then $x$ is a horse' and `For every object $x$, if $x$ is Pegasus then $x$ is a pig,' respectively. Assuming that no $x$ is Pegasus, then we will get that these sentences are \textit{true}.
+
+We emphasize, though, that these analyzes could be completely wrong given how natural languages such as English actually work (or it may be that one ought to see `Pegasus' as denoting rather than non-denoting when English sentences are analyzed). We have been guided by what is natural from a mathematical/technical viewpoint, not by the goal of setting up a system that corresponds directly to how natural languages work.}),\\
+n) first-order quantification over a sort $S$ additionally excludes properties that hold for more than one individual from what is quantified over,\\
+o) first-order function symbols and first-order relation symbols may be applied not just to first-order expressions but also to second-order expressions\footnote{This follows the convention in mathematics of writing $f(X)$ instead of $\{y: \exists x \in X. y = f(x)\}$ and $R(X)$ instead of $\forall x \in X.R(x)$. As with the other conventions that we have adopted, this one will simplify things for us.
+
+For a function $g$ of two arguments, the convention is that $g(X, Y)$ is the same thing as $\{Z: \exists x \in X. \exists y \in Y. z = g(x, y)\}$. The extension to three or more arguments is analogous.
+
+The convention for an $n$-ary relation follows if one sees an $n$-ary relation as a 1-ary relation defined for $n$-tuples. Specifically, one gets: $R(X, Y) \leftrightarrow \forall x \in X, \forall y \in Y.\, R(x, y)$. That is, $R$ needs to hold for every pair $x, y$ of objects where $x \in X$ and where $y \in Y$.},\\
+p) there is a special sort $\mathcal{PROP}$ for propositions.
+
+No comprehension principle has been included and the reason is that we will need to have maximum flexibility in this respect. A particular theory may validate a particular comprehension schema, but nothing is required in general.
+
+The distinction between first-order function symbols and second-order function symbols is informally that the former correspond to functions defined for individuals\footnote{It will be important for us, though, that the domain of definition can be \textit{extended} to include properties.} while the latter correspond to functions defined for properties.
+
+The sort $\mathcal{PROP}$ cannot be used in combination with first-order quantification, first-order functions, or first-order relations. More exactly, first-order quantification over $\mathcal{PROP}$ is not permitted and $\mathcal{PROP}$ cannot be used as a sort in the sorting for a first-order function or a first-order relation.
+
+A second-order relation is the same thing as a second-order function whose result has sort $\mathcal{PROP}$. A second-order function that involves no sorts other than $\mathcal{PROP}$ may be thought of as a propositional connective.
+
+The reason for the choices made above is that they make the mereological interpretation maximally straightforward. In particular:\\
+\indent * It is second-order expressions rather than first-order expressions that will be regarded as primary here,\\
+\indent * $\subseteq$, $\cap$, and $\cup$ will all be given straightforward mereological interpretations,\\
+\indent * having many sorts rather than a single sort is very natural from the viewpoint of our mereological interpretation,\\
+\indent * it is for properties (what the second-order quantifiers in monadic second-order logic quantify over) rather than $n$-ary predicates (for $n > 1$) that the mereological interpretation applies most straightforwardly, and\\
+\indent * many-sorted logic leads to a natural way of dealing with $n$-ary predicates (for $n > 1$).
+
+Although the system is non-standard, it is easy to translate common variants of second-order logic into it. These will thus be given a mereological interpretation.
+
+The notation that we will use is as follows:\\
+\indent * First-order variables and second-order variables are distinguished by casing, with first-order variables being written in lower case and second-order variables being written in upper case. For example, $x$ and $y$ are first-order variables while $X$ and $Y$ are second-order variables.\\
+\indent * Each variable is associated with a sort, and the sorts will be written as superscripts whenever we want to make them explicit. For example, $x^S$ is a first-order variable of sort $S$, $y^T$ is a first-order variable of sort $T$, and $X^T$ is a second-order variable of sort $T$.\\
+\indent * We also apply casing to function and relation symbols to distinguish what pertains to first-order logic from what pertains to second-order logic. For example, $f$ may be a first-order function symbol, $F$ a second-order function symbol, $r$ a first-order relation symbol, and $R$ a second-order relation symbol.\\
+\indent * Function and relation symbols come with sortings as illustrated by these examples:\\
+\indent \indent $f : S, T \rightarrow U$ indicates that $f$ is a function of two arguments that is applied to individuals of sorts $S$ and $T$ to yield an individual of sort $U$,\\
+\indent \indent $F : S, T, U \rightarrow V$ indicates that $F$ is a function of three arguments that is applied to monadic predicates (collections/properties in extension) of sorts $S$, $T$, and $U$ to yield a property of sort $V$,\\
+\indent \indent $r \rightarrowtail S_1, S_2$ indicates that $r$ is a binary relation defined for individuals of types $S_1$ and $S_2$, and\\
+\indent \indent $R : S, T, U \rightarrow \mathcal{PROP}$ indicates that $R$ is a 3-ary relation defined for properties of types $S$, $T$, and $U$.\\
+\indent * For any sort $S$, we will write $\varnothing^S$ for the collection/property of sort $S$ that holds for nothing and $\mathcal{U}^S$ for the property that holds for everything (of sort $S$).\\
+\indent * We will write $M \cap N$ and $M \cup N$ for the `intersection' and `union,' respectively, of two properties $M$ and $N$ (the operations $\cap$ and $\cup$ are not sorted; they apply to all properties).\\
+\indent * The subset/inclusion relation among collections/properties is written $\subseteq$ (this relation is not sorted but applies to all properties).\\
+\indent * For any sort $S$, the identity relation for $S$ that is available in first-order logic will be written $=_S$ while the identity relation for $S$ that is available in second-order logic will be written $=^S$ (there are $2^n$ things in the sense of $=^S$ where there are $n$ things in the sense of $=_S$; $n$ individuals correspond to $2^n$ properties).\\
+\indent * There is also the unsorted identity relation $=$. $=$ coincides with $=^S$ among things that have sort $S$.\\
+\indent * The formula $(X \subseteq Y) \wedge (Y \subseteq X)$ will be provably equivalent to $X = Y$.\\
+\indent * For a first-order expression $\phi$, we write $\{\phi\}$ for the property that only holds for $\phi$.\footnote{$\{\phi\}(x)$ is thus equivalent to $x=\phi$. Here $\phi$ is a first-order expression while $\{\phi\}$ is a second-order expression, but the distinction between the two is mostly syntactical: Our mereological interpretation will treat $\phi$ and $\{\phi\}$ as the same object.}\\
+\indent * For a bound variable, we will normally only write out the sort once (for example, we will normally write $\forall x^S.x =_S x$ instead of $\forall x^S.x^S =_S x^S$).\\
+\indent * As usual, the second quantifier may be omitted when two quantifiers of the same kind follow each other (we may thus write $\forall x,y. \Phi$ instead of $\forall x. \forall y. \Phi$, $\exists X,Y,Z. \Phi$ instead of $\exists X.\exists Y.\exists Z. \Phi$, etc.).\\
+\indent * If an expression $\phi$ has sort $S$ then we may write $\phi^S$ instead of $\phi$ to make this explicit.
+
+The following will hold:\\
+\indent $\forall x^S.\varnothing^S(x) \leftrightarrow \bot$,\\
+\indent $\forall x^S.\mathcal{U}^S(x) \leftrightarrow \top$,\\
+\indent $\forall Y^S, Z^S.\forall x^S.[(Y \cap Z)(x)] \leftrightarrow [Y(x) \wedge Z(x)]$,\\
+\indent $\forall Y^S, Z^S.\forall x^S.[(Y \cup Z)(x)] \leftrightarrow [Y(x) \vee Z(x)]$, and\\
+\indent $\forall Y^S, Z^S.(Y \subseteq Z) \leftrightarrow \forall x^S.Y(x) \rightarrow Z(x)$.
+
+The propositional connectives $\top$, $\bot$, $\wedge$, $\vee$, $\rightarrow$, $\leftrightarrow$, and $\neg$ will be used just like in the previous chapter. 
+
+We also include propositional constants and propositional quantification as in the previous chapter. We write $X^{\mathcal{PROP}}$ to indicate that $X$ is a propositional variable. For example, the sentence $\forall X^{\mathcal{PROP}}. X \vee (\neg X)$ states that classical logic holds.
+
+\section{The Mereological Interpretation of $\cap$, $\cup$, $\subseteq$, and Second-Order Identity} \label{interpretation_of_cap_and_cup}
+Section \ref{interpretation_of_monadic_predicates} argued for seeing one property $\Phi$ as part of another property $\Psi$ just in case $\forall x.\Phi(x) \rightarrow \Psi(x)$ holds. We now note that if these two order relations coincide then the meets, joins, and co-Heyting complements need to coincide as well:\\
+\indent* $\Phi \cap \Psi$ needs to be $\Phi \times \Psi$ (the mereological product of $\Phi$ and $\Psi$),\\
+\indent* $\Phi \cup \Psi$ needs to be $\Phi + \Psi$ (the mereological sum of $\Phi$ and $\Psi$), and\\
+\indent* $\Phi \subseteq \Psi$ needs to be $\mathcal{T} + \Phi - \Psi$\footnote{The constant $\mathcal{T}$ appears for the same reason here as in the previous chapter. One may begin by considering the case where it is equal to $0$.} (ignoring the complicating topic of negation; cf. Section \ref{negation_in_predicate_logic}).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=4]
+
+  % Diamond coordinates
+  \coordinate (A) at (0,0);     % left
+  \coordinate (B) at (1,1);     % top
+  \coordinate (C) at (2,0);     % right
+  \coordinate (D) at (1,-1);    % bottom
+
+  % Draw diamond
+  %\draw[very thick] (A) -- (B) -- (C) -- (D) -- cycle;
+
+  % Element positions (roughly centered)
+  \coordinate (Top) at (1,0.3);
+  \coordinate (Bottom) at (1,-0.3);
+  \coordinate (Left) at (0.7,0);
+  \coordinate (Right) at (1.3,0);
+
+  % Draw nodes (dots)
+  \fill (Top) circle (0.02);
+  \fill (Bottom) circle (0.02);
+  \fill (Left) circle (0.02);
+  \fill (Right) circle (0.02);
+
+  % Labels
+  \node[above=2pt, align=center] at (Top) {$\Phi + \Psi$ \\ (Interpretation of `$\Phi \cup \Psi$')};
+  \node[below=2pt, align=center] at (Bottom) {$\Phi \times \Psi$ \\ (Interpretation of `$\Phi \cap \Psi$')};
+  \node[left=3pt] at (Left) {$\Phi$};
+  \node[right=3pt] at (Right) {$\Psi$};
+
+\end{tikzpicture}
+\caption{Interpretations of intersections and unions.}
+\label{fig:diamonds}
+\end{figure}
+
+$\Phi = \Psi$ is to be the same thing as $(\Phi \subseteq \Psi) \wedge (\Psi \subseteq \Phi)$ and must thus be $\mathcal{T} + (\Phi - \Psi) + (\Psi - \Phi)$, which one may write more concisely as $\mathcal{T} + (\Phi \dotdiv \Psi)$.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.2]
+    % Top row - individual propositions
+    \node at (-2, 5) {$\Phi$};
+    \node at (-2, 4.7) {$\bullet$};
+    
+    \node at (2, 5) {$\Psi$};
+    \node at (2, 4.7) {$\bullet$};
+    
+    % Second row - combinations with T
+    \node at (0, 2.5) {$\mathcal{T} + (\Phi - \Psi) + (\Psi - \Phi)$};
+    \node at (0, 2) {(Interpretation of `$\Phi = \Psi$')};
+    \node at (0, 1.6) {$\bullet$};
+    
+    % Third row - left and right branches
+    \node at (-4, 1) {$\mathcal{T} + \Phi - \Psi$};
+    \node at (-4, 0.5) {(Interpretation of `$\Phi \subseteq \Psi$')};
+    \node at (-4, 0.2) {$\bullet$};
+    
+    \node at (4, 1) {$\mathcal{T} + \Psi - \Phi$};
+    \node at (4, 0.5) {(Interpretation of `$\Psi \subseteq \Phi$')};
+    \node at (4, 0.2) {$\bullet$};
+    
+    % Center - T only
+    \node at (0, -0.5) {$\mathcal{T}$};
+    \node at (0, -0.8) {(Interpretation of `$\top$')};
+    \node at (0, -1.2) {$\bullet$};
+    
+    % Bottom row - combinations without T
+    \node at (0, -2.5) {$(\Phi - \Psi) + (\Psi - \Phi)$};
+    \node at (0, -2.8) {$\bullet$};
+    
+    % Bottom individual differences
+    \node at (-2.5, -4) {$\Phi - \Psi$};
+    \node at (-2.5, -4.3) {$\bullet$};
+    
+    \node at (2.5, -4) {$\Psi - \Phi$};
+    \node at (2.5, -4.3) {$\bullet$};
+\end{tikzpicture}
+\caption{Interpretations for `$=$' and `$\subseteq$.'}
+\label{fig:diamonds}
+\end{figure}
+
+The mereological interpretations given here for $\Phi \subseteq \Psi$ and $\Phi = \Psi$ will serve as basic ingredients below as we discuss the mereological interpretation of other things such as functions or what it means for an object to belong to a particular domain of quantification.
+
+\section{The Domain of a Sort} \label{domain_of_a_sort}
+The fact that sorts can overlap means that an expression $\Phi$ of a sort $S$ can satisfy $\exists X^T.X=\Phi$ for a sort $T$ that is different from the sort $S$.
+
+We will say in this case that $\Phi$ is within the domain of sort $T$ (even though the sort of $\Phi$ is $S$, not $T$).
+
+The previous chapter understood propositional quantifiers as quantifying over everything that is part of $\mathcal{B}$ and that contains $\mathcal{T}$ as a part. We will similarly understand the second-order quantifiers for a sort $S$ as quantifying over everything that is part of $\mathcal{U}^S$ and that contains $\varnothing^S$ as a part. How the latter can be relative (to sorts) will be the topics of Sections \ref{subsorts} and \ref{quotient_sorts}, respectively.
+
+$\Phi$ is thus within the domain of sort $T$ if it satisfies $\Phi \subseteq \mathcal{U}^T$ along with $\varnothing^T \subseteq \Phi$.
+
+If $\varnothing^S = \varnothing^T$ while $\mathcal{U}^S \subseteq \mathcal{U}^T$ then we say that the sort $S$ is a \textit{subsort} of the sort $T$. Any individual of sort $S$ will then also be an individual within the domain of the sort $T$.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=2, thick]
+
+  % Coordinates
+  \coordinate (A) at (0,0);
+  \coordinate (B) at (1,1);
+  \coordinate (C) at (2,0);
+  \coordinate (D) at (1,-1);
+
+  \coordinate (E) at (0.5,-0.5);
+  \coordinate (F) at (1,0);
+  \coordinate (G) at (1.5,-0.5);
+  \coordinate (H) at (1,-1);
+
+  % Outer diamond
+  \draw[very thick] (A) -- (B) -- (C) -- (D) -- cycle;
+
+  % Inner diamond
+  \draw[very thick] (E) -- (F) -- (G) -- (H) -- cycle;
+
+  % Labels
+  \node[above=2pt] at (B) {$\mathcal{U}^T$};
+  \node[above=2pt] at (F) {$\mathcal{U}^S$};
+  \node[below=2pt] at (D) {$\varnothing^S = \varnothing^T$};
+\end{tikzpicture}
+\caption{Sort $S$ is a subsort of sort $T$.}
+\label{fig:diamonds}
+\end{figure}
+
+If $\mathcal{U}^S = \mathcal{U}^T$ while $\varnothing^T \subseteq \varnothing^S$ then we say that the sort $S$ is a \textit{quotient sort} of the sort $T$. This terminology will be explained and justified in Section \ref{quotient_sorts}.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=2, thick]
+
+  % Coordinates for outer diamond
+  \coordinate (A) at (0,0);
+  \coordinate (B) at (1,1);
+  \coordinate (C) at (2,0);
+  \coordinate (D) at (1,-1);
+
+  % Coordinates for inner diamond (top aligned, bottom above)
+  \coordinate (E) at (0.5,0.5);
+  \coordinate (F) at (1,1);
+  \coordinate (G) at (1.5,0.5);
+  \coordinate (H) at (1,0); % bottom higher than outer
+
+  % Outer diamond
+  \draw[very thick] (A) -- (B) -- (C) -- (D) -- cycle;
+
+  % Inner diamond
+  \draw[very thick] (E) -- (F) -- (G) -- (H) -- cycle;
+
+  % Labels
+  \node[above=2pt] at (B) {$\mathcal{U}^T = \mathcal{U}^S$};
+  \node[below=2pt] at (D) {$\varnothing^T$};
+  \node[below=2pt] at (H) {$\varnothing^S$};
+\end{tikzpicture}
+\caption{Sort $S$ is a quotient sort of sort $T$.}
+\label{fig:diamonds}
+\end{figure}
+
+
+We may occasionally speak of $\varnothing^S$ as the \textit{lower limit} and of $\mathcal{U}^S$ as the \textit{upper limit} for the sort $S$.
+
+For any property $M$ and any sort $S$, the object $(M \cap \mathcal{U}^S) \cup \varnothing^S$ (which one may alternatively write as $(M \cup \varnothing^S) \cap \mathcal{U}^S$) satisfies the criteria for being within the domain of sort $S$ (as defined above). We call it the \textit{projection} of $M$ onto the domain of the sort $S$ and denote it $\mathrm{Proj}_S(M)$.
+
+One may think of the projection of $M$ onto sort $S$ as an `approximation' to $M$ within the domain of sort $S$, chosen to be as good as possible. Projections will matter for us in Section \ref{quotient_sorts}.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=2]
+  % Draw the diamond shape
+  \draw[thick] (0,2) -- (2,0) -- (0,-2) -- (-2,0) -- cycle;
+  
+  % Add labels at vertices
+  \node[above] at (0,2.2) {$\mathcal{U}^T$};
+  \node[below] at (0,-2.2) {$\varnothing^T$};
+  
+  % Add points
+  \fill (0.5,0.25) circle (1pt);
+  \node[right] at (0.55,0.25) {\footnotesize $(\mathrm{M} \cap \mathcal{U}^T) \cup \varnothing^T$};
+  
+  \fill (1.6,1.6) circle (1pt);
+  \node[right] at (1.7,1.6) {\footnotesize $M$};
+\end{tikzpicture}
+\caption{$M$ is projected onto the sort $T$ (the lattice-theoretic interval that is delimited by $\varnothing^T$ and $\mathcal{U}^T$) through the expression `$(\mathrm{M} \cap \mathcal{U}^T) \cup \varnothing^T$' (or `$(\mathrm{M} \cup \varnothing^T) \cap \mathcal{U}^T$'). }
+\label{fig:diamonds}
+\end{figure}
+
+\section{The Mereological Interpretation of Expressions That Involve Function Symbols} \label{function_application}
+We will now discuss how expressions that involve a second-order function symbol $F$ can be interpreted mereologically. First-order function symbols will be discussed in Section \ref{from_first_order_to_second_order}.
+
+To make the presentation below simpler, we will assume that what needs to be interpreted is a function $F$ of 2 arguments with sorting $F : S, S \rightarrow S$ (where $S$ is a sort). The generalization to $n$ arguments and other sortings will be obvious.
+
+We will begin by noting that when giving a mereological interpretation for an expression such as ‘$F(M, N)$,’ there is no need to give a mereological interpretation for $F$. What is needed is rather a purely mereological way of expressing how $F(M, N)$ depends on $M$ and $N$. For example, it could be that $F(M, N)$ is the mereological sum of $M$ and $N$ or it could be that $F(M, N)$ is the mereological product of $M$ and $N$.
+
+A different notation could perhaps make this clearer: One could write $F_{M, N}$ instead of $F(M, N)$.
+
+The idea that we will use may be explained via variables. Suppose, for example, that it can be presupposed that the three variables $X^S$, $Y^S$, and $Z^S$ are related in such a way that $Z^S = F(X^S, Y^S)$. It is then possible to express $F(M, N)$ without mentioning $F$ as `The object $W$ in the domain of quantification which is such that $(X^S = M \wedge Y^S = N) \rightarrow Z^S = W$.’
+
+As a concrete example, $Z^S$ could be $X^S \cup Y^S$ and one would then have $(X^S = M \wedge Y^S = N) \rightarrow (Z^S = M \cup N)$. $M \cup N$ would thus satisfy the description `The object $W$ in the domain of quantification (i.e., the domain of the sort $S$) which is such that $(X^S = M \wedge Y^S = N) \rightarrow Z^S = W$.’
+
+This is clearly related to 1) how functions were introduced historically via `variable quantities’ and 2) how functions are introduced in schools to students who have yet to learn about set theory, relations, and $n$-tuples.
+
+This said, we will not use actual variables but rather what one may think of as `pseudo-variables.’ For example, we will have that $F_0 = F(F_1, F_2)$, where $F_0$, $F_1$, and $F_2$ are the pseudo-variables associated with $F$. Their intuitive meanings are as follows:\\
+•	$F_1$ is the first argument of $F$,\\
+•	$F_2$ is the second argument of $F$, and \\
+•	$F_0$ is the result of applying $F$ to $F_1$ and $F_2$.
+
+An analogy that may be helpful here is to think of $F_1$ and $F_2$ as the `inputs’ of a measurement instrument (e.g., a voltmeter) and of $F_0$ as the `output.’ One sets the inputs equal to the things for which one wishes to make a measurement and one can then read off the result of the measurement as the output. For example, one may set $F_1 = M$ and $F_2 = N$ and find that the output in this case is $M \cup N$.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=1.7]
+    % Define coordinates for diamond centers
+    \coordinate (S) at (-1, 2);
+    \coordinate (T) at (2, 2);
+    \coordinate (F) at (5, 2);
+    
+    % Draw first diamond (S_max, S_min)
+    \draw[thick] (S) ++(0:0.6) -- ++(135:1) -- ++(-135:1) -- ++(-45:1) -- cycle;
+    \fill (S) circle (1pt);
+    \node at (S) [right=2pt] {$F_1$};
+    \node at (S) [above=40pt] {$\mathcal{U}^S$};
+    \node at (S) [below=38pt] {$\varnothing^S$};
+    
+    % Draw second diamond (T_max, T_min)
+    \draw[thick] (T) ++(0:0.6) -- ++(135:1) -- ++(-135:1) -- ++(-45:1) -- cycle;
+    \fill (T) circle (1pt);
+    \node at (T) [right=3pt] {$F_2$};
+    \node at (T) [above=40pt] {$\mathcal{U}^T$};
+    \node at (T) [below=38pt] {$\varnothing^T$};
+    
+    % Draw third diamond (\bot, \top)
+    \draw[thick] (F) ++(0:0.7) -- ++(135:1) -- ++(-135:1) -- ++(-45:1) -- cycle;
+    \fill (F) circle (1pt);
+    \node at (F) [right=3pt] {$F_0$};
+    \node at (F) [above=40pt] {$\mathcal{U}^U$};
+    \node at (F) [below=40pt] {$\varnothing^U$};
+
+\end{tikzpicture}
+\caption{$F_0$ is the result of applying $F$ to $F_1$ and $F_2$. $F_1$ is confined to the sort $S$, $F_2$ is confined to the sort $T$, and $F_0$ is confined to the sort $U$.}
+\label{fig:diamonds}
+\end{figure}
+
+Seeing $F_0$, $F_1$, and $F_2$ as things that can `vary' will require a shift in viewpoint, more exactly a shift in what is viewed as trivially true.\footnote{Shifts in what is treated as trivially true was the subject of Section \ref{trivially_true}.} While we translate the proposition $\top$ into the constant $\mathcal{T}$, here we will not be able to use $\mathcal{T}$ as the object that corresponds to what is trivially true. The reason for this is that $\mathcal{T}$ will imply things to the effect that $F_0$, $F_1$, and $F_2$ are perfectly determinate objects within the domain of the sort $S$, leaving no opportunity for them to vary. With the analogy from above, it is as if the inputs of the measurement instrument had been hardwired to specific objects, making it impossible to set the inputs equal to different objects at different times.
+
+What we need is instead a fine-grained view on the propositions of the theory\footnote{Different level of fine-grainedness was the topic of Section \ref{fine_grained_and_coarse_grained_views_on_propositions}.}, one from which it is possible to reason counterfactually about what $F_0$ would become provably identical to if axioms of the form $F_1 = \phi_1$ and $F_2 = \phi_2$ were added. We will thus make sure that we have enough fine-grainedness that we are able to distinguish between things that are not provably identical, and we will use no more fine-grainedness than that.
+
+It remains for us to explain how one can understand a definite description such as `The object $W$ in the domain of quantification which is such that $(F_1 = M \wedge F_2 = N) \rightarrow F_0 = W$’ in purely mereological terms. We will understand $=$, $\wedge$, and $\rightarrow$ mereologically in the same way that these things were understood mereologically in the last chapter, and the definite description will be interpreted using the fact that `the object $X$ such that $\Phi$’ is the same thing as `the mereological sum of all objects $X$ such that $\Phi$.’
+
+One additional step of interpretation is needed here, though. What we get directly through our mereological framework M\textsubscript{D} is the ability to refer to things of the form `the mereological sum of all the objects $\Psi$ as $X$ ranges over all objects’ (where $\Psi$ as $X$ can be chosen as desired). The next section will explain how it is possible to work around this difficulty.
+
+The restriction to objects `within the domain of quantification' may be handled via what was discussed in the previous two sections. Section \ref{domain_of_a_sort} discussed how $\Phi$ belongs to the domain of the sort $T$ just in case one has $\Phi \subseteq \mathcal{U}^T$ along with $\varnothing^T \subseteq \Phi$. Section \ref{interpretation_of_cap_and_cup} discussed the mereological interpretation of `$\subseteq$.'
+
+With this, we have summarized how one can understand function application (for functions expressible in second-order logic) in a purely mereological way.
+
+\section{Definite Descriptions and Set Comprehension} \label{definite_descriptions}
+We noted in the previous section that `the object $X$ such that $\Phi$’ is the same thing as `the mereological sum of all objects $X$ such that $\Phi$’ and we also noted that what one gets directly from our mereological theory is the ability to refer to things of the form `the mereological sum of all the objects $\Psi$ as $X$ ranges over all objects.’ We will now explain how to get from the latter to the former.
+
+Note that $\Phi$ is a proposition in these expressions, unlike $X$ and $\Psi$. We can, however, use our interpretation of propositional logic from the previous chapter to understand $\Phi$ mereologically, after which it will be an object like any other as far as our mereological framework is concerned.
+
+We find it easiest, though, to also use the ability discussed in Section \ref{analogy_with_logic} to reinterpret our mereological framework $M_D$ as quantified intuitionistic propositional logic. $\Phi$ will then once again be an actual proposition and `the mereological sum of all the objects $\Psi$ as $X$ ranges over all objects’ becomes $\forall X.\Psi$.
+
+A restriction to things (propositions under the propositional interpretation; non-propositions under the mereological interpretation) that satisfy $\Phi$ can then be expressed through expressions of the form $\forall X.\Phi \rightarrow \Psi$.
+
+By finally setting $\Psi$ to $X$, one gets the expression $\forall X.\Phi \rightarrow X$ which can be thought of as the conjunction (in some sense) of all the propositions $X$ which are such that $\Phi$ holds. For example, if $\Phi$ is $X = A \vee X = B$ then $\forall X.\Phi \rightarrow X$ becomes $A \wedge B$.\footnote{As another concrete illustration, $\Phi$ could hold for all and only the axioms of some theory $T$ and $\forall X.\Phi \rightarrow X$ would then assert of each of the axioms of $T$ that it holds. This is analogous to quantifying over the sentences of a formal language and asserting of all those that satisfy a certain predicate that they are true.}
+
+The following theorem offers technical confirmation for what we have just claimed:
+\newtheorem{theorem}{Theorem}
+\begin{theorem}
+\label{thm:inf-imp}
+In quantified intuitionistic proposional logic, the following holds:
+1) For any proposition $\Omega$ such that $\Phi[\Omega/X]$ holds, $\forall X. \Phi \to X$ implies $\Omega$, and 2) if $\Psi$ is any such proposition (i.e., for any proposition $\Omega$ such that $\Phi[\Omega/X]$ holds, $\Psi$ implies $\Omega$) then $\Psi$ implies $\forall X. \Phi \to X$. In other words, $\forall X. \Phi \to X$ is the weakest proposition that implies all propositions $\Omega$ such that $\Phi[\Omega/X]$ holds.
+\end{theorem}
+
+\begin{proof}
+To see that 1) is true, note that $\forall X. \Phi \to X$ implies $\Phi[\Omega/X] \to \Omega$, which implies $\Omega$ under the assumption that $\Phi[\Omega/X]$ holds. So $\forall X. \Phi \to X$ implies $\Omega$ under the assumptions of 1).
+
+To see that 2) is true, assume that for any proposition $\Omega$ such that $\Phi[\Omega/X]$ holds, $\Psi$ implies $\Omega$. We want to show that $\Psi$ implies $\forall X. \Phi \to X$, so assume that $\Psi$ holds. Because of our second assumption, our first assumption can be simplified to: For any object $\Omega$ such that $\Phi[\Omega/X]$ holds, $\Omega$ holds. But this is just another way of saying $\forall X. \Phi \to X$. Hence $\Psi$ implies $\forall X. \Phi \to X$.
+\end{proof}
+
+But conjunctions become mereological sums under the mereological interpretation, and so we have found a way to get the mereological sum of the things that satisfy $\Phi$.
+
+Let us finally note that the current chapter uses mereological sums to interpret set unions. The mereological sums that we have discussed here can accordingly be thought of as unions among sets.
+
+In the special case where the sets are 1-element sets (to be discussed later), this can also be seen as set comprehension: One forms the set of all individuals $X$ such that $\Phi$.
+
+For the sake of simplicity, we have not included any syntax for general unions or set comprehension in the language that we are translating, but the considerations of this section would have been relevant if we had chosen to do so.
+
+\section{Second-Order Relations as Functions That Map Sets to Propositions} \label{second_order_relations_as_functions}
+By applying the ideas of the previous section to the special case where the function result has sort $\mathcal{PROP}$, we get the kind of relations that one can express through second-order logic. An $n$-ary relation is thus viewed as an $n$-ary function whose result is a \textit{proposition}.
+
+If the arguments are propositions as well then we get a propositional \textit{connective}.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=2]
+    % Define coordinates for diamond centers
+    \coordinate (S) at (-2, 2);
+    \coordinate (T) at (2, 2);
+    \coordinate (F) at (0, 0);
+    
+    % Draw first diamond (S_max, S_min)
+    \draw[thick] (S) ++(0:0.6) -- ++(135:1) -- ++(-135:1) -- ++(-45:1) -- cycle;
+    \fill (S) circle (1pt);
+    \node at (S) [right=2pt] {$R_1$};
+    \node at (S) [above=40pt] {$\mathcal{U}^S$};
+    \node at (S) [below=38pt] {$\varnothing^S$};
+    
+    % Draw second diamond (T_max, T_min)
+    \draw[thick] (T) ++(0:0.6) -- ++(135:1) -- ++(-135:1) -- ++(-45:1) -- cycle;
+    \fill (T) circle (1pt);
+    \node at (T) [right=3pt] {$R_2$};
+    \node at (T) [above=40pt] {$\mathcal{U}^T$};
+    \node at (T) [below=38pt] {$\varnothing^T$};
+    
+    % Draw third diamond (\bot, \top)
+    \draw[thick] (F) ++(0:0.7) -- ++(135:1) -- ++(-135:1) -- ++(-45:1) -- cycle;
+    \fill (F) circle (1pt);
+    \node at (F) [right=2pt] {$R_0$};
+    \node at (F) [above=40pt] {$\mathcal{F}$};
+    \node at (F) [below=40pt] {$\mathcal{T}$};
+
+\end{tikzpicture}
+\caption{$R_0$ measures how true it is that $R$ holds between $R_1$ and $R_2$.}
+\label{fig:diamonds}
+\end{figure}
+
+\section{From First-Order Logic to Second-Order Logic} \label{from_first_order_to_second_order}
+We have so far discussed the mereological interpretation of second-order quantifiers and second-order expressions. We will now discuss how the expressions that one can form in first-order logic may be translated into the kind of expressions for which we already have mereological interpretations.
+
+Our mereological interpretation for predicate logic may in fact be seen as involving two steps:\\
+Step 1. Eliminate `first-order expressions' in favor of `second-order expressions.'\\
+Step 2. Translate the result into the mereological framework M\textsubscript{D} that we are using.
+
+For simplicity, functions of the kind that one can define in first-order logic will be referred to here as `first-order functions' while functions of the kind that one can define in second-order logic will be referred to as `second-order functions.' We will discuss below how any first-order function may be viewed as a second-order function.
+
+The present section will discuss Step 1. (except that the topic of quantification will be left for Section \ref{quantification}) and will not deal with mereology in any direct way.
+
+The problem of how to dispense with first-order expressions is from one point of view close to trivial. It is, after all, a well-known idea in philosophy that an individual object $i$ may be replaced by the property $P_i$ which holds for an object $x$ just in case $x=i$. That is: $P_i(x) \leftrightarrow x=i$.
+
+One can thus replace references to individuals with references to their corresponding properties and one can similarly replace quantification over individuals with quantification over properties.
+
+We are, however, working in a negation-free logic at this point (negation will not be discussed until Section \ref{negation_in_predicate_logic}) and are not able to say of a property $M$ that it differs from the property $\varnothing$ that corresponds to the empty set (since the formula $\neg (M = \varnothing)$ involves negation). This means that what appears to be two individuals may turn out to be a single individual or even no individual at all, and what is done here has to make good sense in all these cases.
+
+In accordance with this, our mereological interpretation will be such that the objects that interpret first-order expressions of a sort $S$ will be exactly the same as the objects that interpret second-order expressions of sort $S$.
+
+The only exception to this rule is that Section \ref{quantification} will restrict the quantifiers for first-order variables so that (intuitively speaking) only individuals get quantified over. The current section will not use any quantifiers and will not use negation.
+
+Although one would ordinarily think of functions in first-order logic as defined on individuals, here we do not have the ability to distinguish between properties that correspond to individuals and properties that do not (since that requires negation) and so we will regard even functions in first-order logic as defined for all properties. Here we will use the fact that a function (in the ordinary, set-theoretic sense of `function') $f:A \rightarrow B$ gives rise to a pair of functions $f^* : P(B) \rightarrow P(A)$, $f_* : P(A) \rightarrow P(B)$ defined as follows:\\
+\indent $f^*(Y) = \{x \in A: \exists y \in Y.y = f(x)\}$ ($f^*(Y)$ is said to be the `inverse image' of $Y$) and\\
+\indent $f_*(X) = \{y \in B: \exists x \in X.y = f(x)\}$ ($f_*(X)$ is said to be the `(direct) image' of $X$).
+
+The functions $f^*$ and $f_*$ are clearly monotonic:\\
+\indent $Y_1 \subseteq Y_2 \rightarrow f^*(Y_1) \subseteq f^*(Y_2)$ and\\
+\indent $X_1 \subseteq X_2 \rightarrow f_*(X_1) \subseteq f_*(X_2)$.
+
+There is, moreover, a \textit{Galois connection}\footnote{In category-theoretic terminology, $f_*$ and $f^*$ form a pair of \textit{adjoints}, with $f_*$ being the \textit{left adjoint} and with $f^*$ being the \textit{right adjoint}. See (MacLane, 1998).
+
+The idea of understanding a function $f$ through its corresponding adjoint pair $f^*$, $f_*$ can be found in categorical logic (cf. ).} that relates the two functions:\\
+\indent $f_*(X) \subseteq Y \leftrightarrow X \subseteq f^*(Y)$.
+
+Not only does the function $f$ determine the two functions $f^*$ and $f_*$, but any of the three functions determines the other two:\\
+\indent $f^*(Y) = \bigcup\limits_{X \subseteq A, f_*(X) \subseteq Y} X$,\\
+\indent $f_*(X) = \bigcap\limits_{Y \subseteq B, X \subseteq f^*(Y)} Y$, and\\
+\indent $\{f(x)\} = f_*(\{x\})$.
+
+For our purposes, this enables us to eliminate a first-order function $f:S \rightarrow T$ in favor of two second-order functions $D_f: S \rightarrow T$ (the `direct image function corresponding to $f$') and $I_f: T \rightarrow S$ (the `inverse image function corresponding to $f$') such that the following axioms hold\footnote{The idea of representing a function $f$ via its adjoint pair $f^*$, $f_*$ comes from category theory. See ... .}:\\
+\indent (Monotonicity for $I_f$) $\forall Y_1^T, Y_2^T. Y_1 \subseteq Y_2 \rightarrow I_f(Y_1) \subseteq I_f(Y_2)$.\\
+\indent (Monotonicity for $D_f$) $\forall X_1^S, X_2^S.X_1 \subseteq X_2 \rightarrow D_f(X_1) \subseteq D_f(X_2)$.\\
+\indent (Galois connection between $D_f$ and $I_f$) $\forall X^S, Y^T.D_f(X) \subseteq Y \leftrightarrow X \subseteq I_f(Y)$.
+
+Setting $X = I_f(Y)$ or $Y = D_f(X)$ in the Galois connection gives one the following consequences:\\
+\indent (Extensiveness of the unit) $X \subseteq I_f(D_f(X))$.\\
+\indent (Contractiveness of the counit) $D_f(I_f(Y)) \subseteq Y$.
+
+Note that if $f$ were a \textit{partial} function then $D_f(X)$ could be the empty set even with $X$ non-empty, and $I_f(D_f(X))$ would then also be empty and $X \subseteq I_f(D_f(X))$ would not hold.
+
+The condition $D_f(I_f(Y)) \subseteq Y$ could similarly fail if $f$ were a \textit{many-valued} function (for example, $Y$ and $I_f(Y)$ could be 1-element sets and $D_f(I_f(Y))$ could have many elements).
+
+Section \ref{product_sorts} will show how an $n$-ary relation ($n > 1$) can be viewed as a 1-ary relation (i.e., a property/set) defined for $n$-tuples and how an $n$-ary function can be viewed as a 1-ary function defined for $n$-tuples.
+
+\section{0-ary Function and Relation Symbols} \label{0ary_functions_and_relations}
+Although the next section will discuss products, we will not define 0-ary products and will instead discuss 0-ary functions and relations here. 
+
+A $0$-ary relation symbol can be replaced by a propositional constant. We discussed these in the previous chapter.\footnote{This treats $0$-ary relation symbols as special cases of second-order $n$-ary relation symbol. 
+    
+Since we do not define 0-ary products, we do not include  `first-order $0$-ary relation symbols.'}
+
+A $0$-ary second-order function symbol $F: S$ is simply an object within the domain of the sort $S$. In other words, $\varnothing^S \subseteq F$ and $F \subseteq \mathcal{U}^S$ need to hold.
+
+A $0$-ary first-order function symbol $f: S$ is likewise an object within the domain of the sort $S$. The sort $S$ could be empty and $f$ will then be identical to $\varnothing^S$ as well as to $\mathcal{U}^S$.
+
+\section{Product Sorts (Tuples)} \label{product_sorts}
+Recall that the \textit{product set} $A \times B$ of two sets $A$ and $B$ is the set of all 2-\textit{tuples} (i.e., ordered pairs) $<x, y>$ where $x \in A$ and $y \in B$. One defines \textit{projection functions}\footnote{Projection in this sense must not be confused with projection in the sense of Section \ref{domain_of_a_sort}.} $\pi_1$ and $\pi_2$ according to $\pi_1(<x, y>) = x$ and $\pi_2(<x, y>) = y$ and one has $<\pi_1(z), \pi_2(z)> = z$ for every element $z$ in $A \times B$ (since every element $z$ in $A \times B$ can be written in the form $z = <x, y>$). $x$ and $y$ are known as the \textit{components} of $<x, y>$.
+
+For the sake of simplicity, we will confine the following discussion to 2-tuples. The generalization to $n$-tuples will be obvious.
+
+In accordance with Section \ref{from_first_order_to_second_order}, we will understand the functions mentioned above via their corresponding direct image functions. For $X \subseteq A$, $Y \subseteq B$, and $Z \subseteq A \times B$, we have:\\
+\indent * $\pi_1(Z) = \{x \in A: \exists z \in Z.\pi_1(z) = x\}$.\\
+\indent * $\pi_2(Z) = \{y \in B: \exists z \in Z.\pi_2(z) = y\}$.\\
+\indent * $<X, Y> = \{z \in A \times B: \exists x \in X.\exists y \in Y. z = <x, y>\}$.
+
+One needs to be careful, though, when attempting to generalize the identities mentioned in the first paragraph above, as can be seen from the following counterexamples:\\
+\indent a) $<X_1, Y_1> = <X_2, Y_2>$ does not imply $X_1 = X_2$ and $Y_1 = Y_2$, as one can see by letting $Y_1$ and $Y_2$ be the empty set.\\
+\indent b) A subset of $A \times B$ can fail to have the form $<X, Y>$ (for some choices of $X$ and $Y$), as follows from cardinality considerations ($2^{|A|} \times 2^{|B|}$ can be smaller than $2^{|A| \times |B|}$).
+
+In view of a) and b), we will introduce some additional terminology. We will refer to the subsets of $A \times B$ that have the form $<X, Y>$ as \textit{rectangular} subsets of $A \times B$ and will say that a rectangular set $<X, Y>$ is \textit{invertible} if $<X, Y> = <X', Y'>$ implies $X = X' \wedge Y = Y'$ (for any $X' \subseteq A, Y' \subseteq B$). We will write $\mathrm{Rect}_{A, B}$ for the set of all rectangular subsets of $A \times B$ and $\mathrm{InvertibleRect}_{A, B}$ for the subset of $\mathrm{Rect}_{A, B}$ that only includes invertible sets.
+
+The basic idea in what follows will be that the correspondence between elements $<x, y>$ of $A \times B$ and pairs of elements $x \in A, y \in B$ can be extended into a correspondence between elements $<X, Y>$ of $\mathrm{Rect}_{A, B} \setminus \{\emptyset\}$ and pairs of elements $X \in \mathcal{P}(A) \setminus \{\emptyset\}, Y \in \mathcal{P}(B) \setminus \{\emptyset\}$. Our problem is that we do not have a way to simply exclude the special case of the empty set as that would require not only negation but also classical logic.
+
+We will accordingly emphasize invertible rectangular subsets rather than non-empty rectangular subsets. We will define $A \times B$ by simultaneously defining $\mathrm{InvertibleRect}_{A, B}$, and we will use an axiom that ensures that two subsets of $A \times B$ are identical just in case they include the same sets from $\mathrm{InvertibleRect}_{A, B}$. In other words, the invertible rectangular sets have to form a \textit{separating family}.
+
+In order to force a set $C$ to be a product of two sets $A$ and $B$, we will use functions $\mathrm{P}_1$, $\mathrm{P}_2$, $\mathrm{I}_1$, $\mathrm{I}_2$, $\mathrm{T}$, and a predicate $\mathrm{IR}$:\\
+$\mathrm{P}_1: \mathcal{P}(C) \rightarrow \mathcal{P}(A)$.\\
+$\mathrm{P}_2: \mathcal{P}(C) \rightarrow \mathcal{P}(B)$.\\
+$\mathrm{I}_1: \mathcal{P}(A) \rightarrow \mathcal{P}(C)$.\\
+$\mathrm{I}_2: \mathcal{P}(B) \rightarrow \mathcal{P}(C)$.\\
+$\mathrm{T} : \mathcal{P}(A) \times \mathcal{P}(B) \rightarrow \mathcal{P}(C)$.\\ 
+$\mathrm{IR} \subseteq \mathcal{P}(C)$.
+
+The intuitive meaning of these will be as follows:\\
+\indent * $\mathrm{P}_1$ and $\mathrm{P}_2$ are the direct-image functions for the projection functions from $A \times B$ to $A$ and $B$, respectively.\\
+\indent * $\mathrm{I}_1$ and $\mathrm{I}_2$ are the inverse-image functions corresponding to $\mathrm{P}_1$ and $\mathrm{P}_2$.\\
+\indent * $\mathrm{T}$ is the direct-image function for tuple-formation.\\
+\indent * $\mathrm{IR}$ says that a subset of $C$ is `rectangular and invertible.'
+
+The conditions that we impose on these are as follows:\\
+\indent * $\mathrm{P}_1$ and $\mathrm{P}_2$ are monotone.\\
+\indent * $\mathrm{I}_1$ and $\mathrm{I}_2$ are monotone.\\
+\indent * $\mathrm{T}$ is monotone in both arguments.\\
+\indent * $\mathrm{T}(\varnothing, Y) = \varnothing$.\\
+\indent * $\mathrm{T}(X, \varnothing) = \varnothing$.\\
+\indent * $\mathrm{T}(A, B) = C$.\\
+\indent * $\mathrm{T}(X, Y) = \mathrm{I}_1(X) \cap \mathrm{I}_2(Y)$.\\
+\indent * $\mathrm{P}_1(X) \subseteq Y \leftrightarrow X \subseteq \mathrm{I}_1(Y)$.\\
+\indent * $\mathrm{P}_2(X) \subseteq Y \leftrightarrow X \subseteq \mathrm{I}_2(Y)$.\\
+\indent * $\mathrm{IR}(Z) \rightarrow \exists X, Y.\ Z = \mathrm{T}(X, Y)$.\\
+\indent * $(\mathrm{IR}(Z) \wedge Z = \mathrm{T}(X, Y) \wedge Z = \mathrm{T}(X', Y')) \rightarrow (X = X' \wedge Y = Y')$.\\
+\indent * $(S \subseteq C \wedge S' \subseteq C) \rightarrow (S = S' \leftrightarrow \forall S'' \subseteq C.\ \mathrm{IR}(S'') \rightarrow (S'' \subseteq S \leftrightarrow S'' \subseteq S'))$.\\
+\indent * $\mathrm{IR}(\mathrm{T}(X, Y)) \rightarrow (\mathrm{P}_1(\mathrm{T}(X, Y)) = X)$.\\
+\indent * $\mathrm{IR}(\mathrm{T}(X, Y)) \rightarrow (\mathrm{P}_2(\mathrm{T}(X, Y)) = Y)$.\\
+\indent * $\mathrm{IR}(Z) \rightarrow \mathrm{T}(\mathrm{P}_1(Z), \mathrm{P}_2(Z)) = Z$.
+
+[TODO: Include at least one theorem. Maybe prove that $A \times B$ includes an element if and only if both $A$ and $B$ include elements. And this is exactly the case where a rectangular set is invertible?]
+
+This approach to characterizing products may be compared with the approach from category theory that is based on the observation that a pair of functions $f: X \rightarrow A$, $g: X \rightarrow B$ corresponds to a function $<f, g> : X \rightarrow A \times B$, where $X$ can be any set\footnote{More generally, the category-theoretical approach allows $X$, $A$, $B$, and $A \times B$ to be objects of any category that has binary products.}. This too will avoid problems in the case of the empty set, but one is forced to quantify over all sets (or at least to introduce a set $X$ that can be set equal to different sets) and over all the functions from $X$ to the sets $A$, $B$, and $A \times B$.
+
+By contrast, our approach avoids introducing anything that is not already implicitly present in the problem. The functions $\mathrm{P}_1$, $\mathrm{P}_2$, $\mathrm{I}_1$, $\mathrm{I}_2$, and $\mathrm{T}$ and the predicate $\mathrm{IR}$ are all important in their own right and what we are doing is simply to describe them (in a somewhat abstract way, without any use of negation) through axioms.
+
+\section{Negation in Predicate Logic} \label{negation_in_predicate_logic}
+Section \ref{negation} discussed how there can be multiple ways of negating a proposition and Chapter \ref{interpretation_of_propositional_logic} discussed how negation can be understood mereologically. We briefly recall the main ideas here:\\
+a) Any proposition $A$ that is known not to hold can be used to negate other propositions ($P$ is then negated through the proposition $P \rightarrow A$),\\
+b) one has reason in this case to regard $P$ and $P \vee A$ as `equivalent' (cf. Section \ref{negation}),\\
+c) the proposition `$\bot$' in a theory implies every proposition \textit{that is expressible in the theory} but that does not mean that it implies absolutely every proposition, and\\
+d) the mereological interpretation given for `$\bot$' in Chapter \ref{interpretation_of_propositional_logic} was accordingly just a (theory-dependent) constant $\mathcal{B}$ and not the object $1$ that contains every object as a part.
+
+For an identity proposition $\phi = \psi$ in predicate logic, one can thus use $(\phi = \psi) \rightarrow \mathcal{B}$ as its `negation,' and one can regard $\phi = \psi$ as `equivalent' to $(\phi = \psi) \vee \mathcal{B}$.
+
+However, since $(\phi = \psi) \vee \mathcal{B}$ is weaker than $\phi = \psi$, this means that we no longer understand the formula `$\phi = \psi$' as saying that $\phi$ and $\psi$ are the same.
+
+While this may seem wrong, one can use reasoning by cases when working with the proposition $(\phi = \psi) \vee \mathcal{B}$ to deal separately with the case where $\phi = \psi$ holds and the case where $\mathcal{B}$ holds.
+
+The latter case is simply the case where a contradiction holds. As long as one knows that no contradiction holds then it is possible to go from $(\phi = \psi) \vee \mathcal{B}$ to $\phi = \psi$.
+
+And if a contradiction does hold then one will have not just $\phi = \psi$ but also $\neg (\phi = \psi)$, making it very unclear what is actually being said on the matter of whether $\phi$ and $\psi$ are the same object or not.
+
+\section{Individuals and First-Order Identity} \label{individuals_and_fol_identity}
+What does it mean for a property of sort $S$ to hold for exactly one individual of sort $S$? Our answer is that 1-element sets are distinguished among sets by the fact that their subsets correspond exactly to propositions.
+
+In more detail, the correspondence looks as follows for a set $U$:\\
+(From propositions to sets) Each proposition $P$ corresponds to the subset $\{x \in U: P\}$ of $U$.\\
+(From sets to propositions) Each subset $U'$ of $U$ corresponds to the proposition $U' = U$.
+
+This correspondence becomes a one-to-one corresponce exactly in the case when $U$ is a 1-element set.
+
+Note that $\top$ corresponds to $U$ and that $\bot$ corresponds to $\{\}$. Without the Law of Excluded Middle (cf. Chapter \ref{classical_and_intuitionistic}), one gets a spectrum of propositions/sets in between these extremes.
+
+The set $\{x \in U: P\}$ can be understood mereologically through what was said in Section \ref{definite_descriptions}. What is needed in this case is the mereological sum of 1) a proposition which says that $x$ is a subset of $U$ and 2) the proposition $P$.
+
+Knowing what it means for something to be an individual enables one to define the identity relation of first-order logic. For a sort $S$, we write $=_S$ for first-order identity on $S$.
+
+This is \textit{not} the identity relation $=$ of second-order logic, even if one restricts consideration to properties of sort $S$. One can see the difference between the two relations in that $\forall X^S. X =_S \varnothing^S$ and $\forall X^S. \varnothing^S =_S X$ always hold\footnote{The intuitive reason is that all individuals in the empty set satisfy the property of being identical to everything in the set $X$, regardless of what $X$ might be.} while the corresponding identities for $=$ assert that the sort $S$ is empty.
+
+For sets $P^S$ and $Q^S$ of sort $S$, we will translate $P =_S Q$ so that it asserts the existence of a set $U^S$ of sort $S$ such that $U$ corresponds to an individual (as defined above) and such that $P \subseteq U$ and $Q \subseteq U$ both hold. This will clearly ensure that $x =_S y$ holds for every $x \in P$ and every $y \in Q$.
+
+\section{Quantification} \label{quantification}
+Quantification for second-order variables of a sort $S$ is just like propositional quantification except that the objects $\varnothing^S$ (or its mererological interpretation; we will use the same notation for both) and $\mathcal{U}^S$ appear in place of $\mathcal{T}$ (the interpretation of `$\top$') and $\mathcal{B}$ (the interpretation of `$\bot$').
+
+Quantification for first-order variables of a sort $S$ is like quantification for second-order variables except that the quantifiers need to be restricted to the properties that correspond to individuals (cf. Section \ref{individuals_and_fol_identity}).
+
+\section{Extensionality} \label{extensionality}
+Second-order logic connects first-order quantification with second-order quantification via \textit{extensionality}: Two properties of sort $S$ are identical just in case they hold for the same individuals of sort $S$.
+
+If individuals are thought of as `atoms' then one may think of this as a requirement that there be sufficiently many atoms of sort $S$ to distinguish between properties (and hence also functions) defined on $S$.
+
+Our translation will explicitly enforce extensionality for every sort that appears in the theory that is translated.
+
+Note, though, that it might be worthwhile to explore the mereological aspects of \textit{not} enforcing extensionality for all sorts that appear in a theory.
+
+\section{Summary of the Translation} \label{translation}
+We will now summarize how predicate logic of the form we have discussed in this chapter is to be translated into our mereological framework M\textsubscript{D}. This is, again, a translation that we think of as a \textit{reduction} of one thing to another.
+
+We have chosen to present the translation as a way to successively transform \textit{theories} based on predicate logic into theories based on our framework M\textsubscript{D} (see Section \ref{theories_based_on_m_d} for the definition of such theories). The final theory will have constants that lack direct counterparts among the constants in the original theory as well as axioms that lack direct counterparts in the original theory.
+
+As a first step, the procedures of Section \ref{product_sorts} are to be performed so that all $n$-ary first-order relations and all $n$-ary first-order functions get eliminated for $n > 1$.
+
+For a first-order function $f : A_1, ..., A_n \rightarrow B$, a new sort $A$ is introduced and made into a product of $A_1, ..., A_n$ through the method described in Section \ref{product_sorts}.\footnote{In detail, one will introduce the $n$ second-order projection functions $\mathrm{P}_1^f : A_1 \rightarrow A$, ..., $\mathrm{P}_n^f : A_n \rightarrow A$, their inverses $\mathrm{I}_1^f : A \rightarrow A_1$, ..., $\mathrm{I}_n^f : A \rightarrow A_n$, the second-order tuple-formation function $\mathrm{T}^f : A_1, ..., A_n \rightarrow A$, and a second-order predicate $\mathrm{IR}^f : A \rightarrow \mathcal{PROP}$. One then adds axioms as in Section \ref{product_sorts}.
+
+(Note that we have used superscripting here as a practical way to avoid name clashes.)} An expression of the form $f(\phi_1, ..., \phi_n)$ can then be replaced everywhere with $f'(t(\phi_1, ..., \phi_n))$, where $f' : A \rightarrow B$ is the function that will be used instead of $f$.
+
+A first-order relation $r : A_1, ..., A_n$ ($n > 1$) poses no additional challenges. $r(\phi_1, ..., \phi_n)$ gets replaced everywhere with $r'(t(\phi_1, ..., \phi_n))$, where $r'$ is the relation that will be used instead of $r$.
+
+As a next step, all first-order expressions are to be eliminated as discussed in Section \ref{from_first_order_to_second_order}. With the expection of the tuple-related functions (i.e., projection and formation functions) introduced in the previous step, any 1-ary first-order function $f: S \mapsto T$, a pair of second-order functions $I_f: T \mapsto S$ and $D_f: S \mapsto T$ are to be added along with the following axioms:\\
+\indent $Y_1^T \subseteq Y_2^T \rightarrow I_f(Y_1) \subseteq I_f(Y_2)$,\\
+\indent $X_1^S \subseteq X_2^S \rightarrow D_f(X_1) \subseteq D_f(X_2)$, and\\
+\indent $I_f(Y) \subseteq X \leftrightarrow Y \subseteq D_f(X)$.
+
+While eliminating all first-order functions (e.g., $f$) in favor of their direct-image functions (e.g., $D_f$), one must simultaneously replace everything else that pertains to first-order logic with things that are available in second-order logic:\\
+\indent 1. First-order variables need to be replaced with second-order variables (if only for the sake of syntactic correctness).\\
+\indent 2. First-order constants need to be replaced with second-order constants (again for the sake of syntactic correctness).\\
+\indent 3. 1-ary first-order relations need to be replaced with second-order constants.\\
+\indent 4. Expressions of the form $r(\phi)$ (where $r$ is predicated of $\phi$) need to be eliminated in favor of expressions of the form $... \subseteq ---$, where the first blank is filled with what $\phi$ translates into and where the second blank is filled with the second-order constant that replaces $r$.\\
+\indent 5. Quantification over first-order variables needs to be replaced by quantification that is explicitly restricted to individuals (cf. Sections \ref{quantification} and \ref{quantification}).
+\indent 6. The identity relation of first-order logic needs to be translated into a second-order relation as indicated in Section \ref{individuals_and_fol_identity}.
+
+Although 1.-3. above involve replacing an old variable/constant with a fresh one, one can simplify things by reusing the old variable/constant while giving it a new interpretation. For example, a first-order varible $x^S$ of some sort $S$ can be given a new interpretation as a second-order variable of sort $S$. This is, strictly speaking, a violation of our convention that lower-case letters are used for first-order variables/constants only, but there is no need to retain that convention once all first-order expressions have been eliminated.
+
+5. and 6. may be facilitated by introducing a second-order predicate $I$ which says that something is an individual. To be more exact, the formula $I(\Phi, \varnothing^S, \mathcal{U}^S)$ will have the meaning that $\Phi$ is an individual of the sort $S$ that has $\varnothing^S$ and $\mathcal{U}^S$ as its lower and upper limits. 
+
+The definition of $I$ may in turn be facilitated by a second-order predicate $B$ such that $B(\Phi, \varnothing^S, \mathcal{U}^S)$ tells one that $\Phi$ is a set/property (and not necessarily an individual) of the sort $S$ that has $\varnothing^S$ and $\mathcal{U}^S$ as its lower and upper limits. $B(\Phi, \Psi, X)$ will simply be $\Psi \subseteq \Phi \wedge \Phi \subseteq X$.
+
+[Definition of $I$; Section \ref{individuals_and_fol_identity}]
+
+[Definition of $=_S$]
+
+For the final part of the translation, we will write $\mathrm{Tr}(\Phi)$ for the translation of an expression $\Phi$. Here $\Phi$ is an expression in predicate logic while $\mathrm{Tr}(\Phi)$ is an expression in our mereological framework M\textsubscript{D}. This is accordingly also the part of the translation where mereology enters the picture.
+
+For every sort $S$, two constants $\varnothing^S$ and $\mathcal{U}^S$ are to be added to the target theory (the theory that is based on M\textsubscript{D}) together with the axiom $\varnothing^S \le \mathcal{U}^S$.
+
+Two constants $\mathcal{T}$ and $\mathcal{B}$ are similarly to be added together with the axiom $\mathcal{T} \le \mathcal{B}$. Their intuitive meanings are as in the previous chapter.
+
+For a propositional constant $U^{\mathcal{PROP}}$ in the source theory, a corresponding constant $U$ is to added in the target theory together with the axioms $\mathcal{T} \le U$ and $U \le \mathcal{B}$. The translation of such a constant is maximally straightforward:\footnote{It would also be possible as an alternative to translate $U$ as in the previous chapter while omitting the axioms $\mathcal{T} \le U$ and $U \le \mathcal{B}$. We choose here to make use of the fact that we are translating entire theories and not just individual formulas.}\\
+\indent * $\mathrm{Tr}(U) = U$.
+
+For a constant $C^S$ of sort $S$ in the source theory, we similarly add a corresponding constant $C$ in the target theory together with the axioms $\varnothing^S \le C$ and $C \le \mathcal{U}^S$. The translation is again maximally simple:\footnote{Here one might again take the alternative approach and exclude the axioms $\varnothing^S \le C$ and $C \le \mathcal{U}^S$ while translating $C$ into $((C + \varnothing^S) \times \mathcal{U}^S)$.}\\
+\indent * $\mathrm{Tr}(C) = C$.
+
+Variables are translated in the following way (which ensures that the translated expressions are bounded from below and above in the expected way):\\
+\indent * $\mathrm{Tr}(X^{\mathcal{PROP}}) = ((X + \mathcal{T}) \times \mathcal{B})$.\\
+\indent * $\mathrm{Tr}(X^S) = (X + \varnothing^S) \times \mathcal{U}^S)$.
+
+The expressions $\top$ and $\bot$ are translated as in the previous chapter:\\
+\indent * $\mathrm{Tr}(\top) = \mathcal{T}$.\\
+\indent * $\mathrm{Tr}(\bot) = \mathcal{B}$.
+
+For a sort $S$, the expressions $\varnothing^S$ and $\mathcal{U}^S$ are translated analogously:\footnote{We choose here to use the same symbols in the source theory as in the target theory. We cannot do so in the case of propositions since the expressions `$\top$' and `$\bot$' already have meanings in the context of the mereological framework M\textsubscript{D} (in fact, they do not even stand for individuals, and we are translating propositions into individuals).}\\
+\indent * $\mathrm{Tr}(\varnothing^S) = \varnothing^S$.\\
+\indent * $\mathrm{Tr}(\mathcal{U}^S) = \mathcal{U}^S$.
+
+Conjunctions and disjunctions will be translated exactly as in the previous chapter:\\
+\indent * $\mathrm{Tr}(\Phi \wedge \Psi) = \mathrm{Tr}(\Phi) + \mathrm{Tr}(\Psi)$.\\
+\indent * $\mathrm{Tr}(\Phi \vee \Psi) = \mathrm{Tr}(\Phi) \times \mathrm{Tr}(\Psi)$.
+
+The translations for $\cup$ (union) and $\cap$ (intersection) look like the translations of conjunctions and disjunctions:\\
+\indent * $\mathrm{Tr}(\Phi \cup \Psi) = \mathrm{Tr}(\Phi) + \mathrm{Tr}(\Psi)$.\\
+\indent * $\mathrm{Tr}(\Phi \cap \Psi) = \mathrm{Tr}(\Phi) \times \mathrm{Tr}(\Psi)$.
+
+The translations for $\subseteq$ and $=$ (among non-propositions) become the following:\\
+\indent * $\mathrm{Tr}(\Phi \subseteq \Psi) = (((\mathrm{Tr}(\Phi) - \mathrm{Tr}(\Psi)) + \mathcal{T}) \times \mathcal{B})$.\\
+\indent * $\mathrm{Tr}(\Phi = \Psi) = (((\mathrm{Tr}(\Phi) \dotdiv \mathrm{Tr}(\Phi)) + \mathcal{T}) \times \mathcal{B})$
+
+The same translations may also be used for propositions:\footnote{Note that the operations $\subseteq$ and $\rightarrow$ take their operands in the opposite orders. This is the reason why we use $\mathrm{Tr}(\Phi) - \mathrm{Tr}(\Psi)$ in one case and $\mathrm{Tr}(\Psi) - \mathrm{Tr}(\Phi)$ in the other case.
+
+Including $\mathcal{B}$ in the translated formula is only necessary in the case of $\subseteq$ and $=$, but including it also in the translations of $\rightarrow$ and $\leftrightarrow$ (which we did not do in the previous chapter) highlights the similarities.}\\ 
+\indent * $\mathrm{Tr}(\Phi \rightarrow \Psi) = (((\mathrm{Tr}(\Psi) - \mathrm{Tr}(\Phi)) + \mathcal{T}) \times \mathcal{B})$.\\
+\indent * $\mathrm{Tr}(\Phi \leftrightarrow \Psi) = (((\mathrm{Tr}(\Phi) \dotdiv \mathrm{Tr}(\Psi)) + \mathcal{T}) \times \mathcal{B})$.
+
+The translation for propositional quantification is to be as in the previous chapter (the definition of $\mathrm{Tr_I}$ was given there; $Y$ is to be a fresh variable):\\
+\indent * $\mathrm{Tr}(\forall X^{\mathcal{PROP}}.\Phi) = \mathrm{Tr_I}(\forall X.((X \rightarrow \mathcal{T}) \wedge (\mathcal{B} \rightarrow X)) \rightarrow Y) [\mathrm{Tr}(\Phi) / Y]$.\\
+\indent * $\mathrm{Tr}(\exists X^{\mathcal{PROP}}.\Phi) = \mathrm{Tr_I}(\exists X.(X \rightarrow \mathcal{T}) \wedge (\mathcal{B} \rightarrow X) \wedge Y) [\mathrm{Tr}(\Phi) / Y]$.
+
+Entirely analogous translations apply when the quantification is over a sort $S$ ($Y$ is to be a fresh variable):\\
+\indent * $\mathrm{Tr}(\forall X^S.\Phi) = \mathrm{Tr_I}(\forall X.((X \rightarrow \varnothing^S) \wedge (\mathcal{U}^S \rightarrow X)) \rightarrow Y) [\mathrm{Tr}(\Phi) / Y]$.\\
+\indent * $\mathrm{Tr}(\exists X^S.\Phi) = \mathrm{Tr_I}(\exists X.(X \rightarrow \varnothing^S) \wedge (\mathcal{U}^S \rightarrow X) \wedge Y) [\mathrm{Tr}(\Phi) / Y]$.
+
+The translation of negation is to be as in the previous chapter:\\
+\indent * $\mathrm{Tr}(\neg \Phi) = (\mathcal{B} - \mathrm{Tr}(\Phi)) + \mathcal{T}$.
+
+For a function $F: A_1, ..., A_n \mapsto A$, one adds constants $F_1, ..., F_n, F_0$ are in the target theory.
+
+[...]
+
+For a relation $R: A_1, ..., A_n \mapsto A$, one adds constants $R_1, ..., R_n, R_0$ in the target theory.
+
+[...]
+
+Note finally that since the above translates propositions into non-propositions, a description is needed of how \textit{assertions} in the original theory are to be turned into assertions in the theory that one gets from the translation. One needs to know this in order to be apply to convert axioms in the original theory into axioms in the target theory. The translation $\mathrm{Tr}(\Phi)$ of $\Phi$ is, after all, not even a proposition.
+
+The answer is that an assertion of $\Phi$ is to be turned into an assertion of $\mathrm{Tr}(\Phi) = \mathcal{T}$. Setting $\mathrm{Tr}(\Phi)$ equal to the object $\mathcal{T}$ that represents what is trivially true (from the viewpoint of the theory) has the effect that $\mathrm{Tr}(\Phi)$ comes to be treated as trivially true.
+
+Every axiom $\Phi$ in the original theory is thus turned into the axiom $\mathrm{Tr}(\Phi) = \mathcal{T}$ in the target theory.
+
+\section{Soundness and Completeness of the Translation}
+It is a central claim of this chapter that the translation given in the previous section does nothing more than to provide a mereological interpretation\footnote{We could also say that what we are doing is to provide a mereological `semantics' (note, though, what was said about syntax and semantics in Section \ref{blurring}). The theorems that we will state below are what one expects when this term is used.} of the theory that is translated. One then expects the following theorems to hold.
+
+Theorem (Soundness)
+If $\Phi = \Psi$ is provable in ... then $Tr(\Phi) = Tr(\Psi)$ is provable in M\textsubscript{D}. (Where $\Phi$ and $\Psi$ can be expressions of any kind as long as the formula `$\Phi = \Psi$' makes sense.)
+
+Theorem (Completeness)
+If $Tr(\Phi) = Tr(\Psi)$ is provable in M\textsubscript{D} then $\Phi = \Psi$ is provable in ... . (Where $\Phi$ and $\Psi$ can be expressions of any kind as long as the formula `$\Phi = \Psi$' makes sense.)
+
+Both theorems may be proved through induction over proofs: Soundness may be proved by using induction over proofs in the theory that is translated, completeness by using induction over proofs in the target theory.
+
+Some care may be needed when combining the translation with axioms which make identifications between the objects that one gets from the translation (e.g., $\mathcal{T}$ and $\mathcal{B}$) and objects that one already had in M\textsubscript{D}: Some identifications can lead to a failure of completeness. For example, this will be the case if one uses the identifications $\mathcal{T} = 0$ and $\mathcal{B} = 1$. Consider, in particular, the case where the theory that is translated is based on classical logic, so that $\forall X.(X = \top) \vee (X = \bot)$ is provable.\footnote{See Chapter \ref{classical_and_intuitionistic} for further discussion of classical logic and intuitionistic logic.} Reasoning in the translated theory will then give one a viewpoint according to which the only objects that exist are the objects $\top$ and $\bot$. This includes the two objects $\varnothing_S$ and $\mathcal{U}_S$ for any sort $S$ and anything in between them. But the theory that was translated may have included sorts that include more than two objects when objects are compared up to provable identity, and so one gets a failure of completeness.
+
+\section{Using the Translation in Reverse} \label{using_the_translation_in_reverse}
+(This and the remaining sections of this chapter have in common that they aim to elucidate our mereological interpretation of predicate logic in different ways.)
+
+Although the translation we have given starts from a theory in predicate logic and transforms it into a theory based on the framework M\textsubscript{D}, we would like to highlight the possibility of starting with a theory $T$ based on the framework M\textsubscript{D} and then setting up a theory in predicate logic that can be translated into $T$ using the translation that we have given.
+
+As an extreme case, every object within the framework M\textsubscript{D} may be viewed as a proposition: One translates $\top$ into $0$ and $\bot$ into $1$. This gives one the interpretation of M\textsubscript{D} as quantified intuitionistic propositional logic.
+
+But one can also do the opposite and view most of the objects that one is dealing with as non-propositions. Or one may switch between different perspectives, so that what is viewed as a proposition at one point gets viewed as a non-proposition at another point, or \textit{vice versa}.\footnote{This may be compared with how algebraists and logicians can take different views on the same thing. For example, Boolean algebras correspond to classical logic.}
+
+The next chapter will augment the framework M\textsubscript{D} with existence axioms, but it is only by applying the translation given in this chapter in reverse that one gets to see those existence axioms as implying the existence of mathematical objects definable through predicate logic.
+
+\section{Subsorts, Quotient Sorts, and Subquotients} \label{subsorts_etc}
+Chapter \ref{classical_and_intuitionistic} discussed variation in the meanings of `$\top$' and `$\bot$' (more specifically, we argued that these two expressions are theory-relative). The objects $\varnothing^S$ and $\mathcal{U}^S$ are similar in that they have a dependency on the sort $S$, a form of relativity that we will now discuss in detail.
+
+One reason for discussing this variation is that it corresponds to important and familiar phenomena from mathematics, as will be clear from the discussions in the subsections below.
+
+Apart from that, the subject here is a first step towards matters that we will discuss more in the following chapters.
+
+\subsection{Subsorts} \label{subsorts}
+By the definition in Section \ref{domain_of_a_sort}, a sort $S$ is a subsort of a sort $T$ if $\varnothing^S = \varnothing^T$ while $\mathcal{U}^S \subseteq \mathcal{U}^T$.
+
+This intuitively means that the domain of $S$ is a subset of the domain of $T$. All the individuals that have sort $S$ will also be within the domain of the sort $T$, but an individual of sort $T$ may or may not satisfy the monadic predicate $\mathcal{U}^S$.
+
+In the opposite direction, one gets that any property $\Phi$ of sort $T$ gives rise to a property $\Phi \cap \mathcal{U}^S$ of sort $S$.\footnote{Our mereological interpretation also allows one to use the property $\Phi$ directly with individuals of sort $S$: $\Phi(i)$ can be used in place of $(\Phi \cap \mathcal{U}^S)(i)$ with the same result.}
+
+As examples of how subsorts play a role in mathematics, we may note that the positive integers ($1, 2, 3, ...$) are included among the non-negative integers ($0, 1, 2, 3, ...$), that the latter are included among the integers ($..., -2, -1, 0, 1, 2, 3, ...$), and that the integers are included among the rational numbers. These are all sorts that play roles in mathematics.
+
+\subsection{Quotient Sorts} \label{quotient_sorts}
+By the definition in Section \ref{domain_of_a_sort}, a sort $S$ is a quotient sort of a sort $T$ if $\mathcal{U}^S = \mathcal{U}^T$ while $\varnothing^T \subseteq \varnothing^S$.
+
+When this holds, any individual $i$ of sort $T$ gives rise to an object $i \cup S$ in the domain of the sort $S$\footnote{Our mereological interpretation also allows one to use the object $i$ directly with properties of sort $S$: $\Phi(i)$ can be used in place of $\Phi(i \cup S)$ with the same result.}, and this can be a many-to-one correspondence: What are distinct individuals of sort $T$ may correspond to one and the same individual of sort $S$.\footnote{In general, the object $i \cup S$ does not need to be an individual of sort $S$; it is also possible for $i \cup S$ to be $\varnothing^S$. The mapping from $i$ to $i \cup S$ defines a partial rather than a total function from individuals of sort $T$ to individuals of sort $S$.}
+
+One gets examples of quotient sorts in mathematics whenever one is dealing with a congruence relation $\equiv$ that is not the identity relation. For example, one may calculate with integers and define $x \equiv y$ to mean that $x - y$ is divisible by $n$, where $n > 1$ is an integer. One will then have ..., $x \equiv x - 2n$, $x \equiv x - n$, $x \equiv x$, $x \equiv x + n$, $x \equiv x + 2n$, $x \equiv x + 3n$, ..., so that the objects ..., $x - 2n$, $x - n$, $x$, $x + n$, $x + 2n$, $x + 3n$, ... all function as one and the same object as long as $\equiv$ is used instead of $=$ to compare objects. (This is known as `arithmetic modulo $n$' and plays a fundamental role in number theory.)
+
+For a sort $T$, a quotient sort $S$ of $T$ can be like $T$ except that what are distinct but congruent objects in $T$ correspond to a single object in $S$. In the previous example, the individuals in $T$ would be the integers and the individuals in $S$ would be mereological sums of integers. For example, setting $n=3$ gives one a sort $S$ with three individuals: The mereological sum of all integers that are divisible by 3, the mereological sum of all integers that leaves a remainder of 1 when divided by 3, and the mereological sum of all integers that leaves a remainder of 2 when divided by 3.
+
+The previous section noted that if $S$ is a subsort of $T$ then every individual of sort $S$ falls within the domain of the sort $T$. We may now note how a `dual' result holds for quotient sorts: If $S$ is a quotient sort of $T$ then every property of sort $T$ falls within the domain of sort $S$.
+
+We will finally note that it may seem counterintuitive that the empty property $\varnothing^S$ for a sort $S$ can differ from the empty property $\varnothing^T$ for a sort $T$. Set theory has a single empty set; here it is rather as if any object can play the role of the empty set. This corresponds, though, to variation in what is treated as nothing. If $T$ is a quotient of $S$ and if $s_1$ and $s_2$ are two distinct individuals in $S$ which correpond to a single individual in $T$ then $\varnothing^T$ includes $s_1 - s_2$ and $s_2 - s_1$ among its parts. In intuitive terms, viewing $s_1$ and $s_2$ as the same thing goes hand in hand with viewing the difference between $s_1$ and $s_2$ as being `nothing.'\footnote{Our mereological interpretation of propositions (see the previous chapter) means that it is possible to think of $s_1 - s_2$ as a \textit{proposition} (albeit with the reservation that $\mathcal{T}$ must be viewed as trivially true and that $\mathcal{B}$ must be viewed as trivially false whenever propositions are compared; see Chapter \ref{classical_and_intuitionistic}) which says that $s_1$ is part of $s_2$ (one has that $s_1 - s_2$ is part of $\varnothing^T$ just in case $s_1$ is a $\varnothing^T$-part of $s_2$) and one is thus viewing this proposition here as being `nothing,' a part of the object $\varnothing^T$.
+
+Here we may also make some further observations. Note first that an individual $s$ in $T$ will be known not to be $\varnothing^T$. Since $\varnothing^T$ is part of $s$, this means that $s$ is not part of $\varnothing^T$, and so one has a denial of the proposition $s - \varnothing^T$. Using the absurd proposition $\mathcal{B}$, this denial can be expressed as $\mathcal{B} - (s - \varnothing^T)$ (which intuitively says that $s - \varnothing^T$ implies $\mathcal{B}$). That may, however, be seen as saying that $\mathcal{B}$ is part of $s - \varnothing^T$ (for the reasons given in the previous paragraph), from which it follows that $\mathcal{B}$ is part of $\varnothing^T$ (the reason is that $(P \rightarrow Q) \rightarrow R$ implies that $P \rightarrow R$; interpret this mereologically as in the previous chapter, let $P$ be $\varnothing^T$, let $Q$ be $s$, and let $R$ be $\mathcal{B}$). 
+
+And since every proposition is implied by the proposition $\mathcal{B}$, the conclusion here becomes that all propositions are part of $\varnothing^T$. In summary, one finds that one is able to see $s$ as different from $\varnothing^T$ only by seeing all propositions as `nothing' (i.e., parts of $\varnothing^T$). This may be a counterintuitive conclusion, but we find it inescapable.}
+
+\subsubsection{Comparison with the Set-Theoretic Approach}
+The traditional set-theoretic approach to quotients of mathematical structures uses sets instead of mereological sums. For example, the structure $Z_3$ has three elements: The set of all integers that are divisible by 3, the set of all integers that leave remainder 1 when divided by 3, and the set of all integers that leave remainder 2 when divided by 3. This too leads to the result that a congruence relation gets replaced by an identity relation (i.e., the relation $\equiv_3$ in $Z$ corresponds to the relation $=$ in $Z_3$). This means, though, that one gets sets of sets if one takes the quotient of a quotient. With our approach we get instead that a quotient of a quotient of $S$ is a quotient of $S$. We also get that $S$ is a quotient of itself.
+
+And while the set-theoretic approach provides a straightforward way to define quotients for a structure $S$, things become less natural when one starts from a structure $S$ and then wishes to view $S$ as a quotient of another structure $S'$. One must then in general give an independent definition of $S'$ and then note how there is a quotient of $S'$ that can be put in a structure-preserving one-to-one correspondence with $S$. By contrast, our mereological approach makes it  perfectly natural to start with a sort $S$ and then consider a sort $T$ such that $S$ is a quotient sort of $T$. A concrete example in mathematics appears in non-standard analysis. One may start with the real numbers and then choose to think of each real number as corresponding to many `non-standard numbers.'\footnote{See ...} Our approach allows one to see each real number as the mereological sum of the non-standard numbers that it corresponds to.
+
+We would like to emphasize here how the approach we are using when dealing with quotients arises naturally out of the mereological theory that we are using. Section \ref{additional_part_whole_relations} discussed how we get many part-whole relations out of a single part-whole relation and how each of these part-whole relations corresponds to a congruence relation. We are using the mereological congruence relations that we get from our mereological theory to represent arbitrary congruence relations.
+
+We see it as an argument in favor of our mereological interpretation that subsorts and quotient sorts get treated in a symmetric way (subsorts differ when it comes to $\mathcal{U}$ while quotient sorts differ when it comes to $\varnothing$).\footnote{See (Corry, ...), in particular Section 8.3, for a historical perspective on approaches to capturing the duality between substructures and quotient structures.} Quotient sorts and subsorts both arise everywhere in mathematics and arguably arise in the same way: Any function $f: A \rightarrow B$ determines a quotient sort of $A$ and a subsort of $B$. The quotient sort on $A$ is the one determined by the congruence relation $\equiv$ defined so that $x \equiv y$ holds just in case $f(x) = f(y)$ and the subsort of $B$ is the one that includes exactly the individuals $z$ in $B$ that can be written in the form $z = f(x)$.
+
+\subsection{Subquotients} \label{subquotients}
+If two sorts $S$ and $T$ are related in such a way that one has $\varnothing^T \subseteq \varnothing^S$ along with $\mathcal{U}^S \subseteq \mathcal{U}^T$ then we say that $S$ is a \textit{subquotient} of $T$.
+
+It is possible in this case to either think of $S$ as a subsort of a quotient sort of $T$ or else to think of $S$ as a quotient sort of a subsort of $T$.
+
+We have mentioned subquotients here since they play a role in mathematics\footnote{[Ref.]} and since they get a natural mereological interpretation with our approach.
+
+\section{Bounded Theories} \label{bounded_theories}
+A feature of the translation that we have given in this chapter which will become important in the next chapter is the following: It does not make any use of the objects $0$ and $1$ in M\textsubscript{D}. The theories that one gets from the translation can instead be thought of as being within a fragment of M\textsubscript{D} that excludes $0$ and $1$. We will say that the resulting theories are \textit{bounded}.
+
+As one excludes $0$ from M\textsubscript{D}, one must also exclude $-$. It is, after all, possible to write $0$ as $x - x$. Symmetric differences must likewise be excluded since $x \doteq x$ is the same thing as $0$.
+
+One can, however, use the 3-ary operations expressed through $D(x, y, z) = x + (y - z)$ and $S(x, y, z) = x + (y \doteq z)$ (the letters `D' and `S' come from `difference' and `symmetric difference,' respectively). These may be thought about as `bounded' versions of $-$ and $\doteq$, with $x$ acting as a `lower bound' for $x + (y - z)$ and in $x + (y \doteq z)$.
+
+As examples of how lower bounds enter into our translation, note how $\mathcal{T}$ and $\varnothing^S$ serve as lower bounds in the following expressions:\\
+\indent * $\mathrm{Tr}(X^{\mathcal{PROP}}) = ((X + \mathcal{T}) \times \mathcal{B})$.\\
+\indent * $\mathrm{Tr}(X^S) = (X + \varnothing^S) \times \mathcal{U}^S)$.
+
+In fact, expressions within a sort $S$ get bounded from below by $\varnothing^S$ and from above by $\mathcal{U}^S$ while propositions get bounded from below by $\mathcal{T}$ and from above by $\mathcal{B}$.
+
+\section{The Equational Nature of the Translated Theories} \label{equational_theories_from_translation}
+An additional feature possessed by the translated theories is that all axioms can be written as equations. For example, the theory that is translated may include an axiom $\Phi \vee \Psi$ that has the form of a disjunction, but the corresponding axiom that one gets in the translated theory has the form of an equation: $((\mathrm{\Phi} + \mathrm{\Psi}) + \mathcal{T}) \times \mathcal{B} = \mathcal{T}$.
+
+We have expressed some axioms using $\le$ instead of $=$, but these can easily be rewritten as equations. For example, the axiom $\varnothing^S \le \mathcal{U}^S$ can be written as $\varnothing^S + \mathcal{U}^S = \mathcal{U}^S$.
+
+In the terminology of Section \ref{theories_based_on_m_d}, the theories that one gets from the translation are \textit{equational theories}.
+
+\section{Summary}
+This chapter has discussed how predicate logic (possibly many-sorted and possibly second-order instead of first-order) may be given a mereological interpretation and thereby reduced to mereology. This extends the results of the previous chapter and enables one to think of countless mathematical theories in purely mereological terms.
+
+On a technical level, what one does is to translate theories of one kind into theories of another kind, but we have argued for viewing the translation as saying what the translated objects \textit{are}.
+
+From this follows not only that the translation has to be complete (i.e., distinct objects need to be translated into distinct objects) but also that it has to be perfectly natural, free of arbitrarily selected encodings (say encoding of the kinds that get used in computers when objects of all kinds need to be represented as sequences of ones and zeroes).
+
+Throughout the chapter, we have emphasized the mereological view of the framework M\textsubscript{D} that theories are translated into. We will discuss in an appendix what there is to be said when M\textsubscript{D} is reinterpreted as quantified intuitionistic propositional logic. This will relate the results of this chapter to earlier literature.
+
+\begin{subappendices}
+\section{The Viewpoint of Quantified Intuitionistic Propositional Logic} \label{viewpoint_of_qipl}
+In order to relate what has been done in this chapter to earlier work, we recall from Section \ref{analogy_with_logic} that the mereological framework M\textsubscript{D} that we are using can be thought of as essentially being quantified intuitionistic propositional logic (QIPL)\footnote{See Appendix \ref{appendix_on_qipl}.} reinterpreted as a mereological theory. The translation that has been the subject of this chapter can therefore be thought of as a \textit{faithful translation into QIPL}.
+
+That it is possible to translate (classical or intuitionistic) first-order logic faithfully into QIPL was shown for the first time in (Löb, 1976). A detailed verification of all the claims
+made in Löb’s paper can be found in (Arts and Dekkers, 1992).
+
+Sørensen and Urzyczyn (2010) provide a faithful translation of IFOL (including function symbols) into QIPL which may be simpler and easier to understand. The paper builds on ideas from (Urzyczyn, 1997).
+
+The fact that QIPL is intertranslatable with first-order logic shows what its expressive power is: QIPL is Turing-complete. This fact may also be demonstrated, though, by picking a particular theory in first-order logic that is known to be Turing-complete and showing how it has a faithful translation into QIPL.  This approach is taken by Gabbay (1974, 1981) and Sobolev (1977), who give a translation into QIPL for the classical theory that involves a single binary relation symbol $R$ along with axioms which ensure that $R$ is reflexive and symmetric.
+
+This is likewise the approach taken in (Urzyczyn, 1997) and in (Dudenhefner and Rehof, 2018). The former uses the Turing-completeness of twocounter automata and the latter uses the Turing-completeness of solvability problems for Diophantine equations.
+
+Even as one knows that two theories are intertranslatable, it is reasonable to ask how \textit{exactly} they are related, and here we see a contribution from the present chapter. We have (arguably) shown how (classical or intuitionistic) first-order logic can be translated into QIPL in a way that avoids all arbitrary encodings and that is instead perfectly natural.
+
+This thesis is additionally making the case for QIPL (or the mereological framework M\textsubscript{D}) as a system that has a lot to speak for itself as a foundation for mathematics. We find QIPL -- once understood -- to be simple, elegant, and easy to work with.\footnote{The existing literature could leave one with a different impression. Arts writes in (Arts and Dekkers, 1992) that ‘it is a pity that I did not succeed in
+discovering the model-theoretical ideas that must have been in Mr. Loeb’s mind when he wrote [his] article.’ Urzyczyn (1997) says regarding Löb’s
+proof that it is ‘very complex and difficult to follow’ and goes on to say
+that ‘[t]he proof of Löb has been studied and slightly simplified by Arts
+[...] and Arts and Dekkers [...], but the resulting presentations are still
+quite complicated.’ Dudenhefner and Rehof (2018) say regarding their own
+approach based on Diophantine equations that ‘[c]ompared to the previous
+approaches, the described reduction is more accessible for formalization
+and more comprehensible for didactic purposes.’}
+\end{subappendices}
+
+\end{document}
+

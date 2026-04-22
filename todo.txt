@@ -1,0 +1,38 @@
+=================
+Things to Be Done
+=================
+
+* File endings such as ".coh.theory" and ".reg.theory" should impose restrictions on what you are allowed to express in the theory:
+  .theory -- Maximally permissive, needed for 'mereological' things
+  .sol.theory -- Second-order logic (with many sorts, where FOL and SOL can be used for each sort)
+  .fol.theory -- First-order logic (with many sorts)
+  .coh.theory -- Coherent logic 
+  .reg.theory -- Regular logic
+  .eq.theory -- Equational logic (P is not allowed; can use facts but not assumptions)
+  (Note that these restrictions need to be enforced for subtheories as well as the theory itself.) 
+
+* A theory should only have D ('the domain') if it either uses it or gets it through an implicit import. Same thing for P ('propositions').
+
+* Support for reflection is not done by any means. What exists now is likely to be full of errors and there are not many unit tests that reflection works as it is supposed to. A separate document should be created with documentation on how reflection is supposed to work.
+
+* Support for implicit and named subtheories may done (although it is likely that there are errors or problems with the immediate representation), but documentation is needed on how this is supposed to work.
+
+* Documentation is also needed of all the mereological facts that get generated for a theory.
+
+* The generation of mereological facts needs to be checked. There should be unit tests which verify that the right things are generated.
+
+* The support for FOL functions has not been properly checked. There should be documentation and unit tests. Product sorts, SOL functions, and mereological facts should be generated as expected.
+
+* Product sorts depend on special support. This should be documented and there should be unit tests.
+
+* It should be possible to specify 'lean4' or 'mereological' as the target for the compilation. The former means that Lean 4 code is generated. The former means that Eidos code is generated, but with mereological interpretations explicitly included for everything that was in the original theory. my_theory.fol.theory will be compiled into my_theory.fol.lean or my_theory.fol.mereological.theory depending on the option you choose.
+- If you specify 'lean4' as the target then you should get two things in the resulting Lean 4 code:
+1) straightforward translations into Lean 4 where theories in Eidos become specifications in Lean 4 that are roughly correspond to what the user might have used manually for the same mathematical concepts
+2) mereological interpretations.
+- If you specify 'mereological' as the target then you get a translation into mereology of the original theory.
+
+* 'lean4' as the target will involve a 'support library' in Lean 4. This is the equivalent of a run-time library for an ordinary programming language. Having the right support functions should make it possible to make the generated Lean 4 code reasonably readable for humans.
+
+* There is currently support for '--pure', '--debug' and '--pretty'. None of these options was planned and they should probably be removed. They can be kept for a bit longer, though, to simplify debugging.
+
+* Enforce commas/semicolons. There are places in the language where commas/semicolons appear optional at this point and where they should arguably be mandatory. In any case, a decision needs to be taken on this and there needs to be unit tests which ensure that the right things are allowed/disallowed.
