@@ -93,6 +93,21 @@ checkLevel1 t1 op t2 =
 -- Level 2 Classification (Mereological Subtypes)
 -- ---------------------------------------------------------------------------
 
+-- | Fine-grained classification of a mereological expression, used by the
+-- operator-validation logic (e.g. checking that ∈ has an individual on the
+-- left and a set on the right).
+--
+-- __Relationship to 'ExprType'\/'MereologicalSubtype' in "Eidos.IR"__:
+-- 'ExprType' is the type attached to every resolved term in the IR tree and
+-- carries the same individual\/set\/proposition\/mereological distinction via
+-- 'MereologicalSubtype'.  'Level2Type' is a separate view used only inside
+-- 'TypeCheck' to drive operator checks (e.g. 'acceptIndividualOperand').
+-- The bridge is 'getResolvedTermType' in "Eidos.FromSyntax", which converts
+-- an 'ExprType' to a 'Level2Type'.
+-- Keeping them separate lets 'TypeCheck' evolve its classification logic
+-- independently of the IR wire format, but the two must be kept consistent.
+-- A future refactor could unify them via a @toLevel2Type :: ExprType ->
+-- Level2Type@ conversion function and drop the duplication.
 data Level2Type
   = L2Individual            -- ^ Individual (can be element of a set)
   | L2Set                   -- ^ Set (contains individuals)
@@ -356,9 +371,8 @@ checkResolvedRightImpl :: ResolvedRightImpl -> Either String ()
 checkResolvedRightImpl (ResolvedRightImpl left mbRight) = do
   checkResolvedLeftImpl left
   case mbRight of
-    Nothing -> return ()
-    Just (op, right) -> do
-      checkResolvedRightImpl right
+    Nothing       -> return ()
+    Just (_, right) -> checkResolvedRightImpl right
 
 checkResolvedLeftImpl :: ResolvedLeftImpl -> Either String ()
 checkResolvedLeftImpl (ResolvedLeftImpl disj rests) = do
