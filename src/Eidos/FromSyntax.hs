@@ -263,12 +263,18 @@ buildSignatureItem th0 th item = do
             else return th
 
     SigIndividual (IndividualDeclaration nm sortExprAST) -> do
-
-      when (firstLetterIsUppercase nm) $
-        throwError $ "Individual names must start with lowercase: " ++ nm
-      
       s <- either throwError return $ lookupSortByExpr th sortExprAST
-      let mo = mkMereo th MereologicalEntityKindIndividual nm s FromSignature
+      let isPropSort = sortKind s == SortKindProp
+      when (isPropSort && not (firstLetterIsUppercase nm)) $
+        throwError $ "Proposition names must start with uppercase: " ++ nm
+      when (not isPropSort && firstLetterIsUppercase nm) $
+        throwError $ "Individual names must start with lowercase: " ++ nm
+      let moKind =
+            if isPropSort
+              then MereologicalEntityKindProposition
+              else MereologicalEntityKindIndividual
+          mo = mkMereo th moKind nm s FromSignature
+      
       shouldInsert <- shouldInsertDeclaration nm (EntityMereological mo)
       return (if shouldInsert then addEntityToTh th (EntityMereological mo) else th)
 
