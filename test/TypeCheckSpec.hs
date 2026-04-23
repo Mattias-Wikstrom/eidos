@@ -52,13 +52,13 @@ shouldReject src needle = case buildStr src of
               expectationFailure $
                 "Build failed as expected, but needle '" ++ needle ++
                 "' not found in:\n" ++ e
-  Right _ -> expectationFailure "Expected a type error but build succeeded"
+  Right _ -> expectationFailure "Expected a type error but building IR succeeded"
 
 -- | Assert that building the source fails (any error).
 shouldRejectAny :: String -> Expectation
 shouldRejectAny src = case buildStr src of
   Left  _ -> return ()
-  Right _ -> expectationFailure "Expected a type error but build succeeded"
+  Right _ -> expectationFailure "Expected a type error but building IR succeeded"
 
 -- ---------------------------------------------------------------------------
 -- Convenience sort / entity builders for unit tests
@@ -227,10 +227,10 @@ main = hspec $ do
         convertLevel2 L2Sort "#mereological" `shouldBe` Nothing
 
       it "rejects Function#individual (functions are not mereological)" $
-        convertLevel2 (L2Function 1) "#individual" `shouldBe` Nothing
+        convertLevel2 (L2FOLFunction 1) "#individual" `shouldBe` Nothing
 
       it "rejects Function#set" $
-        convertLevel2 (L2Function 2) "#set" `shouldBe` Nothing
+        convertLevel2 (L2FOLFunction 2) "#set" `shouldBe` Nothing
 
       it "rejects Theory#mereological" $
         convertLevel2 L2Theory "#mereological" `shouldBe` Nothing
@@ -379,159 +379,514 @@ main = hspec $ do
       it "rejects proposition ∨ proposition at Level 1" $
         validateOperation prop Nothing "\x2228" prop Nothing `shouldSatisfy` isLeft_
 
-  -- ── End-to-end: well-typed theories that must be accepted ────────────────
+    -- ── End-to-end: well-typed theories that must be accepted ────────────────
 
-  describe "End-to-end: well-typed theories (must be accepted)" $ do
+    describe "End-to-end: well-typed theories (must be accepted)" $ do
 
-    it "accepts a theory with an individual declared over a sort" $
-      shouldAccept [r|
-        { signature {
-            sort S;
-            x : S;
+      it "accepts a theory with an individual declared over a sort" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              x : S;
+            }
           }
-        }
-      |]
+        |]
 
-    it "accepts a theory with a set declared over a sort" $
-      shouldAccept [r|
-        { signature {
-            sort S;
-            mySet ⊆ S;
+      it "accepts a theory with a set declared over a sort" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              MySet ⊆ S;
+            }
           }
-        }
-      |]
+        |]
 
-    it "accepts individual in set fact" $
-      shouldAccept [r|
-        { signature {
-            sort S;
-            x     : S;
-            mySet ⊆ S;
+      it "accepts individual in set fact" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              x     : S;
+              MySet ⊆ S;
+            }
+            axioms {
+              facts { x ∈ MySet; }
+            }
           }
-          axioms {
-            facts { x ∈ mySet; }
-          }
-        }
-      |]
+        |]
 
-    it "accepts set ⊆ set fact" $
-      shouldAccept [r|
-        { signature {
-            sort S;
-            A ⊆ S;
-            B ⊆ S;
+        
+      it "accepts individual in set using predicate syntax" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              x     : S;
+              MySet ⊆ S;
+            }
+            axioms {
+              facts { MySet(x); }
+            }
           }
-          axioms {
-            facts { A ⊆ B; }
+        |]
+        
+      it "accepts individual in binary predicate" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              x     : S;
+              MyPred ⊆ S, S;
+            }
+            axioms {
+              facts { MyPred(x, x); }
+            }
           }
-        }
-      |]
+        |]
 
-    it "accepts a propositional axiom (truth constant)" $
-      shouldAccept [r|
-        { axioms { assertions { ⊤; } } }
-      |]
 
-    it "accepts a universally quantified axiom over a user sort" $
-      shouldAccept [r|
-        { signature {
-            sort S;
-            mySet ⊆ S;
+      it "accepts FOL function applied to individual" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              x     : S;
+              f : S → S;
+            }
+            axioms {
+              facts { f(x) = x; }
+            }
           }
-          axioms {
-            assertions { ∀x:S x ∈ mySet; }
-          }
-        }
-      |]
+        |]
 
-    it "accepts a subsort declaration" $
-      shouldAccept [r|
-        { signature {
-            sort S;
-            T subsort S;
+      it "accepts FOL function applied to set (via extension to sets)" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              A     ⊆  S;
+              f : S → S;
+            }
+            axioms {
+              facts { f(A) = A; }
+            }
           }
-        }
-      |]
+        |]
+        
+      it "accepts SOL function applied to set" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              A     ⊆  S;
+              F : S → S;
+            }
+            axioms {
+              facts { F(A) = A; }
+            }
+          }
+        |]
+        
+      it "rejects SOL function applied to individual" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              i     :  S;
+              A     ⊆  S;
+              F : S → S;
+            }
+            axioms {
+              facts { F(i) = A; }
+            }
+          }
+        |]
+        
+      it "accepts SOL function applied to singleton" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              i     :  S;
+              A     ⊆  S;
+              F : S → S;
+            }
+            axioms {
+              facts { F({i}) = A; }
+            }
+          }
+        |]
+        
+      it "accepts SOL function applied to mereological object" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              i     :  S;
+              A     ⊆  S;
+              F : S → S;
+            }
+            axioms {
+              facts { F(i#mereological) = A; }
+            }
+          }
+        |]
 
-  -- ── End-to-end: ill-typed theories that must be rejected ─────────────────
+      it "accepts SOL function applied to an individual that has been converted into a set" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              i     :  S;
+              A     ⊆  S;
+              F : S → S;
+            }
+            axioms {
+              facts { F(i#set) = A; }
+            }
+          }
+        |]
+        
+      it "accepts set converted into individual" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              A     ⊆  S;
+              P ⊆ S;
+            }
+            axioms {
+              facts { P(A#individual); }
+            }
+          }
+        |]
 
-  describe "End-to-end: ill-typed theories (must be rejected)" $ do
+      it "accepts equality between sort and function domain" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              f : S, S → S;
+            }
+            axioms {
+              facts { S = f#dom; }
+            }
+          }
+        |]
 
-    -- ∈ misuse: set on the left (must be individual)
-    it "rejects set ∈ set (left operand of ∈ is a set, not an individual)" $
-      shouldRejectAny [r|
-        { signature {
-            sort S;
-            mySet    ⊆ S;
-            otherSet ⊆ S;
+      it "accepts set ⊆ set fact" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              A ⊆ S;
+              B ⊆ S;
+            }
+            axioms {
+              facts { A ⊆ B; }
+            }
           }
-          axioms {
-            facts { mySet ∈ otherSet; }
-          }
-        }
-      |]
+        |]
 
-    -- ∈ misuse: individual on the right (must be a set)
-    it "rejects individual ∈ individual (right operand of ∈ is not a set)" $
-      shouldRejectAny [r|
-        { signature {
-            sort S;
-            x : S;
-            y : S;
+      it "accepts singletons as sets" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              i : S;
+              B ⊆ S;
+            }
+            axioms {
+              facts { {i} ⊆ B; }
+            }
           }
-          axioms {
-            facts { x ∈ y; }
-          }
-        }
-      |]
+        |]
+      
+      it "accepts a propositional axiom (truth constant)" $
+        shouldAccept [r|
+          { axioms { assertions { ⊤; } } }
+        |]
 
-    -- ⊆ misuse: individual ⊆ individual
-    it "rejects individual ⊆ individual (both operands of ⊆ must be sets)" $
-      shouldRejectAny [r|
-        { signature {
-            sort S;
-            x : S;
-            y : S;
+      it "accepts a universally quantified axiom over a user sort" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              MySet ⊆ S;
+            }
+            axioms {
+              assertions { ∀x:S x ∈ MySet; }
+            }
           }
-          axioms {
-            facts { x ⊆ y; }
-          }
-        }
-      |]
+        |]
 
-    -- ⊆ misuse: individual on the left, set on the right
-    it "rejects individual ⊆ set (left operand of ⊆ must be a set)" $
-      shouldRejectAny [r|
-        { signature {
-            sort S;
-            x     : S;
-            mySet ⊆ S;
+      it "accepts a subsort declaration" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              T subsort S;
+            }
           }
-          axioms {
-            facts { x ⊆ mySet; }
-          }
-        }
-      |]
+        |]
 
-    -- ⊆ misuse: set on the left, individual on the right
-    it "rejects set ⊆ individual (right operand of ⊆ must be a set)" $
-      shouldRejectAny [r|
-        { signature {
-            sort S;
-            mySet ⊆ S;
-            y     : S;
-          }
-          axioms {
-            facts { mySet ⊆ y; }
-          }
-        }
-      |]
 
-    -- Reference to an undefined name
-    it "rejects a fact referencing an undeclared entity" $
-      shouldRejectAny [r|
-        { axioms {
-            facts { undeclaredThing ∈ alsoUndeclared; }
+      it "accepts comparison between mereological objects" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              T subsort S;
+            }
+            axioms {
+              metafacts { T#max ≤ S#max; }
+            }
           }
-        }
-      |]
+        |]
+
+      it "accepts operations involving mereological objects" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              i : S;
+            }
+            axioms {
+              metafacts { (i#mereological - S#max) = 𝕌#min; }
+            }
+          }
+        |]
+
+      it "accepts an identification among sorts" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              sort T;
+            }
+            axioms {
+              facts { S = T; }
+            }
+          }
+        |]
+        
+
+    -- ── End-to-end: ill-typed theories that must be rejected ─────────────────
+
+    describe "End-to-end: ill-typed theories (must be rejected)" $ do
+      it "rejects attempt to apply 1-ary FOL predicate to a set" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              A     ⊆  S;
+              B     ⊆  S;
+            }
+            axioms {
+              facts { B(A); }
+            }
+          }
+        |]
+  
+      it "rejects attempt to apply 2-ary FOL predicate to sets" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              A     ⊆  S;
+              B     ⊆  S, S;
+            }
+            axioms {
+              facts { B(A, A); }
+            }
+          }
+        |]
+
+      it "rejects function application with wrong number of arguments" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              A     ⊆  S;
+              F : S, S → S;
+            }
+            axioms {
+              facts { F(A) = A; }
+            }
+          }
+        |]
+
+      it "rejects singletons as individual" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              i : S;
+            }
+            axioms {
+              facts { {i} = i; }
+            }
+          }
+        |]
+
+      it "rejects attempt to take singleton of set" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              A ⊆ S;
+              B ⊆ S;
+            }
+            axioms {
+              facts { {A} ⊆ B; }
+            }
+          }
+        |]
+
+      it "rejects attempt to use lowercase letter as a set" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              s ⊆ S;
+            }
+            axioms {
+              facts { }
+            }
+          }
+        |]
+
+      it "rejects attempt to use uppercase letter as an individual" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              I : S;
+            }
+            axioms {
+              facts { }
+            }
+          }
+        |]
+
+      it "rejects a propositional axiom when presented as fact" $
+        shouldRejectAny [r|
+          { axioms { fact { ⊥; } } }
+        |]
+
+      it "rejects an identification between a sort and a FOL function" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              f : S → S;
+            }
+            axioms {
+              facts { S = f; }
+            }
+          }
+        |]
+
+      it "rejects an identification between a sort and a SOL function" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              F : S → S;
+            }
+            axioms {
+              facts { S = f; }
+            }
+          }
+        |]
+        
+      it "rejects an identification between a FOL function and a SOL function" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              f : S → S;
+              F : S → S;
+            }
+            axioms {
+              facts { f = F; }
+            }
+          }
+        |]
+
+        
+      it "rejects an identification between a FOL function and an individual" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              f : S → S;
+              i : S;
+            }
+            axioms {
+              facts { f = i; }
+            }
+          }
+        |]
+        
+      it "rejects an identification between a 1-ary FOL function and a 2-ary FOL function" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              f : S → S;
+              g : S, S → S;
+            }
+            axioms {
+              facts { f = g; }
+            }
+          }
+        |]
+
+      -- ∈ misuse: set on the left (must be individual)
+      it "rejects set ∈ set (left operand of ∈ is a set, not an individual)" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              MySet    ⊆ S;
+              OtherSet ⊆ S;
+            }
+            axioms {
+              facts { MySet ∈ OtherSet; }
+            }
+          }
+        |]
+
+      -- ∈ misuse: individual on the right (must be a set)
+      it "rejects individual ∈ individual (right operand of ∈ is not a set)" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              x : S;
+              y : S;
+            }
+            axioms {
+              facts { x ∈ y; }
+            }
+          }
+        |]
+
+      -- ⊆ misuse: individual ⊆ individual
+      it "rejects individual ⊆ individual (both operands of ⊆ must be sets)" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              x : S;
+              y : S;
+            }
+            axioms {
+              facts { x ⊆ y; }
+            }
+          }
+        |]
+
+      -- ⊆ misuse: individual on the left, set on the right
+      it "rejects individual ⊆ set (left operand of ⊆ must be a set)" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              x     : S;
+              MySet ⊆ S;
+            }
+            axioms {
+              facts { x ⊆ MySet; }
+            }
+          }
+        |]
+
+      -- ⊆ misuse: set on the left, individual on the right
+      it "rejects set ⊆ individual (right operand of ⊆ must be a set)" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;            
+              MySet ⊆ S;
+              y     : S;
+            }
+            axioms {
+              facts { MySet ⊆ y; }
+            }
+          }
+        |]
+
+      -- Reference to an undefined name
+      it "rejects a fact referencing an undeclared entity" $
+        shouldRejectAny [r|
+          { axioms {
+              facts { undeclaredThing ∈ alsoUndeclared; }
+            }
+          }
+        |]

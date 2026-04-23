@@ -114,7 +114,7 @@ entityOrigin (EntityFunction f)     = funcOrigin f
 entityOrigin (EntityMereological m) = mereoOrigin m
 entityOrigin (EntityRelation r)     = relOrigin r
 entityOrigin (EntityTheory _)       = error "entityOrigin: EntityTheory has no Origin"
-
+    
 -- ---------------------------------------------------------------------------
 -- Sort
 -- ---------------------------------------------------------------------------
@@ -261,13 +261,18 @@ data MereologicalSubtype
   | MereologicalSubtypeMereological
   deriving (Show, Eq)
 
-data ExprType = ExprType
-  { exprMajorType    :: MajorType
-  , exprMereoSubtype :: Maybe MereologicalSubtype
-  , exprSort         :: Maybe Sort
-  , exprNumArgs      :: Maybe Int
-  }
-  deriving (Show)
+data EntityClass
+  = SortClass
+  | FOLFunctionClass Int      -- arity
+  | SOLFunctionClass Int
+  | RelationClass Int         -- arity (1 for sets, n for n-ary relations)
+  | IndividualClass
+  | PropositionClass
+  | OtherMereologicalClass    -- e.g., S#min, S#max, function argument/result objects
+  | TheoryClass
+  deriving (Eq, Show)
+
+type ExprType = EntityClass
 
 -- ---------------------------------------------------------------------------
 -- Resolved expressions
@@ -468,33 +473,32 @@ lookupVarContext ctx name =
     Just vd -> Just vd
     Nothing -> varContextParent ctx >>= \p -> lookupVarContext p name
 
--- ---------------------------------------------------------------------------
--- ExprType helpers
--- ---------------------------------------------------------------------------
-
-termTypeMereological :: Maybe MereologicalSubtype -> Maybe Sort -> ExprType
-termTypeMereological sub ms = ExprType
-  { exprMajorType    = MajorTypeMereologicalObject
-  , exprMereoSubtype = sub
-  , exprSort         = ms
-  , exprNumArgs      = Nothing
-  }
-
-termTypeFunction :: Int -> ExprType
-termTypeFunction n = ExprType
-  { exprMajorType    = MajorTypeFunction
-  , exprMereoSubtype = Nothing
-  , exprSort         = Nothing
-  , exprNumArgs      = Just n
-  }
-
 termTypeSort :: ExprType
-termTypeSort = ExprType
-  { exprMajorType    = MajorTypeSort
-  , exprMereoSubtype = Nothing
-  , exprSort         = Nothing
-  , exprNumArgs      = Nothing
-  }
+termTypeSort = SortClass
+
+termTypeIndividual :: ExprType
+termTypeIndividual = IndividualClass
+
+termTypeSet :: ExprType
+termTypeSet = RelationClass 1
+
+termTypeProposition :: ExprType
+termTypeProposition = PropositionClass
+
+termTypeFOLFunction :: Int -> ExprType
+termTypeFOLFunction arity = FOLFunctionClass arity
+
+termTypeSOLFunction :: Int -> ExprType
+termTypeSOLFunction arity = SOLFunctionClass arity
+
+termTypeRelation :: Int -> ExprType
+termTypeRelation arity = RelationClass arity
+
+termTypeOtherMereological :: ExprType
+termTypeOtherMereological = OtherMereologicalClass
+
+termTypeTheory :: ExprType
+termTypeTheory = TheoryClass
 
 -- ---------------------------------------------------------------------------
 -- Misc helpers
