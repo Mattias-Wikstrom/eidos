@@ -8,6 +8,7 @@ import           Eidos.Parser       (parseFile)
 import           Eidos.FromSyntax   (buildTheoryFromFile, buildTheoryPure)
 import           Eidos.BuildMonad   (mkPureResolver)
 import           Eidos.Pretty       (prettyTheory, prettyTheoryDecl, prettyFactDebug)
+import           Eidos.DebugIR      (dumpTheoryIR)
 import           Eidos.IR as IR 
 
 main :: IO ()
@@ -51,6 +52,25 @@ main = do
               putStrLn "\n=== Pretty-printed IR theory ==="
               putStrLn $ prettyTheory theory
               exitSuccess
+
+    ["--dump-ir", filePath] -> do
+      result <- parseFile filePath
+      case result of
+        Left err -> do
+          IO.hPutStrLn IO.stderr ("Parse error: " ++ show err)
+          exitFailure
+        Right ast -> do
+          irResult <- buildTheoryFromFile filePath ast
+          case irResult of
+            Left buildErr -> do
+              IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
+              exitFailure
+            Right theory -> do
+              putStrLn "\n=== AST (source-level) ==="
+              putStrLn $ prettyTheoryDecl ast
+              putStrLn "\n=== IR dump (resolved, deterministic) ==="
+              putStrLn $ dumpTheoryIR theory
+              exitSuccess
     
     ["--pure", filePath] -> do
       result <- parseFile filePath
@@ -85,6 +105,7 @@ main = do
       IO.hPutStrLn IO.stderr "Usage:"
       IO.hPutStrLn IO.stderr "  eidos-parser <file.theory>              # Parse and build IR (IO mode)"
       IO.hPutStrLn IO.stderr "  eidos-parser --debug <file.theory>      # Parse and build IR with debug output (shows resolved facts)"
+      IO.hPutStrLn IO.stderr "  eidos-parser --dump-ir <file.theory>    # Parse and print AST + deterministic IR dump"
       IO.hPutStrLn IO.stderr "  eidos-parser --pure <file.theory>       # Parse and build IR (pure mode, no external files)"
       IO.hPutStrLn IO.stderr "  eidos-parser --pretty <file.theory>     # Parse and pretty-print AST"
       exitFailure
