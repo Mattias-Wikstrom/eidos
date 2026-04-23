@@ -1492,16 +1492,20 @@ validateTermPairSemantics (ResolvedTermPair left rights _) = do
     let rightClass = resolvedTermType right
     case op of
       "∈" -> do
-        if leftClass /= IndividualClass
-          then Left $ "Left operand of ∈ must be an individual, got " ++ show leftClass
-          else if rightClass /= RelationClass 1
-            then Left $ "Right operand of ∈ must be a set, got " ++ show rightClass
+        let leftOk = leftClass == IndividualClass || leftClass == OtherMereologicalClass
+        let rightOk = rightClass == RelationClass 1 || rightClass == OtherMereologicalClass
+        if not leftOk
+          then Left $ "Left operand of ∈ must be an individual or mereological, got " ++ show leftClass
+          else if not rightOk
+            then Left $ "Right operand of ∈ must be a set or mereological, got " ++ show rightClass
             else Right ()
       "⊆" -> do
-        if leftClass /= RelationClass 1
-          then Left $ "Left operand of ⊆ must be a set, got " ++ show leftClass
-          else if rightClass /= RelationClass 1
-            then Left $ "Right operand of ⊆ must be a set, got " ++ show rightClass
+        let leftOk = leftClass == RelationClass 1 || leftClass == OtherMereologicalClass
+        let rightOk = rightClass == RelationClass 1 || rightClass == OtherMereologicalClass
+        if not leftOk
+          then Left $ "Left operand of ⊆ must be a set or mereological, got " ++ show leftClass
+          else if not rightOk
+            then Left $ "Right operand of ⊆ must be a set or mereological, got " ++ show rightClass
             else Right ()
       "≤" -> Right ()
       "=" -> do

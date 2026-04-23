@@ -651,6 +651,31 @@ main = hspec $ do
           }
         |]
         
+      it "accepts a mereological object (like a wildcard) used where only sets are accepted" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              i     :  S;
+              A     ⊆  S;
+            }
+            axioms {
+              facts { i ∈ A#mereological; }
+            }
+          }
+        |]
+        
+      it "accepts a mereological object (like a wildcard) used where only individuals are accepted" $
+        shouldAccept [r|
+          { signature {
+              sort S;
+              i     :  S;
+              A     ⊆  S;
+            }
+            axioms {
+              facts { A#mereological ∈ A; }
+            }
+          }
+        |]
 
     -- ── End-to-end: ill-typed theories that must be rejected ─────────────────
 
@@ -878,6 +903,33 @@ main = hspec $ do
             }
             axioms {
               facts { MySet ⊆ y; }
+            }
+          }
+        |]
+
+      it "rejects a set used where only individuals are accepted" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              i     :  S;
+              A     ⊆  S;
+            }
+            axioms {
+              facts { i#set ∈ A; }
+            }
+          }
+        |]
+
+        
+      it "rejects an individual used where only sets are accepted" $
+        shouldRejectAny [r|
+          { signature {
+              sort S;
+              i     :  S;
+              A     ⊆  S;
+            }
+            axioms {
+              facts { i ∈ A#individual; }
             }
           }
         |]
