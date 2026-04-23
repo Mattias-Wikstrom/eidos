@@ -18,6 +18,7 @@ library
                     , Eidos.FromSyntax
                     , Eidos.IR
                     , Eidos.Pretty
+                    , Eidos.DebugIR
                     , Eidos.TypeCheck
                     , Eidos.ExternalRef
                     , Eidos.BuildMonad 
