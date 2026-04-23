@@ -18,6 +18,21 @@ total=0
 passed=0
 failed=0
 
+# External references (e.g. @monoid, @ring) require IO mode so the resolver can
+# read sibling files from theories/.  Pure mode is still available for focused
+# parser/type-check tests by setting EIDOS_TEST_MODE=pure.
+MODE="${EIDOS_TEST_MODE:-io}"
+if [ "$MODE" = "pure" ]; then
+    RUN_ARGS=(--pure)
+    MODE_LABEL="pure mode (external refs disabled)"
+else
+    RUN_ARGS=()
+    MODE_LABEL="IO mode (external refs enabled)"
+fi
+
+echo "Using $MODE_LABEL"
+echo
+
 # Run tests for each theory
 for theory in theories/*.theory; do
     if [ -f "$theory" ]; then
@@ -26,8 +41,7 @@ for theory in theories/*.theory; do
         
         echo -n "Testing $filename... "
         
-        # Run the parser in pure mode (no external references)
-        if cabal run eidos-parser -- --pure "$theory" > /dev/null 2>&1; then
+        if cabal run eidos-parser -- "${RUN_ARGS[@]}" "$theory" > /dev/null 2>&1; then
             echo -e "${GREEN}PASSED${NC}"
             passed=$((passed + 1))
         else
@@ -35,7 +49,7 @@ for theory in theories/*.theory; do
             failed=$((failed + 1))
             # Show the error for debugging
             echo "  Error details:"
-            cabal run eidos-parser -- --pure "$theory" 2>&1 | head -5 | sed 's/^/    /'
+            cabal run eidos-parser -- "${RUN_ARGS[@]}" "$theory" 2>&1 | head -5 | sed 's/^/    /'
         fi
     fi
 done
