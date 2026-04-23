@@ -57,6 +57,12 @@ data FactKind
   | FactKindAssertion
   | FactKindMetafactsFact
   | FactKindSortLimitation
+  | FactKindImplicitMerge
+    -- ^ Equality fact auto-generated when an implicit subtheory's entity is
+    -- merged into the parent namespace.  Always has the form
+    -- @unqualifiedName = sub.qualifiedName@.  Distinguished from user-written
+    -- assertions so that pretty-printers and downstream passes can suppress
+    -- or specially handle them.
   deriving (Show, Eq)
 
 -- ---------------------------------------------------------------------------

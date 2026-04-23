@@ -449,10 +449,11 @@ prettyTheoryName (TheoryName nm) = nm
 prettyFact :: Fact -> Doc
 prettyFact f =
   (case IR.factKind f of
-     FactKindAssertion -> "assertion: "
-     FactKindFact -> "fact: "
+     FactKindAssertion     -> "assertion: "
+     FactKindFact          -> "fact: "
      FactKindMetafactsFact -> "metafact: "
-     FactKindSortLimitation -> "sort limit: ") ++
+     FactKindSortLimitation -> "sort limit: "
+     FactKindImplicitMerge -> "implicit merge: ") ++
   "<resolved expression>"
 
 -- ---------------------------------------------------------------------------
@@ -572,8 +573,9 @@ prettyResolvedPropExpr = prettyResolvedPropExprWithOpts defaultPrettyOptions { p
 prettyFactDebug :: Fact -> Doc
 prettyFactDebug f =
   let kindStr = case IR.factKind f of
-        FactKindAssertion -> "assertion: "
-        FactKindFact -> "fact: "
+        FactKindAssertion     -> "assertion: "
+        FactKindFact          -> "fact: "
         FactKindMetafactsFact -> "metafact: "
         FactKindSortLimitation -> "sort limit: "
+        FactKindImplicitMerge -> "implicit merge: "
   in kindStr ++ prettyResolvedPropExpr (factPropExpr f)
