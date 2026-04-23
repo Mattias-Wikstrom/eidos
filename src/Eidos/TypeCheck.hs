@@ -46,7 +46,7 @@ import           Data.Maybe      (fromMaybe)
 import           Eidos.AST
 import qualified Eidos.AST as AST
 import           Eidos.IR
-import qualified Eidos.IR as IR
+import qualified Eidos.IR as IR (EntityClass)
 
 -- ---------------------------------------------------------------------------
 -- Level 1 Classification
@@ -90,6 +90,81 @@ checkLevel1 t1 op t2 =
   Left $ "Level 1 type mismatch: " ++ show t1 ++ " " ++ op ++ " " ++ show t2
 
 -- ---------------------------------------------------------------------------
+-- Entity classification (related to the surface syntax of Eidos)
+-- ---------------------------------------------------------------------------
+
+classifyEntity :: Entity -> EntityClass
+classifyEntity (EntitySort _) = SortClass
+classifyEntity (EntityFunction f) =
+  case funcKind f of
+    FunctionKindFOLFunctionFromTheory -> FOLFunctionClass (length (funcArgSorts f))
+    FunctionKindSOLFunctionFromTheory -> SOLFunctionClass (length (funcArgSorts f))
+    _ -> error "unexpected function kind"  -- only user-declared functions appear here
+classifyEntity (EntityRelation r) = RelationClass (length (relArgSorts r))
+classifyEntity (EntityMereological m) =
+  case mereoKind m of
+    MereologicalEntityKindSet -> RelationClass 1
+    MereologicalEntityKindIndividual -> IndividualClass
+    MereologicalEntityKindProposition -> PropositionClass
+    _ -> OtherMereologicalClass
+classifyEntity (EntityTheory _) = TheoryClass
+
+compatibleEntities :: Entity -> Entity -> Either String ()
+compatibleEntities e1 e2 =
+  if classifyEntity e1 == classifyEntity e2
+    then Right ()
+    else Left $ "Cannot equate " ++ show (classifyEntity e1) ++ " with " ++ show (classifyEntity e2)
+
+-- | Obtain the arity of an entity if it is a relation (set or n-ary relation), Nothing otherwise.
+relationArity :: Entity -> Maybe Int
+relationArity (EntityMereological m) | mereoKind m == MereologicalEntityKindSet = Just 1
+relationArity (EntityRelation r) = Just (length (relArgSorts r))
+relationArity _ = Nothing
+
+-- | Extract the left and right entities from a simple equality fact.
+-- Returns Nothing if the expression is not of the form "term = term".
+extractEqualityEntities :: ResolvedPropExpr -> Maybe (Entity, Entity)
+extractEqualityEntities (ResolvedPropBicond left _) = go left
+  where
+    go :: ResolvedRightImpl -> Maybe (Entity, Entity)
+    go (ResolvedRightImpl leftImpl _) = goLeft leftImpl
+    
+    goLeft :: ResolvedLeftImpl -> Maybe (Entity, Entity)
+    goLeft (ResolvedLeftImpl disj _) = goDisj disj
+    
+    goDisj :: ResolvedDisj -> Maybe (Entity, Entity)
+    goDisj (ResolvedDisj conj _) = goConj conj
+    
+    goConj :: ResolvedConj -> Maybe (Entity, Entity)
+    goConj (ResolvedConj neg _) = goNeg neg
+    
+    goNeg :: ResolvedNeg -> Maybe (Entity, Entity)
+    goNeg (ResolvedNegChild quant) = goQuant quant
+    goNeg _ = Nothing
+    
+    goQuant :: ResolvedQuantified -> Maybe (Entity, Entity)
+    goQuant (ResolvedQuantified _ atomic) = goAtomic atomic
+    
+    goAtomic :: ResolvedAtomicProp -> Maybe (Entity, Entity)
+    goAtomic (ResolvedAtomicTermPair tp) = goTP tp
+    goAtomic _ = Nothing
+    
+    goTP :: ResolvedTermPair -> Maybe (Entity, Entity)
+    goTP tp =
+      case resolvedTPRight tp of
+        [rft] | resolvedRFTOp rft == "=" ->
+          (,) <$> entityFromTerm (resolvedTPLeft tp)
+              <*> entityFromTerm (resolvedRFTRight rft)
+        _ -> Nothing
+extractEqualityEntities _ = Nothing
+
+-- | Extract the Entity from a ResolvedTerm that is a simple constant.
+entityFromTerm :: ResolvedTerm -> Maybe Entity
+entityFromTerm (ResolvedTerm (ResolvedFactor (ResolvedBTAtomic constRef) [] _) [] _) =
+  Just (resolvedConstEntity constRef)
+entityFromTerm _ = Nothing
+
+-- ---------------------------------------------------------------------------
 -- Level 2 Classification (Mereological Subtypes)
 -- ---------------------------------------------------------------------------
 
@@ -113,7 +188,8 @@ data Level2Type
   | L2Set                   -- ^ Set (contains individuals)
   | L2Proposition           -- ^ Proposition (can be used in logical connectives)
   | L2BareMereological      -- ^ Bare mereological object (explicit any)
-  | L2Function Int          -- ^ Function (with arity)
+  | L2FOLFunction Int    -- arity
+  | L2SOLFunction Int    -- arity
   | L2Sort                  -- ^ Sort
   | L2Theory                -- ^ Theory
   deriving (Show, Eq)
@@ -123,9 +199,12 @@ type TypeWithAny = (Level2Type, Bool)  -- Bool = isExplicitAny (from #mereologic
 
 -- | Classify an expression at level 2.
 classifyLevel2 :: Entity -> Level2Type
-classifyLevel2 (EntitySort _) = L2Sort
-classifyLevel2 (EntityFunction f) = L2Function (length (funcArgSorts f))
-classifyLevel2 (EntityRelation r) = L2Function (length (relArgSorts r))
+classifyLevel2 (EntityFunction f) =
+  case funcKind f of
+    FunctionKindFOLFunctionFromTheory -> L2FOLFunction (length (funcArgSorts f))
+    FunctionKindSOLFunctionFromTheory -> L2SOLFunction (length (funcArgSorts f))
+    _ -> L2BareMereological  -- shouldn't happen for user functions
+classifyLevel2 (EntityRelation r) = L2FOLFunction (length (relArgSorts r))  -- relations are FOL predicates
 classifyLevel2 (EntityMereological m) =
   case mereoKind m of
     MereologicalEntityKindIndividual -> L2Individual
@@ -309,19 +388,19 @@ validateOperation left mbConvLeft op right mbConvRight = do
 -- ---------------------------------------------------------------------------
 
 -- | Check a resolved term's type and return its Level2Type.
+-- | Check a resolved term's type and return its Level2Type.
 checkResolvedTerm :: ResolvedTerm -> Either String Level2Type
 checkResolvedTerm term = do
-  let ty = resolvedTermType term
-  case exprMajorType ty of
-    MajorTypeMereologicalObject ->
-      case exprMereoSubtype ty of
-        Just MereologicalSubtypeIndividual -> Right L2Individual
-        Just MereologicalSubtypeSet -> Right L2Set
-        Just MereologicalSubtypeProposition -> Right L2Proposition
-        Just MereologicalSubtypeMereological -> Right L2BareMereological
-        Nothing -> Right L2BareMereological
-    MajorTypeFunction -> Right (L2Function (fromMaybe 0 (exprNumArgs ty)))
-    MajorTypeSort -> Right L2Sort
+  let entityClass = resolvedTermType term  -- This is now EntityClass
+  case entityClass of
+    SortClass -> Right L2Sort
+    FOLFunctionClass arity -> Right (L2FOLFunction arity)
+    SOLFunctionClass arity -> Right (L2SOLFunction arity)
+    RelationClass arity -> Right (if arity == 1 then L2Set else L2Set)  -- relations are sets of tuples
+    IndividualClass -> Right L2Individual
+    PropositionClass -> Right L2Proposition
+    OtherMereologicalClass -> Right L2BareMereological
+    TheoryClass -> Right L2Theory
 
 -- | Check if a resolved term is a valid set (ignores the result).
 checkSetOperand :: ResolvedTerm -> Either String ()

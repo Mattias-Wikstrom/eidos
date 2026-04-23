@@ -248,22 +248,29 @@ buildSignatureItem th0 th item = do
           return th10
 
     SigIndividual (IndividualDeclaration nm sortExprAST) -> do
+
+      when (firstLetterIsUppercase nm) $
+        throwError $ "Individual names must start with lowercase: " ++ nm
+      
       checkNameConflict nm
       s <- either throwError return $ lookupSortByExpr th sortExprAST
       let mo = mkMereo th MereologicalEntityKindIndividual nm s FromSignature
       return (addEntityToTh th (EntityMereological mo))
 
-    SigSet (SetDeclaration nm domainExprs) -> case domainExprs of
-      [sexpr] -> do
-        checkNameConflict nm
-        s <- either throwError return $ lookupSortByExpr th sexpr
-        let mo = mkMereo th MereologicalEntityKindSet nm s FromSignature
-        return (addEntityToTh th (EntityMereological mo))
-      _ -> do
-        checkNameConflict nm
-        argSorts <- mapM (liftLookup (lookupSortByExpr th)) domainExprs
-        let rel = mkRelation th nm argSorts FromSignature
-        return (addEntityToTh th (EntityRelation rel))
+    SigSet (SetDeclaration nm domainExprs) -> do
+      when (not (firstLetterIsUppercase nm)) $
+        throwError $ "Set/relation names must start with uppercase: " ++ nm
+      case domainExprs of
+        [sexpr] -> do
+          checkNameConflict nm
+          s <- either throwError return $ lookupSortByExpr th sexpr
+          let mo = mkMereo th MereologicalEntityKindSet nm s FromSignature
+          return (addEntityToTh th (EntityMereological mo))
+        _ -> do
+          checkNameConflict nm
+          argSorts <- mapM (liftLookup (lookupSortByExpr th)) domainExprs
+          let rel = mkRelation th nm argSorts FromSignature
+          return (addEntityToTh th (EntityRelation rel))
 
     SigRelation (RelationDeclaration nm first rest) -> do
       checkNameConflict nm
@@ -565,11 +572,11 @@ twoTermPropExpr l op r =
         (mereoExprType mo))
       []
       (mereoExprType mo)
-    mereoExprType mo = termTypeMereological (Just (kindToSubtype (mereoKind mo))) (Just (mereoSort mo))
-    kindToSubtype MereologicalEntityKindIndividual   = MereologicalSubtypeIndividual
-    kindToSubtype MereologicalEntityKindSet          = MereologicalSubtypeSet
-    kindToSubtype MereologicalEntityKindProposition  = MereologicalSubtypeProposition
-    kindToSubtype _                                  = MereologicalSubtypeMereological
+    mereoExprType mo = case mereoKind mo of
+      MereologicalEntityKindIndividual -> IndividualClass
+      MereologicalEntityKindSet -> RelationClass 1
+      MereologicalEntityKindProposition -> PropositionClass
+      _ -> OtherMereologicalClass
 
 -- | Add an entity to the theory's object list and name map (local only; propagation
 --   to ancestors is done explicitly via 'propagateSubtheory').
@@ -775,7 +782,7 @@ addMergeEqualityFact th lhsName lhsEntity rhsName rhsEntity =
   let leftTerm  = termFromEntityWithName lhsName  lhsEntity
       rightTerm = termFromEntityWithName rhsName rhsEntity
       relation  = ResolvedRelationFollowedByTerm [] "=" Nothing rightTerm
-      termPair  = ResolvedTermPair leftTerm [relation] (termTypeMereological Nothing Nothing)
+      termPair  = ResolvedTermPair leftTerm [relation] OtherMereologicalClass
       atomicProp = ResolvedAtomicTermPair termPair
       quantified = ResolvedQuantified [] atomicProp
       neg       = ResolvedNegChild quantified
@@ -1136,17 +1143,20 @@ findSubtheoryByPath th (p:ps) =
 
 -- | Determine the 'ExprType' for an entity looked up by name.
 entityToExprType :: Entity -> ExprType
-entityToExprType (EntitySort _)         = termTypeSort
-entityToExprType (EntityFunction f)     = termTypeFunction (length (funcArgSorts f))
+entityToExprType (EntitySort _) = SortClass
+entityToExprType (EntityFunction f) = 
+  case funcKind f of
+    FunctionKindFOLFunctionFromTheory -> FOLFunctionClass (length (funcArgSorts f))
+    FunctionKindSOLFunctionFromTheory -> SOLFunctionClass (length (funcArgSorts f))
+    _ -> OtherMereologicalClass
+entityToExprType (EntityRelation r) = RelationClass (length (relArgSorts r))
 entityToExprType (EntityMereological m) =
-  let sub = case mereoKind m of
-              MereologicalEntityKindIndividual  -> Just MereologicalSubtypeIndividual
-              MereologicalEntityKindSet         -> Just MereologicalSubtypeSet
-              MereologicalEntityKindProposition -> Just MereologicalSubtypeProposition
-              _                                 -> Just MereologicalSubtypeMereological
-  in termTypeMereological sub (Just (mereoSort m))
-entityToExprType (EntityRelation r)     = termTypeMereological (Just MereologicalSubtypeSet) (Just (relDomain r))
-entityToExprType (EntityTheory _)       = termTypeMereological Nothing Nothing
+  case mereoKind m of
+    MereologicalEntityKindIndividual -> IndividualClass
+    MereologicalEntityKindSet -> RelationClass 1
+    MereologicalEntityKindProposition -> PropositionClass
+    _ -> OtherMereologicalClass
+entityToExprType (EntityTheory _) = TheoryClass
 
 -- ---------------------------------------------------------------------------
 -- Name resolution (from original file)
@@ -1280,20 +1290,20 @@ resolveBaseTerm th ctx bt = case bt of
     resolved <- resolvePropExpr subTh emptyVarContext operand
     return (ResolvedBTEvaluationInTheory
               (ResolvedEvaluationInTheory path subTh resolved),
-            termTypeMereological (Just MereologicalSubtypeProposition) Nothing)
+            PropositionClass)  -- evaluation yields a proposition
 
   BTProjectionToSort (ProjectionToSort sexpr operand) -> do
     s  <- lookupSortByExpr th sexpr
     rt <- resolveTerm th ctx operand
     return (ResolvedBTProjectionToSort (ResolvedProjectionToSort s rt),
-            termTypeMereological (Just MereologicalSubtypeSet) (Just s))
+            RelationClass 1)  -- projection to a sort yields a set
 
   BTProjectionToInterval (ProjectionToInterval lo hi operand) -> do
     rl <- resolveTerm th ctx lo
     rh <- resolveTerm th ctx hi
     rt <- resolveTerm th ctx operand
     return (ResolvedBTProjectionToInterval (ResolvedProjectionToInterval rl rh rt),
-            termTypeMereological Nothing Nothing)
+            OtherMereologicalClass)
 
   BTGeneralizedSumOrProduct (GeneralizedSumOrProduct sym var operand) -> do
     (rvar, ctx') <- case var of
@@ -1303,17 +1313,20 @@ resolveBaseTerm th ctx bt = case bt of
       Right vid -> return (Right vid, ctx)
     rt <- resolveTerm th ctx' operand
     return (ResolvedBTGeneralizedSumOrProduct (ResolvedGeneralizedSumOrProduct sym rvar rt),
-            termTypeMereological Nothing Nothing)
+            OtherMereologicalClass)
 
   BTSingleton inner -> do
     rt <- resolveTerm th ctx inner
-    return (ResolvedBTSingleton rt,
-            termTypeMereological (Just MereologicalSubtypeSet) Nothing)
+    let innerTy = resolvedTermType rt
+    case innerTy of
+      IndividualClass -> pure ()
+      RelationClass 1 -> Left "Cannot take singleton of a set (singleton only for individuals)"
+      _ -> Left "Singleton argument must be an individual"
+    return (ResolvedBTSingleton rt, RelationClass 1)
 
   BTParen inner -> do
     rp <- resolvePropExpr th ctx inner
-    return (ResolvedBTParen rp,
-            termTypeMereological (Just MereologicalSubtypeProposition) Nothing)
+    return (ResolvedBTParen rp, PropositionClass)
 
 -- | Resolve term suffixes and propagate the type.
 resolveSuffix
@@ -1326,55 +1339,73 @@ resolveSuffix th ctx (acc, ty) suffix = case suffix of
 
   SuffixCall (CallSuffix args) -> do
     rargs <- mapM (resolveTerm th ctx) args
-    case exprMajorType ty of
-      MajorTypeFunction ->
-        let numArgs = fromMaybe 0 (exprNumArgs ty)
-        in if length args /= numArgs
-           then Left $ "Argument count mismatch: expected " ++ show numArgs
-                    ++ ", got " ++ show (length args)
-           else return (acc ++ [ResolvedSuffixCall rargs],
-                        termTypeMereological Nothing Nothing)
-      _ -> Left "Attempt to call a non-function."
+    case ty of
+      -- Relation (set or n-ary predicate)
+      RelationClass arity -> do
+        if length args /= arity
+          then Left $ "Relation arity mismatch: expected " ++ show arity ++ ", got " ++ show (length args)
+          else do
+            forM_ rargs $ \arg -> do
+              let argTy = resolvedTermType arg
+              case argTy of
+                IndividualClass -> return ()
+                _ -> Left "Relation argument must be an individual"
+            return (acc ++ [ResolvedSuffixCall rargs], PropositionClass)
+
+      -- FOL function: result is IndividualClass if all args individuals, else RelationClass 1
+      FOLFunctionClass n ->
+        if length args /= n
+          then Left $ "FOL function arity mismatch: expected " ++ show n ++ ", got " ++ show (length args)
+          else do
+            let anySet = any (\arg -> case resolvedTermType arg of RelationClass 1 -> True; _ -> False) rargs
+                resultClass = if anySet then RelationClass 1 else IndividualClass
+            return (acc ++ [ResolvedSuffixCall rargs], resultClass)
+
+      -- SOL function: always returns a set
+      SOLFunctionClass n ->
+        if length args /= n
+          then Left $ "SOL function arity mismatch: expected " ++ show n ++ ", got " ++ show (length args)
+          else do
+            return (acc ++ [ResolvedSuffixCall rargs], RelationClass 1)
+
+      _ -> Left "Cannot apply arguments to a non‑function/non‑set"
 
   SuffixSpecialOp op -> case op of
     s | s `elem` ["min","max"] ->
-        case exprMajorType ty of
-          MajorTypeSort -> return (acc ++ [ResolvedSuffixSpecialOp s],
-                                   termTypeMereological Nothing Nothing)
+        case ty of
+          SortClass -> return (acc ++ [ResolvedSuffixSpecialOp s], OtherMereologicalClass)
           _ -> Left $ "Attempt to apply '#" ++ s ++ "' to a non-sort."
     s | s `elem` ["res","arg"] ->
-        case exprMajorType ty of
-          MajorTypeFunction -> return (acc ++ [ResolvedSuffixSpecialOp s],
-                                       termTypeMereological Nothing Nothing)
+        case ty of
+          FOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp s], OtherMereologicalClass)
+          SOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp s], OtherMereologicalClass)
           _ -> Left $ "Attempt to apply '#" ++ s ++ "' to a non-function."
     "dom" ->
-        case exprMajorType ty of
-          MajorTypeFunction -> return (acc ++ [ResolvedSuffixSpecialOp "dom"],
-                                       termTypeSort)
+        case ty of
+          FOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp "dom"], SortClass)
+          SOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp "dom"], SortClass)
           _ -> Left "Attempt to apply '#dom' to a non-function."
     s | s `elem` ["set","individual","mereological","proposition"] ->
-        return (acc ++ [ResolvedSuffixSpecialOp s],
-                termTypeMereological (Just (viewSubtype s)) Nothing)
+        let newClass = case s of
+              "set" -> RelationClass 1
+              "individual" -> IndividualClass
+              "proposition" -> PropositionClass
+              "mereological" -> OtherMereologicalClass
+              _ -> ty
+        in return (acc ++ [ResolvedSuffixSpecialOp s], newClass)
     s | all (`elem` "0123456789") s && not (null s) ->
-        case exprMajorType ty of
-          MajorTypeFunction -> return (acc ++ [ResolvedSuffixSpecialOp s],
-                                       termTypeMereological Nothing Nothing)
+        case ty of
+          FOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp s], OtherMereologicalClass)
+          SOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp s], OtherMereologicalClass)
           _ -> Left $ "Attempt to apply '#" ++ s ++ "' to a non-function."
     other -> return (acc ++ [ResolvedSuffixSpecialOp other], ty)
 
   SuffixDotAttr attr -> case attr of
     s | s `elem` ["min","max"] ->
-        case exprMajorType ty of
-          MajorTypeSort -> return (acc ++ [ResolvedSuffixDotAttr s],
-                                   termTypeMereological Nothing Nothing)
+        case ty of
+          SortClass -> return (acc ++ [ResolvedSuffixDotAttr s], OtherMereologicalClass)
           _ -> Left $ "Attempt to apply '." ++ s ++ "' to a non-sort."
     other -> return (acc ++ [ResolvedSuffixDotAttr other], ty)
-
-  where
-    viewSubtype "set"          = MereologicalSubtypeSet
-    viewSubtype "individual"   = MereologicalSubtypeIndividual
-    viewSubtype "proposition"  = MereologicalSubtypeProposition
-    viewSubtype _              = MereologicalSubtypeMereological
 
 -- | Resolve a constant reference — may be a bound variable, ⊤/⊥, a sort,
 -- a function, or an individual / set.
@@ -1385,12 +1416,10 @@ resolveConstantRef th ctx (ConstantRef specs ref) = do
   case ref of
     "⊤" -> do
       let mo = lookupInPath th path (theoryTruth)
-      return (ResolvedConstantRef ref (EntityMereological mo)
-                (termTypeMereological (Just MereologicalSubtypeProposition) Nothing))
+      return (ResolvedConstantRef ref (EntityMereological mo) PropositionClass)
     "⊥" -> do
       let mo = lookupInPath th path (theoryFalsity)
-      return (ResolvedConstantRef ref (EntityMereological mo)
-                (termTypeMereological (Just MereologicalSubtypeProposition) Nothing))
+      return (ResolvedConstantRef ref (EntityMereological mo) PropositionClass)
     _ -> do
       let mbVar = if null path
                   then lookupVarContext ctx ref
@@ -1398,12 +1427,11 @@ resolveConstantRef th ctx (ConstantRef specs ref) = do
       case mbVar of
         Just rvd -> do
           let ty = if resolvedVarIsSet rvd
-                   then termTypeMereological (Just MereologicalSubtypeSet) (Just (resolvedVarSort rvd))
+                   then RelationClass 1
                    else case sortKind (resolvedVarSort rvd) of
-                          SortKindProp     -> termTypeMereological (Just MereologicalSubtypeProposition) Nothing
-                          SortKindUniverse -> termTypeMereological Nothing Nothing
-                          _                -> termTypeMereological (Just MereologicalSubtypeIndividual)
-                                               (Just (resolvedVarSort rvd))
+                          SortKindProp -> PropositionClass
+                          SortKindUniverse -> OtherMereologicalClass
+                          _ -> IndividualClass
           return (ResolvedConstantRef ref
                     (EntityMereological (mkMereo th MereologicalEntityKindIndividual ref (resolvedVarSort rvd) FromSignature))
                     ty)
@@ -1456,44 +1484,39 @@ validateAtomicPropTermPairs (ResolvedAtomicTermPair tp) = validateTermPairSemant
 validateAtomicPropTermPairs (ResolvedAtomicConstant _) = Right ()
 
 -- | Validate the semantic meaning of a term pair (checking ∈, ⊆, etc.)
+-- | Validate the semantic meaning of a term pair (checking ∈, ⊆, etc.)
 validateTermPairSemantics :: ResolvedTermPair -> Either String ()
 validateTermPairSemantics (ResolvedTermPair left rights _) = do
-  leftType <- getResolvedTermType left
+  let leftClass = resolvedTermType left
   forM_ rights $ \(ResolvedRelationFollowedByTerm _ op _ right) -> do
-    rightType <- getResolvedTermType right
-    let leftWithAny = (leftType, False)
-    let rightWithAny = (rightType, False)
+    let rightClass = resolvedTermType right
     case op of
       "∈" -> do
-        if not (acceptIndividualOperand leftWithAny)
-          then Left $ "Left operand of ∈ must be an individual, got " ++ show leftType
-          else if not (acceptSetOperand rightWithAny)
-            then Left $ "Right operand of ∈ must be a set, got " ++ show rightType
+        if leftClass /= IndividualClass
+          then Left $ "Left operand of ∈ must be an individual, got " ++ show leftClass
+          else if rightClass /= RelationClass 1
+            then Left $ "Right operand of ∈ must be a set, got " ++ show rightClass
             else Right ()
       "⊆" -> do
-        if not (acceptSetOperand leftWithAny)
-          then Left $ "Left operand of ⊆ must be a set, got " ++ show leftType
-          else if not (acceptSetOperand rightWithAny)
-            then Left $ "Right operand of ⊆ must be a set, got " ++ show rightType
+        if leftClass /= RelationClass 1
+          then Left $ "Left operand of ⊆ must be a set, got " ++ show leftClass
+          else if rightClass /= RelationClass 1
+            then Left $ "Right operand of ⊆ must be a set, got " ++ show rightClass
             else Right ()
       "≤" -> Right ()
-      "=" -> Right ()
+      "=" -> do
+        if leftClass == rightClass
+          then Right ()
+          else if (leftClass == PropositionClass && rightClass == OtherMereologicalClass) ||
+                  (leftClass == OtherMereologicalClass && rightClass == PropositionClass)
+            then Right ()
+            else Left $ "Cannot equate " ++ show leftClass ++ " with " ++ show rightClass
       _ -> Left $ "Unknown operator: " ++ op
 
+
 -- | Helper to get the Level2Type from a ResolvedTerm
-getResolvedTermType :: ResolvedTerm -> Either String Level2Type
-getResolvedTermType term = do
-  let ty = resolvedTermType term
-  case exprMajorType ty of
-    MajorTypeMereologicalObject ->
-      case exprMereoSubtype ty of
-        Just MereologicalSubtypeIndividual -> Right L2Individual
-        Just MereologicalSubtypeSet -> Right L2Set
-        Just MereologicalSubtypeProposition -> Right L2Proposition
-        Just MereologicalSubtypeMereological -> Right L2BareMereological
-        Nothing -> Right L2BareMereological
-    MajorTypeFunction -> Right (L2Function (fromMaybe 0 (exprNumArgs ty)))
-    MajorTypeSort -> Right L2Sort
+getResolvedTermType :: ResolvedTerm -> Either String ExprType
+getResolvedTermType term = Right (resolvedTermType term)
 
 -- ---------------------------------------------------------------------------
 -- Utilities
