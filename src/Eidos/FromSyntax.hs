@@ -263,17 +263,23 @@ buildSignatureItem th0 th item = do
             else return th
 
     SigIndividual (IndividualDeclaration nm sortExprAST) -> do
-
-      when (firstLetterIsUppercase nm) $
-        throwError $ "Individual names must start with lowercase: " ++ nm
-      
       s <- either throwError return $ lookupSortByExpr th sortExprAST
+      -- Naming convention:
+      -- * one-letter individuals over non-proposition sorts are lowercase
+      -- * proposition symbols (e.g. P : ℙ) may be uppercase
+      let isSingleLetter = length nm == 1
+          isPropSort = sortName s == "ℙ"
+      when (isSingleLetter && firstLetterIsUppercase nm && not isPropSort) $
+        throwError $ "Individual names must start with lowercase: " ++ nm
       let mo = mkMereo th MereologicalEntityKindIndividual nm s FromSignature
       shouldInsert <- shouldInsertDeclaration nm (EntityMereological mo)
       return (if shouldInsert then addEntityToTh th (EntityMereological mo) else th)
 
     SigSet (SetDeclaration nm domainExprs) -> do
-      when (not (firstLetterIsUppercase nm)) $
+      -- Naming convention:
+      -- * one-letter set/relation names are uppercase (e.g. A ⊆ S)
+      -- * longer names (e.g. mySet, set1, lessThanOrEq) are permitted
+      when (length nm == 1 && not (firstLetterIsUppercase nm)) $
         throwError $ "Set/relation names must start with uppercase: " ++ nm
       case domainExprs of
         [sexpr] -> do
