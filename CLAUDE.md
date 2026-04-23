@@ -7,3 +7,4 @@ Files that will give you context:
   eidos-skill.skill 
   implicit.txt
   reflection.txt
+  How the Eidos compiler adds things to theories.txt
