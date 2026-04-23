@@ -704,22 +704,24 @@ reflectEntity e = e
 --     Internal structural entities (names containing '#') are only added qualified.
 --   * Named/reflection subtheories: no unqualified names are added.
 --   * Implicit subtheories: for each entity with a "plain" name (no '#'):
---       - Built-ins (𝔻, ℙ, 𝕌, ⊤, ⊥, +, ×, -, ⇒, ∸): the parent already owns the
---         unqualified slot.  Add an equality fact  parent_entity = sub.entity
---         using the qualified entity (already registered above).
---       - User-defined, unqualified name not yet in parent: add normally.
+--       - Built-in sorts/limits (𝔻, ℙ, 𝕌, ⊤, ⊥): the parent already owns the
+--         canonical slot.  Emit one 'FactKindImplicitMerge' equality fact
+--         @unqualifiedName = sub.entity@.
+--       - Mereological operations (+, ×, -, ⇒, ∸): treated as user-defined
+--         entities (see below).  The parent gains an unqualified alias.
+--       - User-defined, unqualified name not yet in parent: create a canonical
+--         entity anchored to the PARENT theory (order-independent), add it under
+--         the unqualified key, and emit @name = sub.name@.
 --       - User-defined, unqualified name already in parent from another implicit
---         subtheory, and the two entities are structurally compatible (same kind /
---         arity / argument sorts / result sort): add an equality fact merging them,
---         and also store the new entity under the unqualified key so the slot becomes
---         ambiguous (multiple entries → lookupInParentByName returns Nothing).
---         The equality facts serve as proof-level witnesses of the identification.
---       - User-defined, same name, NOT structurally compatible: just accumulate
---         (the lookup becomes ambiguous, which is the correct error signal).
+--         subtheory, structurally compatible: emit another @name = sub.name@
+--         equality fact.  The single canonical entry stays; no second entity
+--         is pushed into the slot.
+--       - User-defined, same name, NOT structurally compatible: return a
+--         Left build error.
 --
--- "Internal" means the name contains '#' — these are bookkeeping artefacts
--- (sort limits, domain sorts, image functions, …) and must not pollute the
--- parent's unqualified namespace.
+-- "Internal" means the name contains '#' — bookkeeping artefacts such as sort
+-- limits, domain sorts, and image functions.  They are always propagated only
+-- under their qualified names and never pollute the unqualified namespace.
 --
 -- The propagated names are inserted into the parent's objectsByName map only
 -- (not into theoryObjects, which lists only locally-declared entities).
@@ -755,76 +757,129 @@ termFromEntityWithName displayName entity =
 termFromEntity :: Entity -> ResolvedTerm
 termFromEntity e = termFromEntityWithName (entityName e) e
 
-addEqualityFactNamed :: Theory -> String -> String -> Entity -> Entity -> Theory
-addEqualityFactNamed th lhsName rhsName lhsEntity rhsEntity =
-  let leftTerm = termFromEntityWithName lhsName lhsEntity
+-- | Emit one implicit-merge equality fact of the form
+--   @unqualifiedName = sub.qualifiedName@.
+--
+-- The LHS is always the unqualified canonical name; the RHS is always the
+-- qualified subtheory name.  Using 'FactKindImplicitMerge' (rather than
+-- 'FactKindAssertion') lets pretty-printers and downstream passes identify
+-- and optionally suppress these auto-generated witnesses.
+addMergeEqualityFact
+  :: Theory    -- ^ theory to add the fact to
+  -> String    -- ^ unqualified (LHS) name
+  -> Entity    -- ^ canonical entity for the LHS
+  -> String    -- ^ qualified (RHS) name, e.g. "sub.f"
+  -> Entity    -- ^ subtheory entity for the RHS
+  -> Theory
+addMergeEqualityFact th lhsName lhsEntity rhsName rhsEntity =
+  let leftTerm  = termFromEntityWithName lhsName  lhsEntity
       rightTerm = termFromEntityWithName rhsName rhsEntity
-      relation = ResolvedRelationFollowedByTerm [] "=" Nothing rightTerm
-      termPair = ResolvedTermPair leftTerm [relation] (termTypeMereological Nothing Nothing)
+      relation  = ResolvedRelationFollowedByTerm [] "=" Nothing rightTerm
+      termPair  = ResolvedTermPair leftTerm [relation] (termTypeMereological Nothing Nothing)
       atomicProp = ResolvedAtomicTermPair termPair
       quantified = ResolvedQuantified [] atomicProp
-      neg = ResolvedNegChild quantified
-      conj = ResolvedConj neg []
-      disj = ResolvedDisj conj []
-      leftImpl = ResolvedLeftImpl disj []
+      neg       = ResolvedNegChild quantified
+      conj      = ResolvedConj neg []
+      disj      = ResolvedDisj conj []
+      leftImpl  = ResolvedLeftImpl disj []
       rightImpl = ResolvedRightImpl leftImpl Nothing
   in addFactToTh th (Fact
         { factIsMereologicalTranslation = False
-        , factIsInherited = False
-        , factKind = FactKindAssertion
-        , factPropExpr = ResolvedPropBicond rightImpl []
+        , factIsInherited               = False
+        , factKind                      = FactKindImplicitMerge
+        , factPropExpr                  = ResolvedPropBicond rightImpl []
         })
 
--- | Built-in entity names that every theory already owns
-builtInNames :: [String]
-builtInNames = ["𝔻", "ℙ", "𝕌", "+", "×", "-", "⇒", "∸", "⊤", "⊥"]
+-- | Built-in sort/limit names that every theory already owns an unqualified
+-- entry for.  When an implicit subtheory contributes one of these names, the
+-- parent already owns the canonical slot; we only need to emit an equality
+-- fact linking parent entity = sub.entity.
+--
+-- The mereological operations (+, ×, -, ⇒, ∸) are intentionally excluded:
+-- they are treated the same as user-defined entities so that the parent gains
+-- a proper unqualified alias with a merge equality fact, exactly as the
+-- implicit subtheory document specifies.
+builtInSortNames :: [String]
+builtInSortNames = ["𝔻", "ℙ", "𝕌", "⊤", "⊥"]
 
-isBuiltIn :: String -> Bool
-isBuiltIn name = name `elem` builtInNames
+isBuiltInSort :: String -> Bool
+isBuiltInSort n = n `elem` builtInSortNames
 
-    -- | Decide what to do when we encounter `entity` (from the sub) for the
-    --   unqualified slot `name`.  `qualifiedName` is the already-registered
-    --   "sub.entity" key we can look up to produce well-formed equality facts.
+-- | Decide what to do when we encounter @entity@ (from the sub) for the
+-- unqualified slot @name@.  @qualifiedName@ is the already-registered
+-- @"sub.entity"@ key used to produce well-formed equality facts.
+--
+-- Contract:
+--   * The unqualified name is ALWAYS the LHS of any equality fact produced.
+--   * The qualified (sub.X) name is ALWAYS the RHS.
+--   * Order of subtheory processing must not affect the result.
 addUnqualified :: String -> String -> Theory -> Entity -> Either BuildError Theory
 addUnqualified name qualifiedName th entity
-  -- Built-ins: parent already owns the slot. Add equality fact only.
-  | isBuiltIn name =
-      case ( Map.lookup name (theoryObjectsByName th)
+  -- Built-in sorts/limits: parent already owns the canonical slot.
+  -- Emit "parent_entity = sub.entity" and nothing else.
+  | isBuiltInSort name =
+      case ( Map.lookup name      (theoryObjectsByName th)
            , Map.lookup qualifiedName (theoryObjectsByName th) ) of
         (Just (parentEntity:_), Just (subEntity:_)) ->
-          Right $ addEqualityFactNamed th name qualifiedName parentEntity subEntity
+          Right $ addMergeEqualityFact th name parentEntity qualifiedName subEntity
         _ -> Right th
-  -- Slot empty: first time this name appears
+
+  -- Slot empty: first occurrence of this user-defined name.
+  -- Create a canonical entity anchored to the PARENT theory (not the
+  -- subtheory), so the result is the same regardless of which subtheory
+  -- is processed first.
   | Nothing <- Map.lookup name (theoryObjectsByName th) =
-      let canonical = createCanonicalEntity entity
-          th1 = addEntityToParent th name canonical
-      in Right $ addEqualityFactNamed th1 name qualifiedName canonical entity
-  -- Slot occupied: check compatibility
+      let canonical = createCanonicalEntity th entity
+          th1       = addEntityToParent th name canonical
+      in Right $ addMergeEqualityFact th1 name canonical qualifiedName entity
+
+  -- Slot already occupied by a canonical entity from a previous implicit sub.
+  -- If compatible, emit another equality fact; leave the single canonical
+  -- entry in place (no new entity added to the slot).
   | Just (canonical : _) <- Map.lookup name (theoryObjectsByName th) =
       if entitiesCompatible canonical entity
-        then Right $ addEqualityFactNamed th name qualifiedName canonical entity
-        else Left $ "Name conflict: '" ++ name ++ "' is defined in multiple implicit subtheories with incompatible signatures"
+        then Right $ addMergeEqualityFact th name canonical qualifiedName entity
+        else Left $ "Name conflict: '" ++ name
+               ++ "' is defined in multiple implicit subtheories with incompatible signatures"
+
   | otherwise = Right th
-  
--- | Create a canonical entity that serves as the merged representative
--- for user-defined entities from implicit subtheories.
--- The canonical entity is a copy of the subtheory's entity but with
--- ReflectedFrom set to Nothing, indicating it's the canonical merged version.
-createCanonicalEntity :: Entity -> Entity
-createCanonicalEntity (EntitySort s) =
-  EntitySort (s { sortReflectedFrom = Nothing })
-createCanonicalEntity (EntityFunction f) =
-  EntityFunction (f { funcReflectedFrom = Nothing })
-createCanonicalEntity (EntityMereological m) =
-  EntityMereological (m { mereoReflectedFrom = Nothing })
-createCanonicalEntity (EntityRelation r) =
-  EntityRelation (r { relReflectedFrom = Nothing })
-createCanonicalEntity e = e  -- fallback (should not happen)
+
+-- | Create a canonical entity to serve as the merged representative for a
+-- user-defined name coming from an implicit subtheory.
+--
+-- The canonical entity is structurally identical to the subtheory entity but
+-- has its theory pointer rewritten to @parentTh@ and its @reflectedFrom@
+-- field cleared.  Anchoring to the parent theory ensures the result is
+-- stable across different subtheory processing orders.
+createCanonicalEntity :: Theory -> Entity -> Entity
+createCanonicalEntity parentTh (EntitySort s) =
+  EntitySort s { sortTheory       = parentTh
+               , sortOrigin       = FromSubtheory
+               , sortReflectedFrom = Nothing
+               }
+createCanonicalEntity parentTh (EntityFunction f) =
+  EntityFunction f { funcTheory       = parentTh
+                   , funcOrigin       = FromSubtheory
+                   , funcReflectedFrom = Nothing
+                   }
+createCanonicalEntity parentTh (EntityMereological m) =
+  EntityMereological m { mereoTheory       = parentTh
+                        , mereoOrigin       = FromSubtheory
+                        , mereoReflectedFrom = Nothing
+                        }
+createCanonicalEntity parentTh (EntityRelation r) =
+  EntityRelation r { relTheory       = parentTh
+                   , relOrigin       = FromSubtheory
+                   , relReflectedFrom = Nothing
+                   }
+createCanonicalEntity _ e = e  -- EntityTheory: should not occur here
 
 -- | True for names that are internal structural artefacts produced automatically
 --   by the IR builder (sort limits, domain sorts, image functions, etc.).
---   These contain '#' (e.g. "S#min", "f#dom", "f#dir_img") and must not be
---   propagated as bare unqualified names.
+--   These contain '#' (e.g. "S#min", "f#dom", "f#dir_img") and must never
+--   appear as bare unqualified names in any parent theory, even when the
+--   subtheory is implicit.  'propagateSubtheory' checks this before calling
+--   'addUnqualified'.
 isInternalName :: String -> Bool
 isInternalName = ('#' `elem`)
 

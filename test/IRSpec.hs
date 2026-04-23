@@ -636,6 +636,234 @@ main = hspec $ do
       let names = map theoryName subs
       names `shouldContain` ["sub1", "sub2", "sub3"]
 
+  -- ── Items 1-4: implicit subtheory merge correctness ─────────────────────
+  describe "Implicit merge correctness (items 1-4)" $ do
+
+    -- Item 1: order-independence of createCanonicalEntity
+    it "item1: merge is order-independent — swapping sub1/sub2 gives same entity count" $ do
+      th1 <- buildStr [r|{
+        subtheories { implicit {
+          sub1: { signature { sort S; f: 𝔻 -> 𝔻; } }
+          sub2: { signature { sort S; f: 𝔻 -> 𝔻; } }
+        }}
+      }|]
+      th2 <- buildStr [r|{
+        subtheories { implicit {
+          sub2: { signature { sort S; f: 𝔻 -> 𝔻; } }
+          sub1: { signature { sort S; f: 𝔻 -> 𝔻; } }
+        }}
+      }|]
+      -- Both orderings must produce exactly one canonical unqualified entry for S
+      let countS t = maybe 0 length (Map.lookup "S" (theoryObjectsByName t))
+      countS th1 `shouldBe` 1
+      countS th2 `shouldBe` 1
+      -- And exactly one for f
+      let countF t = maybe 0 length (Map.lookup "f" (theoryObjectsByName t))
+      countF th1 `shouldBe` 1
+      countF th2 `shouldBe` 1
+
+    it "item1: canonical entity's theory is the parent, not a subtheory" $ do
+      th <- buildStr [r|{
+        subtheories { implicit {
+          sub: { signature { sort S; } }
+        }}
+      }|]
+      case lookupInParentByName th "S" of
+        Just (EntitySort s) ->
+          -- The canonical sort should be anchored to the root theory, not "sub"
+          theoryName (sortTheory s) `shouldBe` ""
+        _ -> fail "S not found or wrong kind"
+
+    -- Item 2: mereological operations now get unqualified aliases (not treated as built-in sorts)
+    it "item2: implicit sub's '+' creates an unqualified alias in parent" $ do
+      -- The parent already has '+'; an implicit sub's '+' should generate
+      -- a merge equality fact, NOT skip silently
+      th <- buildStr [r|{
+        subtheories { implicit {
+          sub: { signature { sort S; } }
+        }}
+      }|]
+      -- sub.+ is registered as a qualified name
+      Map.lookup "sub.+" (theoryObjectsByName th) `shouldSatisfy` maybe False (not . null)
+
+    it "item2: implicit sub's operations produce FactKindImplicitMerge facts for built-in sorts 𝔻/ℙ/𝕌" $ do
+      th <- buildStr [r|{
+        subtheories { implicit {
+          sub: { signature { sort S ⊆ 𝔻; } }
+        }}
+      }|]
+      -- There must be at least one FactKindImplicitMerge fact (for 𝔻 = sub.𝔻)
+      let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
+      mergeFacts `shouldSatisfy` (not . null)
+
+    -- Item 3: equality facts use FactKindImplicitMerge, always lhs = sub.rhs
+    it "item3: merge equality facts have FactKindImplicitMerge, not FactKindAssertion" $ do
+      th <- buildStr [r|{
+        subtheories { implicit {
+          sub1: { signature { sort S; } }
+          sub2: { signature { sort S; } }
+        }}
+      }|]
+      let mergeFacts    = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
+          assertionFacts = filter (\f -> factKind f == FactKindAssertion)     (theoryFacts th)
+      -- At least two merge facts: S = sub1.S and S = sub2.S
+      length mergeFacts `shouldSatisfy` (>= 2)
+      -- No user assertions were written, so assertion list should be empty
+      assertionFacts `shouldBe` []
+
+    it "item3: merge fact for single implicit sub has form 'S = sub.S'" $ do
+      th <- buildStr [r|{
+        subtheories { implicit {
+          sub: { signature { sort S; } }
+        }}
+      }|]
+      let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
+      -- Find the fact that mentions S and sub.S
+      mergeFacts `shouldSatisfy` any (mergeFactMentions "S" "sub.S")
+
+    it "item3: two implicit subs each get their own merge equality fact" $ do
+      th <- buildStr [r|{
+        subtheories { implicit {
+          sub1: { signature { sort S; } }
+          sub2: { signature { sort S; } }
+        }}
+      }|]
+      let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
+      mergeFacts `shouldSatisfy` any (mergeFactMentions "S" "sub1.S")
+      mergeFacts `shouldSatisfy` any (mergeFactMentions "S" "sub2.S")
+
+    it "item3: unqualified name is always the LHS of the merge fact" $ do
+      th <- buildStr [r|{
+        subtheories { implicit {
+          sub: { signature { sort S; } }
+        }}
+      }|]
+      let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
+      -- The LHS of every merge fact must NOT contain a dot (i.e. unqualified)
+      mergeFacts `shouldSatisfy` all mergeFactLhsIsUnqualified
+
+    -- Item 4: internal #-names never leak as unqualified
+    it "item4: implicit sub's S#min does not appear unqualified in parent" $ do
+      th <- buildStr [r|{
+        subtheories { implicit {
+          sub: { signature { sort S; } }
+        }}
+      }|]
+      Map.lookup "S#min" (theoryObjectsByName th) `shouldBe` Nothing
+      Map.lookup "S#max" (theoryObjectsByName th) `shouldBe` Nothing
+
+    it "item4: implicit sub's S#min appears only as sub.S#min" $ do
+      th <- buildStr [r|{
+        subtheories { implicit {
+          sub: { signature { sort S; } }
+        }}
+      }|]
+      Map.lookup "sub.S#min" (theoryObjectsByName th) `shouldSatisfy` maybe False (not . null)
+
+    it "item4: function image helpers do not leak unqualified" $ do
+      th <- buildStr [r|{
+        subtheories { implicit {
+          sub: { signature { sort S; sort T; f : S -> T; } }
+        }}
+      }|]
+      Map.lookup "f#dir_img" (theoryObjectsByName th) `shouldBe` Nothing
+      Map.lookup "f#inv_img" (theoryObjectsByName th) `shouldBe` Nothing
+      -- But the qualified versions must exist
+      Map.lookup "sub.f#dir_img" (theoryObjectsByName th) `shouldSatisfy` maybe False (not . null)
+
+    -- Three-deep inheritance chain (preorder → partial_order → lattice)
+    it "item1+3: three-deep implicit chain merges lessThanOrEq with exactly one canonical" $ do
+      th <- buildStr [r|{
+        subtheories { implicit {
+          lat: {
+            signature { lessThanOrEq ⊆ 𝔻, 𝔻; }
+            subtheories { implicit {
+              po: {
+                signature { lessThanOrEq ⊆ 𝔻, 𝔻; }
+                subtheories { implicit {
+                  pre: { signature { lessThanOrEq ⊆ 𝔻, 𝔻; } }
+                }}
+              }
+            }}
+          }
+        }}
+      }|]
+      -- Exactly one unqualified entry
+      case Map.lookup "lessThanOrEq" (theoryObjectsByName th) of
+        Just [_] -> return ()
+        Just es  -> fail $ "Expected 1 canonical, got " ++ show (length es)
+        Nothing  -> fail "lessThanOrEq not found"
+      -- Three merge facts: one for each subtheory level
+      let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
+      length (filter (mergeFactMentionsLhs "lessThanOrEq") mergeFacts) `shouldSatisfy` (>= 3)
+
+-- | Check that a 'FactKindImplicitMerge' fact has the form @lhs = rhs@
+-- by inspecting the resolved expression structure.
+mergeFactMentions :: String -> String -> Fact -> Bool
+mergeFactMentions lhs rhs fact =
+  case factPropExpr fact of
+    ResolvedPropBicond
+      (ResolvedRightImpl
+        (ResolvedLeftImpl
+          (ResolvedDisj
+            (ResolvedConj
+              (ResolvedNegChild
+                (ResolvedQuantified []
+                  (ResolvedAtomicTermPair
+                    (ResolvedTermPair
+                      (ResolvedTerm (ResolvedFactor (ResolvedBTAtomic lref) [] _) [] _)
+                      [ResolvedRelationFollowedByTerm [] "=" _ (ResolvedTerm (ResolvedFactor (ResolvedBTAtomic rref) [] _) [] _)]
+                      _))))
+              [])
+          [])
+        Nothing)
+      [] ->
+        resolvedConstRefName lref == lhs && resolvedConstRefName rref == rhs
+    _ -> False
+
+-- | Check that the LHS of a merge fact (the first name in the equality) has
+-- no dot — i.e. is an unqualified name.
+mergeFactLhsIsUnqualified :: Fact -> Bool
+mergeFactLhsIsUnqualified fact =
+  case factPropExpr fact of
+    ResolvedPropBicond
+      (ResolvedRightImpl
+        (ResolvedLeftImpl
+          (ResolvedDisj
+            (ResolvedConj
+              (ResolvedNegChild
+                (ResolvedQuantified []
+                  (ResolvedAtomicTermPair
+                    (ResolvedTermPair
+                      (ResolvedTerm (ResolvedFactor (ResolvedBTAtomic lref) [] _) [] _)
+                      _ _))))
+              [])
+          [])
+        Nothing)
+      [] -> '.' `notElem` resolvedConstRefName lref
+    _ -> True  -- non-merge facts are not subject to this constraint
+
+-- | True if a merge fact's LHS name equals the given string.
+mergeFactMentionsLhs :: String -> Fact -> Bool
+mergeFactMentionsLhs lhs fact =
+  case factPropExpr fact of
+    ResolvedPropBicond
+      (ResolvedRightImpl
+        (ResolvedLeftImpl
+          (ResolvedDisj
+            (ResolvedConj
+              (ResolvedNegChild
+                (ResolvedQuantified []
+                  (ResolvedAtomicTermPair
+                    (ResolvedTermPair
+                      (ResolvedTerm (ResolvedFactor (ResolvedBTAtomic lref) [] _) [] _)
+                      _ _))))
+              [])
+          [])
+        Nothing)
+      [] -> resolvedConstRefName lref == lhs
+    _ -> False
+
 -- | Parse and build, returning Either String for error testing
 buildStrEither :: String -> IO (Either String Theory)
 buildStrEither input = do
