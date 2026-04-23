@@ -1,0 +1,24 @@
+==============================================
+How the Eidos compiler adds things to theories
+==============================================
+
+Although the Eidos compiler has (or will have) the ability to translate Eidos into Lean 4, the compiler will also 'decorate' theories by adding objects and facts that are seen as 'elaborations' of what was given to the compiler. For example, facts of the kinds FactKindSortLimitation or FactKindImplicitMerge fall in this category.
+
+This ties into the basic philosophy of Eidos that logics such as (classical or intuitionistic) first-order or second-order logic are to be understood in a /mereological/ way. For example, a sort S is represented internally via two mereological objects: S#min and S#max.
+
+As an alternative to generating output in Lean 4, the user can request output in Eidos itself, with the result being that you get to see the elaborated version of the input.
+
+From the viewpoint of Eidos, the mereological interpretation of a theory is what is truly important while things such as sorts, FOL functions, and SOL functions are 'syntactic sugar' on top of the mereological core. Elaboration of a theory makes the mereological view explicit.
+
+The compilation into Lean 4 was originally meant to only include the mereological view, but a decision has been taken to additionally translate mathematical theories that correspond roughly to what the user might have written directly in Lean 4. For example, a sort in Eidos will be translated into a type in Lean 4.
+
+In addition, the two views are to be correlated in Lean 4 in such a way that you can go back and forth between them. This is non-trivial but doable. (There will need to be a library in Lean 4 with things that support the translation, something like a 'runtime library'.)
+
+While the Eidos implementation adds things to theories, it should also 'tag' the added things in one way or another so that it is easy to understand where each thing came from.
+
+What exactly is it that gets added?
+* Every sort S gives rise to two mereological objects S#min and S#max. And here there are also related facts: When viewed as as mereological object, anything of sort S needs to be between S#min and S#max.
+* Every theory gives rise to a sort 𝕌 which encompasses all the mereological objects of the theory. Every mereological object in the theory needs to be between S#min and S#max.
+* Propositions, sets, and individuals may all be viewed as mereological objects as far as Eidos is concerned. This is implicit in how everything is represented internally and means, for example, that a proposition needs to be between ℙ#min and ℙ#max and that ∧ (conjunction) expresses the binary mereological sum of two objects.
+* An $n$-ary function/relation for $n > 1$ implicitly involves a product sort as the real domain of the funtion. The Eidos implementation will add that sort along with projection functions. There is even support in the Eidos language for referring to the domain (f#dom is the domain of f).
+* 
