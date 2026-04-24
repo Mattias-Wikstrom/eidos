@@ -387,7 +387,7 @@ pQuantified = do
   return $ Quantified qs a
 
 pQuantifier :: Parser Quantifier
-pQuantifier =
+pQuantifier = between lbrack rbrack $
       QForall <$> (forallOp *> pVarDecl)
   <|> QExists <$> (existsOp *> pVarDecl)
 
