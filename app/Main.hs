@@ -13,6 +13,7 @@ import           Eidos.IR as IR
 
 import           Eidos.Export.JSON      (exportTheoryToJSONString)
 import           Eidos.Export.LeanProps (exportToLeanProps)
+import Eidos.Export.LeanMereo (exportToLeanMereo)
 
 main :: IO ()
 main = do
@@ -109,6 +110,22 @@ main = do
               putStrLn $ prettyTheory theory
               exitSuccess
     
+    ["--lean_using_mereo", filePath] -> do
+      result <- parseFile filePath
+      case result of
+        Left err -> do
+          IO.hPutStrLn IO.stderr ("Parse error: " ++ show err)
+          exitFailure
+        Right ast -> do
+          irResult <- buildTheoryFromFile filePath ast
+          case irResult of
+            Left buildErr -> do
+              IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
+              exitFailure
+            Right theory -> do
+              putStrLn $ exportToLeanMereo theory
+              exitSuccess
+
     ["--pretty", filePath] -> do
       result <- parseFile filePath
       case result of
@@ -144,6 +161,7 @@ main = do
       IO.hPutStrLn IO.stderr "  eidos-parser --pure <file.theory>       # Parse and build IR (pure mode, no external files)"
       IO.hPutStrLn IO.stderr "  eidos-parser --pretty <file.theory>     # Parse and pretty-print AST"
       IO.hPutStrLn IO.stderr "  eidos-parser --lean_using_props <file.theory>  # Export propositional theory to Lean 4 (all Props strategy)"
+      IO.hPutStrLn IO.stderr "  eidos-parser --lean_using_mereo <file.theory>   # Generate Lean 4 code for mereological theories"
       IO.hPutStrLn IO.stderr "  eidos-parser --json <file.theory>             # Export IR as JSON"
       IO.hPutStrLn IO.stderr "  eidos-parser --json --compact <file.theory>   # Export IR as compact JSON"
       exitFailure
