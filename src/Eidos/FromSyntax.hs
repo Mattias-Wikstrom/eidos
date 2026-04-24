@@ -275,19 +275,28 @@ buildSignatureItem th0 th item = do
       s <- either throwError return $ lookupSortByExpr th sortExprAST
       let th' = markTheorySortExprUsage th sortExprAST
       let isPropSort = sortKind s == SortKindProp
+      let isUniverseSort = sortKind s == SortKindUniverse
+      
+      -- Naming rules:
+      -- - Propositions (ℙ): must start with uppercase
+      -- - Mereological objects (𝕌): can start with either case
+      -- - Individuals (other sorts): must start with lowercase
       when (isPropSort && not (firstLetterIsUppercase nm)) $
         throwError $ "Proposition names must start with uppercase: " ++ nm
-      when (not isPropSort && firstLetterIsUppercase nm) $
+      when (not isPropSort && not isUniverseSort && firstLetterIsUppercase nm) $
         throwError $ "Individual names must start with lowercase: " ++ nm
+      
       let moKind =
             if isPropSort
               then MereologicalEntityKindProposition
-              else MereologicalEntityKindIndividual
-          mo = mkMereo th' moKind nm s FromSignature
+              else if isUniverseSort
+                then MereologicalEntityKindMereological  -- New kind for bare mereological objects
+                else MereologicalEntityKindIndividual
       
+      let mo = mkMereo th' moKind nm s FromSignature
       shouldInsert <- shouldInsertDeclaration nm (EntityMereological mo)
       return (if shouldInsert then addEntityToTh th' (EntityMereological mo) else th')
-
+    
     SigSet (SetDeclaration nm domainExprs) -> do
       when (not (firstLetterIsUppercase nm)) $
         throwError $ "Set/relation names must start with uppercase: " ++ nm
