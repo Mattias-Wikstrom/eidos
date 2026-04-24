@@ -23,8 +23,6 @@
   },
   axioms {
     assertions {
-      D_max = D.max;
-      D_min = D.min;
       D_max ∪ D_min = D_min ∪ D_max;
       D_max ∩ D_min = D_min ∩ D_max;
       D_min ⊆ D_max;
