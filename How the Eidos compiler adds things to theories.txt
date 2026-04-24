@@ -21,4 +21,5 @@ What exactly is it that gets added?
 * Every theory gives rise to a sort 𝕌 which encompasses all the mereological objects of the theory. Every mereological object in the theory needs to be between S#min and S#max.
 * Propositions, sets, and individuals may all be viewed as mereological objects as far as Eidos is concerned. This is implicit in how everything is represented internally and means, for example, that a proposition needs to be between ℙ#min and ℙ#max and that ∧ (conjunction) expresses the binary mereological sum of two objects.
 * An $n$-ary function/relation for $n > 1$ implicitly involves a product sort as the real domain of the funtion. The Eidos implementation will add that sort along with projection functions. There is even support in the Eidos language for referring to the domain (f#dom is the domain of f).
-* 
+* Every FOL function gives rise to two SOL functions behind the scenes. The mathematical idea is well-known: A function f:A -> B between two sets A and B gives rise to a 'direct image function' from the powerset of A to the powerset of B as well as an 'inverse image function' from the powerset of B to the powerset of A.
+
