@@ -101,7 +101,7 @@ main = hspec $ do
         parseString "{ subtheories { named { sub1: @ext1 sub2: @ext2 } } }" `shouldSatisfy` isRight
       
       it "parses mixed subtheory blocks" $
-        parseString "{ subtheories { implicit { sub1: { signature { sort Q; } } } named { sub2: @ext } reflection { sub3: { signature { sort Z; } } } } }" `shouldSatisfy` isRight
+        parseString "{ subtheories { implicit { sub1: { signature { sort Q; } } }, named { sub2: @ext }, reflection { sub3: { signature { sort Z; } } } } }" `shouldSatisfy` isRight
       
       it "parses subtheory with inline body" $
         parseString "{ subtheories { implicit { sub: { signature { sort Q; } } } } }" `shouldSatisfy` isRight
@@ -278,19 +278,19 @@ main = hspec $ do
                 sections1 `shouldBe` sections2
 
       it "rejects duplicate named sections in subtheories" $
-        parseString "{ subtheories { named { sub1: {} } named { sub2: {} } } }"
+        parseString "{ subtheories { named { sub1: {} }, named { sub2: {} } } }"
           `shouldSatisfy` isLeft
 
       it "rejects duplicate implicit sections" $
-        parseString "{ subtheories { implicit { { } } implicit { { } } } }"
+        parseString "{ subtheories { implicit { { } }, implicit { { } } } }"
           `shouldSatisfy` isLeft
 
       it "rejects duplicate reflection sections" $
-        parseString "{ subtheories { reflection { sub1: {} } reflection { sub2: {} } } }"
+        parseString "{ subtheories { reflection { sub1: {} }, reflection { sub2: {} } } }"
           `shouldSatisfy` isLeft
 
       it "accepts mixed distinct sections" $
-        parseString "{ subtheories { implicit { sub: { } } named { sub1: {} } reflection { sub2: {} } } }"
+        parseString "{ subtheories { implicit { sub: { } }, named { sub1: {} }, reflection { sub2: {} } } }"
           `shouldSatisfy` isRight
                 
       it "rejects repeated subtheory names for subtheories of the same kind" $
@@ -298,7 +298,7 @@ main = hspec $ do
           `shouldSatisfy` isLeft
           
       it "rejects repeated subtheory names for subtheories of different kinds" $
-        parseString "{ subtheories { named { sub: {} } reflection { sub: {} } } }"
+        parseString "{ subtheories { named { sub: {} }, reflection { sub: {} } } }"
           `shouldSatisfy` isLeft
           
     describe "Suffix syntax" $ do
