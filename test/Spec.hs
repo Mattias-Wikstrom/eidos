@@ -176,10 +176,10 @@ main = hspec $ do
     describe "Quantified formulas" $ do
 
       it "accepts ∀ over individual" $
-        expectSuccess $ run "{ signature { sort S; } axioms { assertions { ∀x:S x =_S x; } } }"
+        expectSuccess $ run "{ signature { sort S; } axioms { assertions { [∀x:S] x =_S x; } } }"
 
       it "accepts ∀ over set" $
-        expectSuccess $ run "{ signature { sort S; } axioms { assertions { ∀x⊆S x ⊆ x; } } }"
+        expectSuccess $ run "{ signature { sort S; } axioms { assertions { [∀x⊆S] x ⊆ x; } } }"
 
       it "accepts ∃ over proposition" $
         pendingWith "Proposition-typed quantifier variables not registered in variable context"

@@ -600,7 +600,7 @@ main = hspec $ do
               MySet ⊆ S;
             }
             axioms {
-              assertions { ∀x:S x ∈ MySet; }
+              assertions { [∀x:S] x ∈ MySet; }
             }
           }
         |]

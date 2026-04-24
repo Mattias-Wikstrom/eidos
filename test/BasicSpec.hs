@@ -79,7 +79,10 @@ main = hspec $ do
         parseString "{ assertions { ⊤; } }" `shouldSatisfy` isRight
       
       it "parses quantified formulas" $
-        parseString "{ axioms { assertions { ∀x:S x =_S x; } } }" `shouldSatisfy` isRight
+        parseString "{ axioms { assertions { [∀x:S] x =_S x; } } }" `shouldSatisfy` isRight
+
+      it "rejects quantified formulas without quantifier brackets" $
+        parseString "{ axioms { assertions { ∀x:S x =_S x; } } }" `shouldSatisfy` isLeft
       
       it "parses formulas with connectives" $
         parseString "{ axioms { assertions { P → Q ∧ R; } } }" `shouldSatisfy` isRight
@@ -133,8 +136,8 @@ main = hspec $ do
             },
             axioms {
                 assertions {
-                    [x : sub.S]∀z : S ∃y : S (y ⊆ y)↔((x ⊆ y)→((z ⊆ y)←((y ⊆ y)∨(y ⊆ y))));
-                    [x : sub.S][y : sub.S](y ⊆ y)↔((y ⊆ <<sub>>(∃y : S y))→((f(y, y) ⊆ f(f(x, x), y))←((y ⊆ y)∨(y ⊆ y))));
+                    [x : sub.S][∀z : S][∃y : S] (y ⊆ y)↔((x ⊆ y)→((z ⊆ y)←((y ⊆ y)∨(y ⊆ y))));
+                    [x : sub.S][y : sub.S](y ⊆ y)↔((y ⊆ <<sub>>([∃y : S] y))→((f(y, y) ⊆ f(f(x, x), y))←((y ⊆ y)∨(y ⊆ y))));
                     [x : Q][y ⊆ Q](y ⊆ y)↔(y = y);
                     [x : S][y : S] f(y, x) =_S f(x, y);
                     ⊥ ∨ ¬sub.⊤;
@@ -211,7 +214,7 @@ main = hspec $ do
              [x : E] [y : E] ring.prod(x, y) = multiplicative_group.op(x, y);
            },
            assertions {
-             [x : D] (x = 0) ∨ ∃y:E x=y; // Any element is either zero or non-zero
+             [x : D] (x = 0) ∨ [∃y:E] x=y; // Any element is either zero or non-zero
            }
          }
         }|] `shouldSatisfy` isRight

@@ -304,7 +304,7 @@ pSubtheoryDef =
 pPropExprInclVars :: Parser PropExprInclVars
 pPropExprInclVars = do
   pos <- getSourcePos
-  vars <- many (void lbrack *> pVarDecl <* void rbrack)
+  vars <- many (try (void lbrack *> pVarDecl <* void rbrack))
   expr <- pPropExpr
   return $ PropExprInclVars (unPos $ sourceLine pos) (unPos $ sourceColumn pos) vars expr
 
@@ -387,7 +387,7 @@ pQuantified = do
   return $ Quantified qs a
 
 pQuantifier :: Parser Quantifier
-pQuantifier =
+pQuantifier = between lbrack rbrack $
       QForall <$> (forallOp *> pVarDecl)
   <|> QExists <$> (existsOp *> pVarDecl)
 
