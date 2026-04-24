@@ -10,6 +10,7 @@ Things to Be Done
   .reg.theory -- Regular logic
   .eq.theory -- Equational logic (P is not allowed; can use facts but not assumptions)
   .prop.theory -- Propositional logic
+  .mereo.theory -- Purely mereological theory (logical constructs are not allowed)
   (Note that these restrictions need to be enforced for subtheories as well as the theory itself.) 
 
 * A theory should only have D ('the domain') if it either uses it or gets it through an implicit import. Same thing for P ('propositions').
