@@ -22,7 +22,7 @@ This document describes the **current concrete syntax** accepted by the Haskell 
 <argNr>           ::= "0".."9"+
 
 (* structural keywords are reserved and cannot be parsed as <ident> in most positions: *)
-(* signature axioms assertions Assertions facts metafacts subtheories named sort *)
+(* signature axioms assertions facts metafacts subtheories named sort *)
 (* implicit reflection subquotient subsort quotient *)
 ```
 
@@ -76,7 +76,7 @@ This document describes the **current concrete syntax** accepted by the Haskell 
 <axioms-wrapper>   ::= "axioms" "{" <axioms-section> ("," <axioms-section>)* [","] "}"
 <axioms-section>   ::= <assertions-section> | <facts-section> | <metafacts-section>
 
-<assertions-section> ::= ("assertions" | "Assertions") "{" (<prop-expr-incl-vars> ";")* "}"
+<assertions-section> ::= "assertions" "{" (<prop-expr-incl-vars> ";")* "}"
 <facts-section>      ::= "facts"      "{" (<prop-expr-incl-vars> ";")* "}"
 <metafacts-section>  ::= "metafacts"  "{" (<prop-expr-incl-vars> ";")* "}"
 
@@ -186,11 +186,8 @@ Lowest precedence at top, highest at bottom.
 ## 9) Term suffixes
 
 ```bnf
-<term-suffix>      ::= "." <dot-attr-keyword>
-                     | <call-suffix>
+<term-suffix>      ::= <call-suffix>
                      | "#" <hash-attr-keyword>
-
-<dot-attr-keyword> ::= "min" | "max"
 
 <hash-attr-keyword> ::= "min" | "max" | "res" | "arg" | "dom"
                       | "set" | "individual" | "mereological" | "proposition"
@@ -203,6 +200,6 @@ Lowest precedence at top, highest at bottom.
 
 - `subtheories` currently **requires explicit names** for all items and requires items to occur inside `named { ... }`, `implicit { ... }`, or `reflection { ... }` blocks.
 - Duplicate aliases and duplicate group keywords in one `subtheories` section are rejected by the parser.
-- `assertions` and `Assertions` are both accepted.
+- Only lowercase `assertions` is accepted.
 - Optional sort qualifiers (`_S`, `^S`) are parsed after any relation operator, not only `=`.
 - In generalized sums/products, a bare variable form and typed variable form are both accepted (`Σx(...)` and `Σx:S(...)` / `Σx⊆S(...)`).

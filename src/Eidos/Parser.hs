@@ -182,7 +182,7 @@ pAxiomsSection =
 pAssertionsSection :: Parser AssertionsSection
 pAssertionsSection =
   AssertionsSection <$>
-    ((try kwAssertions <|> kwAssertionsCap) *>
+    (kwAssertions *>
       between lbrace rbrace (many (pPropExprInclVars <* semi)))
 
 pFactsSection :: Parser FactsSection
@@ -540,13 +540,8 @@ pConstRefToken =
 
 pTermSuffix :: Parser TermSuffix
 pTermSuffix =
-      SuffixDotAttr   <$> try (dot *> pDotAttrKeyword)
-  <|> SuffixCall      <$> try pCallSuffix
+      SuffixCall      <$> try pCallSuffix
   <|> SuffixSpecialOp <$> (hash *> pHashAttrKeyword)
-
-pDotAttrKeyword :: Parser String
-pDotAttrKeyword =
-      try kwMin <|> kwMax
 
 pHashAttrKeyword :: Parser String
 pHashAttrKeyword =
