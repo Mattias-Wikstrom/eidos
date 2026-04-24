@@ -1,0 +1,20 @@
+{
+  signature {
+    A : 𝕌;
+    P1 : 𝕌;
+    P2 : 𝕌;
+    Q : 𝕌;
+    MyOtherMereologicalObject : 𝕌;
+    MyMereologicalObject : 𝕌;
+  },
+  axioms {
+    metafacts {
+      P1 × Q;
+      P1 × P2;
+      (MyMereologicalObject + (A - P1)) - Q;
+      (A - P2) ∸ (A - MyMereologicalObject);
+      [X : 𝕌] ((A - (A - X)) - X);
+      Q - P1;
+    }
+  }
+}
