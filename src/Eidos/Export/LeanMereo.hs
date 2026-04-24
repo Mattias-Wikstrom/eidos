@@ -183,41 +183,55 @@ renderTermPair (IR.ResolvedTermPair lhs rights _) =
   let leftStr = renderTerm lhs
   in case rights of
        [] -> leftStr
-       _ -> let rightStrs = map (renderRelationFollowedByTermWithLeft leftStr) rights
-            in "(" ++ intercalate " " (leftStr : rightStrs) ++ ")"
+       _ -> renderTermPairChain leftStr rights
 
-renderRelationFollowedByTermWithLeft :: String -> IR.ResolvedRelationFollowedByTerm -> String
-renderRelationFollowedByTermWithLeft leftStr rfbt =
+-- Render a chain of (left op right) pairs, handling - swap correctly.
+-- For non-minus ops:  left OP right1 OP right2  => (left OP right1 OP right2)
+-- For minus:          left - right               => (right → left)
+renderTermPairChain :: String -> [IR.ResolvedRelationFollowedByTerm] -> String
+renderTermPairChain leftStr [rfbt] =
   let op = IR.resolvedRFTOp rfbt
       right = renderTerm (IR.resolvedRFTRight rfbt)
   in case op of
-       "+"  -> "∧ " ++ right
-       "×"  -> "∨ " ++ right
-       "-"  -> right ++ " → " ++ leftStr   -- A - B becomes B → A
-       "∸"  -> "↔ " ++ right
-       "="  -> "↔ " ++ right
-       "≤"  -> "→ " ++ right
-       _    -> op ++ " " ++ right
+       "+"  -> "(" ++ leftStr ++ " ∧ " ++ right ++ ")"
+       "×"  -> "(" ++ leftStr ++ " ∨ " ++ right ++ ")"
+       "-"  -> "(" ++ right ++ " → " ++ leftStr ++ ")"   -- A - B becomes B → A
+       "∸"  -> "(" ++ leftStr ++ " ↔ " ++ right ++ ")"
+       "="  -> "(" ++ leftStr ++ " ↔ " ++ right ++ ")"
+       "≤"  -> "(" ++ leftStr ++ " → " ++ right ++ ")"
+       _    -> "(" ++ leftStr ++ " " ++ op ++ " " ++ right ++ ")"
+renderTermPairChain leftStr (rfbt : rest) =
+  -- For chains, fold left-to-right treating the result as the new leftStr
+  let op = IR.resolvedRFTOp rfbt
+      right = renderTerm (IR.resolvedRFTRight rfbt)
+      combined = case op of
+                   "+"  -> "(" ++ leftStr ++ " ∧ " ++ right ++ ")"
+                   "×"  -> "(" ++ leftStr ++ " ∨ " ++ right ++ ")"
+                   "-"  -> "(" ++ right ++ " → " ++ leftStr ++ ")"
+                   "∸"  -> "(" ++ leftStr ++ " ↔ " ++ right ++ ")"
+                   "="  -> "(" ++ leftStr ++ " ↔ " ++ right ++ ")"
+                   "≤"  -> "(" ++ leftStr ++ " → " ++ right ++ ")"
+                   _    -> "(" ++ leftStr ++ " " ++ op ++ " " ++ right ++ ")"
+  in renderTermPairChain combined rest
+renderTermPairChain leftStr [] = leftStr
 
 renderTerm :: IR.ResolvedTerm -> String
 renderTerm (IR.ResolvedTerm lhs [] _) = renderFactor lhs
 renderTerm (IR.ResolvedTerm lhs rests _) =
-  let base = renderFactor lhs
-  in case rests of
-       [] -> base
-       _ -> let ops = map (renderOpFactorWithLeft base) rests
-            in "(" ++ intercalate " " (base : ops) ++ ")"
+  renderTermChain (renderFactor lhs) rests
 
-renderOpFactorWithLeft :: String -> IR.ResolvedOperationFollowedByFactor -> String
-renderOpFactorWithLeft leftStr off =
+renderTermChain :: String -> [IR.ResolvedOperationFollowedByFactor] -> String
+renderTermChain leftStr [] = leftStr
+renderTermChain leftStr (off : rest) =
   let op = IR.resolvedOFFOp off
       right = renderFactor (IR.resolvedOFFRight off)
-  in case op of
-       "+"  -> "∧ " ++ right
-       "×"  -> "∨ " ++ right
-       "-"  -> right ++ " → " ++ leftStr   -- A - B becomes B → A
-       "∸"  -> "↔ " ++ right
-       _    -> op ++ " " ++ right
+      combined = case op of
+                   "+"  -> "(" ++ leftStr ++ " ∧ " ++ right ++ ")"
+                   "×"  -> "(" ++ leftStr ++ " ∨ " ++ right ++ ")"
+                   "-"  -> "(" ++ right ++ " → " ++ leftStr ++ ")"  -- A - B becomes B → A
+                   "∸"  -> "(" ++ leftStr ++ " ↔ " ++ right ++ ")"
+                   _    -> "(" ++ leftStr ++ " " ++ op ++ " " ++ right ++ ")"
+  in renderTermChain combined rest
 
 renderFactor :: IR.ResolvedFactor -> String
 renderFactor (IR.ResolvedFactor base [] _) = renderBaseTerm base
