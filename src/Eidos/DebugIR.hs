@@ -21,6 +21,8 @@ dumpTheoryIR = go 0
       unlines $
         [ ind level ++ "Theory " ++ renderTheoryName th
         , ind (level + 1) ++ "reflection: " ++ show (theoryReflection th)
+        , ind (level + 1) ++ "uses 𝔻: " ++ show (theoryUsesDomain th)
+        , ind (level + 1) ++ "uses ℙ: " ++ show (theoryUsesProp th)
         , ind (level + 1) ++ "parent: " ++ maybe "<none>" theoryFullyQualifiedName (theoryParent th)
         , ind (level + 1) ++ "closest reflection ancestor: " ++ maybe "<none>" theoryFullyQualifiedName (theoryClosestReflectionAncestor th)
         , ind (level + 1) ++ "object count: " ++ show (length (theoryObjects th))

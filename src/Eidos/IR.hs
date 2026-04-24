@@ -208,6 +208,8 @@ data Theory = Theory
   , theoryName                      :: String
   , theoryFullyQualifiedName        :: String
   , theoryReflection                :: Bool
+  , theoryUsesDomain                :: Bool
+  , theoryUsesProp                  :: Bool
   , theoryClosestReflectionAncestor :: Maybe Theory
   , theorySubtheories               :: [Theory]
   , theoryObjects                   :: [Entity]
