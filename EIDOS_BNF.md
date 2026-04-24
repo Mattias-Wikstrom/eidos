@@ -45,18 +45,16 @@ This document describes the **current concrete syntax** accepted by the Haskell 
 
 <signature-item>    ::= <simple-sort-decl>
                       | <relational-sort-decl>
-                      | <set-decl>
+                      | <set-or-rel-decl>
                       | <function-decl>
-                      | <relation-decl>
                       | <individual-decl>
 
 <simple-sort-decl>     ::= "sort" <ident> ";"
 <relational-sort-decl> ::= <ident> ("subquotient" | "subsort" | "quotient") <sort-expr> ";"
 
 <function-decl>    ::= <ident> ":" <sort-expr> ("," <sort-expr>)* "→" <sort-expr> ";"
-<relation-decl>    ::= <ident> ":" <sort-expr> "," <sort-expr> ("," <sort-expr>)* ";"
 <individual-decl>  ::= <ident> ":" <sort-expr> ";"
-<set-decl>         ::= <ident> "⊆" <sort-expr> ("," <sort-expr>)* ";"
+<set-or-rel-decl>  ::= <ident> "⊆" <sort-expr> ("," <sort-expr>)* ";"
 ```
 
 ## 4) Sort expressions
@@ -209,4 +207,3 @@ Lowest precedence at top, highest at bottom.
 - `assertions` and `Assertions` are both accepted.
 - Optional sort qualifiers (`_S`, `^S`) are parsed after any relation operator, not only `=`.
 - In generalized sums/products, a bare variable form and typed variable form are both accepted (`Σx(...)` and `Σx:S(...)` / `Σx⊆S(...)`).
-
