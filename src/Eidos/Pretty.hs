@@ -298,7 +298,7 @@ prettySubtheoryDef def =
     SubtheoryBody body ->
       "{" ++ "\n" ++ prettyTheoryBodyWithOpts defaultPrettyOptions body ++ "\n}"
     SubtheoryExternalRef ref ->
-      "@" ++ ref   -- Changed from "[[" ++ ref ++ "]]"
+      "@" ++ ref
 
 -- ---------------------------------------------------------------------------
 -- Proposition pretty-printing (AST)
