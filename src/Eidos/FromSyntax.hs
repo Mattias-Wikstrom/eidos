@@ -294,6 +294,8 @@ buildSignatureItem th0 th item = do
           return (if shouldInsert then addEntityToTh th (EntityRelation rel) else th)
 
     SigRelation (RelationDeclaration nm first rest) -> do
+      when (not (firstLetterIsUppercase nm)) $
+        throwError $ "Set/relation names must start with uppercase: " ++ nm
       argSorts <- mapM (liftLookup (lookupSortByExpr th)) (first : rest)
       let rel = mkRelation th nm argSorts FromSignature
       shouldInsert <- shouldInsertDeclaration nm (EntityRelation rel)
