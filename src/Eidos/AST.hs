@@ -306,7 +306,7 @@ data ConstantRef = ConstantRef
   } deriving (Show, Eq)
 
 data TermSuffix
-  = SuffixDotAttr  String     -- ".min" | ".max" | ".res" | ".arg" | ".dom"
+  = SuffixDotAttr  String     -- legacy dot-attributes (currently unsupported by parser)
   | SuffixCall     CallSuffix
   | SuffixSpecialOp String    -- "#min" | "#max" | "#set" | "#1" | …
   deriving (Show, Eq)
