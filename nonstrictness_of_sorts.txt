@@ -1,0 +1,16 @@
+====================================
+The Non-Strictness of Sorts in Eidos
+====================================
+
+Eidos may look at first like a strongly typed language, with sorts in the language and with each function/relation having a sorting. But there is an underlying mereological level that is unsorted/single-sorted and a function/relation can be applied to arguments that fail to fall within its sorts.
+
+An analogy is how typing in TypeScript has JavaScript as an underlying layer where types do not exist. The type 'any' can be used in TypeScript to get the underlying untyped view, and Eidos similarly allows one to use #mereological to view a set/individual/proposition as nothing more than a mereological object.
+
+Applying a function/relation to arguments outside its sorts has the same effect as first projecting the arguments into their respective sorts and then applying the function/relation after that. Any object can be projected onto any sort via this construction:
+<projection-to-sort>
+                   ::= "<" <sort-expr> ">" "(" <term> ")"
+
+<S>(obj) may be thought of as short for <S#min, S#max>(obj) (which illustrates how sorts do not appear at the more fundamental level). The BNF syntax for the latter is as follows:
+<projection-to-interval>
+                   ::= "<" <term> "," <term> ">" "(" <term> ")"
+
