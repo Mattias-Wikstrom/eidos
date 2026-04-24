@@ -68,6 +68,9 @@ main = hspec $ do
     describe "Axioms" $ do
       it "parses assertions section" $
         parseString "{ axioms { assertions { ⊤; } } }" `shouldSatisfy` isRight
+
+      it "rejects capitalized Assertions section keyword" $
+        parseString "{ axioms { Assertions { ⊤; } } }" `shouldSatisfy` isLeft
       
       it "parses facts section" $
         parseString "{ axioms { facts { ⊤; } } }" `shouldSatisfy` isRight
@@ -327,12 +330,11 @@ main = hspec $ do
       it "rejects .dom as a dot-attribute suffix" $
         parseString "{ axioms { assertions { (f).dom = (f).dom; } } }" `shouldSatisfy` isLeft
 
-      -- .min and .max remain valid dot-attr alternatives
-      it "accepts .min as a dot-attribute suffix" $
-        parseString "{ axioms { assertions { S.min ≤ S.max; } } }" `shouldSatisfy` isRight
+      it "rejects .min as a dot-attribute suffix" $
+        parseString "{ axioms { assertions { S.min ≤ S.max; } } }" `shouldSatisfy` isLeft
 
-      it "accepts .max as a dot-attribute suffix" $
-        parseString "{ axioms { assertions { S.max = S.max; } } }" `shouldSatisfy` isRight
+      it "rejects .max as a dot-attribute suffix" $
+        parseString "{ axioms { assertions { S.max = S.max; } } }" `shouldSatisfy` isLeft
 
     describe "Subtheory structure" $ do
       -- Bare items at top level of subtheories {} are not allowed
