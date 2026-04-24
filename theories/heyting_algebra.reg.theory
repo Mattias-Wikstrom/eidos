@@ -10,8 +10,8 @@
   },
   axioms {
     assertions {
-      [x : D] [y : D] lessThanOrEq(meet(x, heyting_complement(x, y)), y);
-      [x : D] [y : D] [z : D] lessThanOrEq(meet(x, z), y) → lessThanOrEq(z, heyting_complement(x, y));
+      [x : D] [y : D] LessThanOrEq(meet(x, heyting_complement(x, y)), y);
+      [x : D] [y : D] [z : D] LessThanOrEq(meet(x, z), y) → LessThanOrEq(z, heyting_complement(x, y));
     }
   }
 }

@@ -137,11 +137,11 @@ For example, <<sub>>(f(i)) will look in sub instead of the main theory when evat
 
 
 From a conversation with an AI:
-"'And distributive_lattice.reg.theory imports lattice, which imports lower_semi_lattice and upper_semi_lattice, which import partial_order, which imports preorder. Both partial_order and preorder define lessThanOrEq, causing ambiguity.'
+"'And distributive_lattice.reg.theory imports lattice, which imports lower_semi_lattice and upper_semi_lattice, which import partial_order, which imports preorder. Both partial_order and preorder define LessThanOrEq, causing ambiguity.'
 
 
 This raises the question of 
-You've raised a profound point about the philosophy of the language. In mathematics, ≤ in a preorder and ≤ in a partial order are the same concept (reflexive, transitive) – the partial order just adds antisymmetry. So having both define lessThanOrEq is not ambiguous; it's refinement.
+You've raised a profound point about the philosophy of the language. In mathematics, ≤ in a preorder and ≤ in a partial order are the same concept (reflexive, transitive) – the partial order just adds antisymmetry. So having both define LessThanOrEq is not ambiguous; it's refinement.
 The design principle
 In Eidos, when an implicit subtheory defines an entity with the same name as an entity already present (from another implicit subtheory or the parent), we have two options:
 Ambiguity error – treat them as different entities that happen to have the same name
@@ -163,16 +163,16 @@ Same thing with ℙ and with 𝕌.
 The equality can be used in proofs
 It works for both built-ins and user-defined entities"
 
-"When partial_order tries to add its lessThanOrEq, we add an equality fact: preorder.lessThanOrEq = partial_order.lessThanOrEq"
+"When partial_order tries to add its LessThanOrEq, we add an equality fact: preorder.LessThanOrEq = partial_order.LessThanOrEq"
 
 "This would lead, though, to a lack of symmetry.
 What is needed instead is one identity for each propagation:
-lessThanOrEq = preorder.lessThanOrEq 
-lessThanOrEq = partial_order.lessThanOrEq
+LessThanOrEq = preorder.LessThanOrEq 
+LessThanOrEq = partial_order.LessThanOrEq
 You're absolutely correct. The equality should be between the unqualified name (which resolves to the parent's entity) and the qualified name (the subtheory's entity). This creates a chain of equalities:
-lessThanOrEq = preorder.lessThanOrEq
-lessThanOrEq = partial_order.lessThanOrEq
-From these, it follows that preorder.lessThanOrEq = partial_order.lessThanOrEq (by transitivity), but that's a derived fact, not an explicit one."
+LessThanOrEq = preorder.LessThanOrEq
+LessThanOrEq = partial_order.LessThanOrEq
+From these, it follows that preorder.LessThanOrEq = partial_order.LessThanOrEq (by transitivity), but that's a derived fact, not an explicit one."
 
 "
 'If an entity exists and it's compatible → skip adding (merge)'
@@ -188,14 +188,14 @@ Add an equality fact connecting them: existing = sub.entity
 
 "The core problem
 We have two conflicting requirements:
-User-defined entities (like lessThanOrEq) should be merged when they refine the same concept (preorder → partial order)
+User-defined entities (like LessThanOrEq) should be merged when they refine the same concept (preorder → partial order)
 User-defined entities should not be merged when they are truly different concepts (two different sorts both named S)
-The current approach (adding unqualified names for all) treats lessThanOrEq from preorder and lessThanOrEq from partial_order as separate entities, causing ambiguity.
+The current approach (adding unqualified names for all) treats LessThanOrEq from preorder and LessThanOrEq from partial_order as separate entities, causing ambiguity.
 The solution: Track entity identity
 We need to know when two entities are the "same concept" (should merge) vs different concepts (should cause ambiguity). For mathematical theories, entities with the same name from different theories in an inheritance chain should merge."
 
 "Maybe the code should check if they are 100% compatible and merge them in that case? 
-For example, lessThanOrEq could have different arities in different theories, and merge makes no sense in that case.
+For example, LessThanOrEq could have different arities in different theories, and merge makes no sense in that case.
 You've identified the key insight. Two entities should be merged only if they are compatible:
 Same entity kind (both sorts, both functions, both relations)
 Same arity (for functions/relations)
@@ -215,7 +215,7 @@ If they are compatible, they represent the same concept and should be merged. If
 What is wrong with the current version of propagateSubtheory?
 
 It seems to be adding way too many identities for implicit subtheories. Those that suffice: 𝔻 = sub.𝔻, ℙ = sub.ℙ, 𝕌=sub.𝕌.
-The order in which subtheories are processed must not matter. The code is not allowed to make the first encounter of something 'win'. For this reason, something like the following may be needed: "The unqualified name should store a list of aliases (or sources) rather than a single entity. This captures the provenance and allows the system to know that lessThanOrEq came from multiple subtheories."
+The order in which subtheories are processed must not matter. The code is not allowed to make the first encounter of something 'win'. For this reason, something like the following may be needed: "The unqualified name should store a list of aliases (or sources) rather than a single entity. This captures the provenance and allows the system to know that LessThanOrEq came from multiple subtheories."
 Note that the system has a somewhat unusual design that 'propagates' things from subtheories to the parent theory. 
 
 Note also that all theories include 𝔻, ℙ, and 𝕌, but that these mean different things in different theories, with an exception in the case of implicit subtheories.  𝔻 in a subtheory may be a different domain from  𝔻 in the main theory. ℙ in a subtheory may satisfy classical logic while ℙ in the main theory only satisfies intuitionistic logic, or vice versa.

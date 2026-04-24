@@ -10,8 +10,8 @@
   },
   axioms {
     assertions {
-      [x : D] [y : D] lessThanOrEq(y, join(x, coheyting_complement(y, x)));
-      [x : D] [y : D] [z : D] lessThanOrEq(y, join(x, z)) → lessThanOrEq(coheyting_complement(y, x), z);
+      [x : D] [y : D] LessThanOrEq(y, join(x, coheyting_complement(y, x)));
+      [x : D] [y : D] [z : D] LessThanOrEq(y, join(x, z)) → LessThanOrEq(coheyting_complement(y, x), z);
     }
   }
 }

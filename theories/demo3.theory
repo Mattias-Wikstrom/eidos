@@ -11,7 +11,6 @@
     assertions {
       DemoSortD = subB.subA.DemoSortA; // Nested subtheories
       DemoSortE = subC.subA.DemoSortA; // Nested subtheories
-      DemoSortF = subA.DemoSortA; // This works too but would fail if demo3_subtheoryB and demo3_subtheoryC were implicit
       DemoSortG = DemoSortA; // This works too
     }
   },
@@ -28,7 +27,8 @@
           }
         },
         subtheories {
-          [implicit] subA: {
+          implicit { 
+            subA: {
             signature {
               sort DemoSortA; // Coincides with subC.subA.DemoSortA
 
@@ -41,6 +41,7 @@
               }
             }
           }
+          }
         }
       },
       subC: {
@@ -51,7 +52,8 @@
           
         },
         subtheories {
-          [implicit] subA: {
+          implicit {
+            subA: {
             signature {
               sort DemoSortA; // Coincides with subB.subA.DemoSortA
 
@@ -63,6 +65,7 @@
                 f(a) = a;
               }
             }
+          }
           }
         }
       } 

@@ -13,7 +13,7 @@
     D subquotient B; // D is a subquotient of B
     f : A → B; // f is a function from A to B
     h : A, A → A; // h is a function of two arguments
-    pred ⊆ A; // pred is a monadic predicate that is applied to objects of sort A
+    Pred ⊆ A; // Pred is a monadic predicate that is applied to objects of sort A
     Pred2 : A, B → Prop; // Pred2 is a relation between A and B
   },
   axioms {
@@ -25,17 +25,17 @@
       ⊥ → ⊤; // ⊤ follows from ⊥
       [x : A] x = x; // Free variables need to be given sortings using the notation [variable : NameOfSort]
       [x : A] ∃y : B x = y; // Any object x of sort A is identical to some object of sort B 
-      0 ≤ 1; // ≤ is the part-whole relation, 0 is part of 1
-      (A).min ≤ o1; // <min>(A) is the minimum among things of sort A
-      (A).min ≤ pred; // That includes predicates
-      o1 ≤ (A).max; // <max>(A) is the maximum among things of sort A
-      pred ≤ (A).max; // That includes predicates
-      (A).min = (B).min; // This holds since A is a subsort of B
-      (A).max ≤ (B).max; // This holds since A is a subsort of B
-      (B).min ≤ (C).min; // This holds since C is a quotient of B
-      (B).max = (C).max; // This holds since C is a quotient of B
-      (B).min ≤ (D).min; // This holds since D is a subquotient of B
-      (D).max ≤ (B).max; // This holds since D is a subquotient of B
+      𝕌#min ≤ 𝕌#max; // ≤ is the part-whole relation, 𝕌#min is part of 𝕌#max
+      A#min ≤ o1; // <min>(A) is the minimum among things of sort A
+      A#min ≤ Pred; // That includes predicates
+      o1 ≤ A#max; // <max>(A) is the maximum among things of sort A
+      Pred ≤ A#max; // That includes predicates
+      A#min = B#min; // This holds since A is a subsort of B
+      A#max ≤ B#max; // This holds since A is a subsort of B
+      B#min ≤ C#min; // This holds since C is a quotient of B
+      B#max = C#max; // This holds since C is a quotient of B
+      B#min ≤ D#min; // This holds since D is a subquotient of B
+      D#max ≤ B#max; // This holds since D is a subquotient of B
     },
     /* The identities section exists mostly to provide a natural way to express theories
         in weak logics such as equational logic. */

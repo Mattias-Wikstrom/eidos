@@ -2,12 +2,12 @@
 {
   signature {
     sort D;
-    lessThanOrEq : D, D → Prop; // Order relation
+    LessThanOrEq : D, D → Prop; // Order relation
   },
   axioms {
     assertions {
-      [x : D] lessThanOrEq(x, x); // Reflexivity
-      [x : D] [y : D] [z : D] (lessThanOrEq(x, y) ∧ lessThanOrEq(y, z)) → lessThanOrEq(x, z); // Transitivity
+      [x : D] LessThanOrEq(x, x); // Reflexivity
+      [x : D] [y : D] [z : D] (LessThanOrEq(x, y) ∧ LessThanOrEq(y, z)) → LessThanOrEq(x, z); // Transitivity
     }
   }
 }

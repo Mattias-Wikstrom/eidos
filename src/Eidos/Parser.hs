@@ -249,7 +249,9 @@ collectAliases = concatMap go
 pSubtheoryEntry :: Parser SubtheoryEntry
 pSubtheoryEntry =
       SubtheoryEntryGroup <$> try pSubtheoryGroup
-  <|> SubtheoryEntryItem  <$> pSubtheoryItem
+  <|> (pSubtheoryItem >>= \item ->
+        fail $ "Subtheory '" ++ maybe "<unnamed>" id (itemName item)
+            ++ "' must appear inside a 'named { }', 'implicit { }', or 'reflection { }' block")
 
 pSubtheoryGroup :: Parser SubtheoryGroup
 pSubtheoryGroup = do
@@ -271,12 +273,17 @@ subtheoryAlias = lexeme $ try $ do
 
 pSubtheoryItem :: Parser SubtheoryItem
 pSubtheoryItem = do
-  qual <- optional (void lbrack *> pGroupKeyword <* void rbrack)
+  -- Reject old [implicit]/[named]/[reflection] bracket-qualifier syntax
+  hadQual <- optional (try (lbrack *> pGroupKeyword <* rbrack))
+  case hadQual of
+    Just kw -> fail $ "[" ++ kw ++ "] bracket-qualifier syntax is no longer supported; "
+                   ++ "use a group block instead, e.g.: " ++ kw ++ " { name: { ... } }"
+    Nothing -> return ()
   name <- optional (try (subtheoryAlias <* colon))  -- Changed from ident to subtheoryAlias
   when (isNothing name) $
     fail "All subtheories must have a name"
   def  <- pSubtheoryDef
-  return $ SubtheoryItem qual name def
+  return $ SubtheoryItem Nothing name def
 
 dottedIdent :: Parser String
 dottedIdent = do
@@ -552,7 +559,7 @@ pTermSuffix =
 
 pDotAttrKeyword :: Parser String
 pDotAttrKeyword =
-      try kwMin <|> try kwMax <|> try kwRes <|> try kwArg <|> kwDom
+      try kwMin <|> kwMax
 
 pHashAttrKeyword :: Parser String
 pHashAttrKeyword =

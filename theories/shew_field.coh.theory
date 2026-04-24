@@ -21,7 +21,7 @@
       [x : E] [y : E] ring.prod(x, y) = multiplicative_group.op(x, y);
     },
     assertions {
-      [x : D] (x = 0) ∨ ∃y:E x=y; // Any element is either zero or non-zero
+      [x : D] (x = zero) ∨ ∃y:E x=y; // Any element is either zero or non-zero
     }
   }
 }
