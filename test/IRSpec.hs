@@ -190,12 +190,12 @@ main = hspec $ do
   describe "Gap 6: mereological translation" $ do
 
     it "produces a translated fact for each assertion" $ do
-      th <- buildStr "{ signature { sort S; } axioms { assertions { ⊤; } } }"
+      th <- buildStr "{ signature { sort S; }, axioms { assertions { ⊤; } } }"
       let translated = filter factIsMereologicalTranslation (theoryFacts th)
       length translated `shouldSatisfy` (>= 1)
 
     it "translated facts have the same FactKind as the original" $ do
-      th <- buildStr "{ signature { sort S; } axioms { assertions { ⊤; } } }"
+      th <- buildStr "{ signature { sort S; }, axioms { assertions { ⊤; } } }"
       let translated = filter factIsMereologicalTranslation (theoryFacts th)
           original   = filter (\f -> not (factIsMereologicalTranslation f)
                                   && factKind f == FactKindAssertion) (theoryFacts th)
@@ -297,8 +297,7 @@ main = hspec $ do
       let input = [r|{
         subtheories {
           implicit {
-            sub1: { signature { sort S; } }
-            sub2: { signature { sort S; } }
+            sub1: { signature { sort S; } }, sub2: { signature { sort S; } }
           }
         }
       }|]
@@ -318,8 +317,7 @@ main = hspec $ do
                 sort D; 
                 f : D → D; 
               } 
-            }
-            sub2: { 
+            }, sub2: { 
               signature { 
                 sort D; 
                 f : D, D → D; 
@@ -337,8 +335,7 @@ main = hspec $ do
       let input = [r|{
         subtheories {
           implicit {
-            sub1: { signature { sort S; } }
-            sub2: { signature { sort S; } }
+            sub1: { signature { sort S; } }, sub2: { signature { sort S; } }
           }
         }
       }|]
@@ -352,11 +349,9 @@ main = hspec $ do
       let input = [r|{
         subtheories {
           implicit {
-            sub1: { signature { sort S; } }
-            sub2: { signature { sort S; } }
+            sub1: { signature { sort S; } }, sub2: { signature { sort S; } }
           }
-        }
-        axioms {
+        }, axioms {
           assertions {
             sub1.S = sub2.S;
           }
@@ -367,8 +362,7 @@ main = hspec $ do
 
     it "accepts name duplication when parent and implicit subtheory both declare S" $ do
       let input = [r|{
-        signature { sort S; }
-        subtheories {
+        signature { sort S; }, subtheories {
           implicit {
             sub: { signature { sort S; } }
           }
@@ -379,13 +373,11 @@ main = hspec $ do
 
     it "allows explicit qualification to access shadowed entity" $ do
       let input = [r|{
-        signature { sort ParentS; }
-        subtheories {
+        signature { sort ParentS; }, subtheories {
           implicit {
             sub: { signature { sort ChildS; } }
           }
-        }
-        axioms {
+        }, axioms {
           assertions {
             sub.ChildS = ParentS;
           }
@@ -399,8 +391,7 @@ main = hspec $ do
       let input = [r|{
         subtheories {
           implicit {
-            sub: { signature { sort S; } }
-            sub: { signature { sort T; } }
+            sub: { signature { sort S; } }, sub: { signature { sort T; } }
           }
         }
       }|]
@@ -411,8 +402,7 @@ main = hspec $ do
 
     it "accepts duplicate sort name when implicit subtheory conflicts with parent entity" $ do
       let input = [r|{
-        signature { sort S; }
-        subtheories {
+        signature { sort S; }, subtheories {
           implicit {
             sub: { signature { sort S; } }
           }
@@ -478,8 +468,7 @@ main = hspec $ do
                   }
                 }
               }
-            }
-            C: {
+            }, C: {
               subtheories {
                 implicit {
                   B: {
@@ -543,9 +532,7 @@ main = hspec $ do
     it "retrieves all subtheories from a theory" $ do
       let input = [r|{
         subtheories {
-          implicit { imp: { signature { sort ImpSort; } } }
-          named { named: { signature { sort NamedSort; } } }
-          reflection { refl: { signature { sort ReflSort; } } }
+          implicit { imp: { signature { sort ImpSort; } } }, named { named: { signature { sort NamedSort; } } }, reflection { refl: { signature { sort ReflSort; } } }
         }
       }|]
       th <- buildStr input
@@ -619,9 +606,7 @@ main = hspec $ do
       let input = [r|{
         subtheories {
           named {
-            sub1: { signature { sort A; } }
-            sub2: { signature { sort B; } }
-            sub3: { signature { sort C; } } 
+            sub1: { signature { sort A; } }, sub2: { signature { sort B; } }, sub3: { signature { sort C; } } 
           }
         }
       }|]
@@ -639,14 +624,12 @@ main = hspec $ do
     it "item1: merge is order-independent — swapping sub1/sub2 gives same entity count" $ do
       th1 <- buildStr [r|{
         subtheories { implicit {
-          sub1: { signature { sort S; f: 𝔻 → 𝔻; } }
-          sub2: { signature { sort S; f: 𝔻 → 𝔻; } }
+          sub1: { signature { sort S; f: 𝔻 → 𝔻; } }, sub2: { signature { sort S; f: 𝔻 → 𝔻; } }
         }}
       }|]
       th2 <- buildStr [r|{
         subtheories { implicit {
-          sub2: { signature { sort S; f: 𝔻 → 𝔻; } }
-          sub1: { signature { sort S; f: 𝔻 → 𝔻; } }
+          sub2: { signature { sort S; f: 𝔻 → 𝔻; } }, sub1: { signature { sort S; f: 𝔻 → 𝔻; } }
         }}
       }|]
       -- Both orderings must produce exactly one canonical unqualified entry for S
@@ -696,8 +679,7 @@ main = hspec $ do
     it "item3: merge equality facts have FactKindImplicitMerge, not FactKindAssertion" $ do
       th <- buildStr [r|{
         subtheories { implicit {
-          sub1: { signature { sort S; } }
-          sub2: { signature { sort S; } }
+          sub1: { signature { sort S; } }, sub2: { signature { sort S; } }
         }}
       }|]
       let mergeFacts    = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
@@ -720,8 +702,7 @@ main = hspec $ do
     it "item3: two implicit subs each get their own merge equality fact" $ do
       th <- buildStr [r|{
         subtheories { implicit {
-          sub1: { signature { sort S; } }
-          sub2: { signature { sort S; } }
+          sub1: { signature { sort S; } }, sub2: { signature { sort S; } }
         }}
       }|]
       let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
