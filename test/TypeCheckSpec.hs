@@ -942,3 +942,30 @@ main = hspec $ do
             }
           }
         |]
+
+      it "rejects a fact that uses lowercase lessThan when only LessThan is declared" $
+        shouldRejectAny [r|
+          { signature {
+              sort D;
+              LessThan : D, D → Prop;
+              x : D;
+              y : D;
+            }
+            axioms {
+              facts { lessThan(x, y); }
+            }
+          }
+        |]
+
+      it "rejects facts that use relations that were never declared in the signature" $
+        shouldRejectAny [r|
+          { signature {
+              sort D;
+              x : D;
+              y : D;
+            }
+            axioms {
+              facts { LessThan(x, y); }
+            }
+          }
+        |]
