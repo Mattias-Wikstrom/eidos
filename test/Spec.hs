@@ -198,8 +198,7 @@ main = hspec $ do
             P : ℙ; 
             Q : ℙ; 
             MySet ⊆ S; 
-          }
-          axioms { 
+          }, axioms { 
             assertions { 
               [x:S][y:S] (x ∈ MySet) ∧ (y ∈ MySet) → (x =_S y);
               P ∨ Q → ¬(P ∧ Q);
