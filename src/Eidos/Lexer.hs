@@ -23,7 +23,7 @@ module Eidos.Lexer
   , generSumSym, generProdSym
   , equals
     -- * Keywords
-  , kwSignature, kwAxioms, kwAssertions, kwAssertionsCap, kwFacts
+  , kwSignature, kwAxioms, kwAssertions, kwFacts
   , kwMetafacts, kwSubtheories, kwNamed, kwSort
   , kwImplicit, kwReflection
   , kwSubquotient, kwSubsort, kwQuotient
@@ -148,17 +148,16 @@ keyword kw = lexeme $ try $ string kw <* notFollowedBy (alphaNumChar <|> char '_
 -- | All structural keywords that must NOT be accepted as plain identifiers.
 structuralKeywords :: [String]
 structuralKeywords =
-  [ "signature", "axioms", "assertions", "Assertions", "facts"
+  [ "signature", "axioms", "assertions", "facts"
   , "metafacts", "subtheories", "named", "sort"
   , "implicit", "reflection"
   , "subquotient", "subsort", "quotient"
   ]
 
-kwSignature, kwAxioms, kwAssertions, kwAssertionsCap, kwFacts :: Parser String
+kwSignature, kwAxioms, kwAssertions, kwFacts :: Parser String
 kwSignature     = keyword "signature"
 kwAxioms        = keyword "axioms"
 kwAssertions    = keyword "assertions"
-kwAssertionsCap = keyword "Assertions"
 kwFacts         = keyword "facts"
 
 kwMetafacts, kwSubtheories, kwNamed, kwSort :: Parser String
