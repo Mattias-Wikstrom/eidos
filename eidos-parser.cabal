@@ -21,6 +21,7 @@ library
                     , Eidos.DebugIR
                     , Eidos.TypeCheck
                     , Eidos.ExternalRef
+                    , Eidos.Export.JSON
                     , Eidos.BuildMonad 
     hs-source-dirs:   src
     default-language: GHC2021
@@ -30,6 +31,9 @@ library
                     , directory
                     , filepath
                     , mtl
+                    , aeson >=2.0
+                    , aeson-pretty >=0.8 
+                    , bytestring >=0.10
 
 executable eidos-parser
     import:           warnings, deps

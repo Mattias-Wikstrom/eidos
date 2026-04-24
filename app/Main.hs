@@ -11,6 +11,8 @@ import           Eidos.Pretty       (prettyTheory, prettyTheoryDecl, prettyFactD
 import           Eidos.DebugIR      (dumpTheoryIR)
 import           Eidos.IR as IR 
 
+import           Eidos.Export.JSON  (exportTheoryToJSONString)
+
 main :: IO ()
 main = do
   args <- getArgs
@@ -72,6 +74,22 @@ main = do
               putStrLn $ dumpTheoryIR theory
               exitSuccess
     
+    ["--json", filePath] -> do
+      result <- parseFile filePath
+      case result of
+        Left err -> do
+          IO.hPutStrLn IO.stderr ("Parse error: " ++ show err)
+          exitFailure
+        Right ast -> do
+          irResult <- buildTheoryFromFile filePath ast
+          case irResult of
+            Left buildErr -> do
+              IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
+              exitFailure
+            Right theory -> do
+              putStrLn $ exportTheoryToJSONString theory
+              exitSuccess
+
     ["--pure", filePath] -> do
       result <- parseFile filePath
       case result of
@@ -108,4 +126,6 @@ main = do
       IO.hPutStrLn IO.stderr "  eidos-parser --dump-ir <file.theory>    # Parse and print AST + deterministic IR dump"
       IO.hPutStrLn IO.stderr "  eidos-parser --pure <file.theory>       # Parse and build IR (pure mode, no external files)"
       IO.hPutStrLn IO.stderr "  eidos-parser --pretty <file.theory>     # Parse and pretty-print AST"
+      IO.hPutStrLn IO.stderr "  eidos-parser --json <file.theory>             # Export IR as JSON"
+      IO.hPutStrLn IO.stderr "  eidos-parser --json --compact <file.theory>   # Export IR as compact JSON"
       exitFailure
