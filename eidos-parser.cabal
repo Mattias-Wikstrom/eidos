@@ -22,6 +22,7 @@ library
                     , Eidos.TypeCheck
                     , Eidos.ExternalRef
                     , Eidos.Export.JSON
+                    , Eidos.Export.LeanProps
                     , Eidos.BuildMonad 
     hs-source-dirs:   src
     default-language: GHC2021
