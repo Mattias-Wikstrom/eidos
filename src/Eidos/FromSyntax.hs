@@ -348,15 +348,17 @@ buildAxSection th0 th axSec = case axSec of
   AxMetafacts (MetafactsSection props) ->
     foldM (addPropFact th0 FactKindMetafactsFact) th props
 
-addPropFact
-  :: forall m. (MonadExternalRefResolver m)
-  => Theory -> FactKind -> Theory -> PropExprInclVars -> BuildM m Theory
 addPropFact th0 fk th prop = do
   let ctx = emptyVarContext
       sourceCtx = propSourceContext prop
-  (resolvedExpr, _ctx') <- either throwError return $
+      -- Extract free variables from PropExprInclVars
+      (PropExprInclVars _ _ vars _) = prop
+  (resolvedExpr, ctx') <- either throwError return $
     resolvePropExprInclVars th0 ctx prop
-
+  
+  -- Get the resolved variable declarations from the context
+  let freeVars = map (toResolvedVarDecl th0) vars
+      
   case typeCheckResolvedExpr resolvedExpr of
     Left typeErr -> throwError (sourceCtx ++ "Type error in " ++ show fk ++ ": " ++ typeErr)
     Right _ -> return ()
@@ -370,10 +372,19 @@ addPropFact th0 fk th prop = do
         , factIsInherited               = False
         , factKind                      = fk
         , factPropExpr                  = resolvedExpr
+        , factFreeVars                  = freeVars  -- Store the free variables
         }
   let th' = markTheoryPropExprUsage th prop
   return (th' { theoryFacts = theoryFacts th' ++ [fact] })
 
+-- Helper to convert AST VarDecl to ResolvedVarDecl
+toResolvedVarDecl :: Theory -> VarDecl -> ResolvedVarDecl
+toResolvedVarDecl th (VarDecl name op sortExpr) =
+  let s = case lookupSortByExpr th sortExpr of
+            Right sort -> sort
+            Left _ -> error $ "Failed to resolve sort for variable: " ++ name
+  in ResolvedVarDecl name (op == "⊆") s
+  
 propSourceContext :: PropExprInclVars -> String
 propSourceContext (PropExprInclVars line col _ _) =
   if line > 0 && col > 0
