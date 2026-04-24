@@ -1,48 +1,4 @@
-<<<<<<< Updated upstream
-/* Theory that demonstrates how to interpret predicate logic using quantified propositional logic */
-{
-  signature {
-    D_max ⊆ object_theory.D;
-    D_min ⊆ object_theory.D;
 
-    T_max : Prop; 
-    T_min : Prop;
-
-    a : object_theory.D;
-    b : object_theory.D;
-  },
-  axioms {
-    assertions {
-      // Make the propositions D_min and D_max delimit the domain of the object_theory
-      a ∈ D_min;
-      a ∈ D_max;
-
-      // Make the propositions T_min and T_max delimit the propositions of the object_theory
-      T_max = object_theory.⊥;
-      T_min = object_theory.⊤;
-
-      // This ensures that b is within the domain of object_theory
-      b ∈ D_min;
-      b ∈ D_max;
-
-      // The following will make object_theory prove that either a or b is zero
-      object_theory.prod(a, b) = object_theory.zero;
-
-      // That does /not/ mean that the following is provable here:
-      (a = object_theory.zero) ∨ (b = object_theory.zero);
-
-      // The following is what is actually provable:
-      object_theory.⊤ → ((a = object_theory.zero) ∨ (b = object_theory.zero));
-    }
-  },
-  subtheories {
-    /* Using a coherent theory as the object_theory for demo purposes */
-    named {
-      object_theory: @integral_domain
-    } 
-  }
-}
-=======
 /* Theory that demonstrates how to interpret predicate logic using quantified propositional logic */
 {
   signature {
@@ -90,4 +46,3 @@
     } 
   }
 }
->>>>>>> Stashed changes
