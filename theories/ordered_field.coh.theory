@@ -8,8 +8,8 @@
   },
   axioms {
     assertions {
-      [x : D] [y : D] [z : D] lessThan(x, y) → lessThan(sum(x, z), sum(y, z));
-      [x : D] [y : D] (lessThan(zero, x) ∧ lessThan(zero, y)) → lessThan(zero, prod(x, y));
+      [x : D] [y : D] [z : D] LessThan(x, y) → LessThan(sum(x, z), sum(y, z));
+      [x : D] [y : D] (LessThan(zero, x) ∧ LessThan(zero, y)) → LessThan(zero, prod(x, y));
     }
   }
 }
