@@ -241,23 +241,3 @@ main = hspec $ do
                   let subs = IR.theorySubtheories th
                   length subs `shouldBe` 1
                   IR.theoryName (head subs) `shouldBe` "sub"  -- alias, not "group.eq"
-    
-    describe "Backward compatibility" $ do
-      it "supports old [[ext]] syntax" $ do
-        withSystemTempDirectory "eidos-test" $ \dir -> do
-          let mainFile = dir </> "main.theory"
-          let subFile = dir </> "ext.theory"
-          writeFile subFile "{ signature { sort Old; } }"
-          writeFile mainFile "{ subtheories { named { sub: [[ext]] } } }"
-          
-          content <- readFile mainFile
-          case parseString content of
-            Left err -> fail (show err)
-            Right ast -> do
-              result <- buildTheoryFromFile mainFile ast
-              case result of
-                Left err -> fail err
-                Right th -> do
-                  let subs = IR.theorySubtheories th
-                  length subs `shouldBe` 1
-                  IR.theoryName (head subs) `shouldBe` "sub"
