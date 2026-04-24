@@ -117,15 +117,15 @@ mkAxiomsWrapper :: Theory -> AxiomsWrapper
 mkAxiomsWrapper th = AxiomsWrapper $
   filter (not . isEmptyAxiomsSection) $
   [ AxAssertions $ AssertionsSection
-      [ PropExprInclVars [] (stringToPropExpr (prettyResolvedPropExpr (factPropExpr f)))
+      [ PropExprInclVars 0 0 [] (stringToPropExpr (prettyResolvedPropExpr (factPropExpr f)))
       | f <- IR.theoryFacts th
       , IR.factKind f == FactKindAssertion ]
   , AxFacts $ FactsSection
-      [ PropExprInclVars [] (stringToPropExpr (prettyResolvedPropExpr (factPropExpr f)))
+      [ PropExprInclVars 0 0 [] (stringToPropExpr (prettyResolvedPropExpr (factPropExpr f)))
       | f <- IR.theoryFacts th
       , IR.factKind f == FactKindFact ]
   , AxMetafacts $ MetafactsSection
-      [ PropExprInclVars [] (stringToPropExpr (prettyResolvedPropExpr (factPropExpr f)))
+      [ PropExprInclVars 0 0 [] (stringToPropExpr (prettyResolvedPropExpr (factPropExpr f)))
       | f <- IR.theoryFacts th
       , IR.factKind f == FactKindMetafactsFact ]
   ]
@@ -309,7 +309,7 @@ prettySubtheoryDef def =
 -- ---------------------------------------------------------------------------
 
 prettyPropExprInclVars :: PropExprInclVars -> Doc
-prettyPropExprInclVars (PropExprInclVars vars expr) =
+prettyPropExprInclVars (PropExprInclVars _ _ vars expr) =
   (if null vars then "" else concatMap prettyVarDecl vars ++ " ") ++
   prettyPropExpr expr
 

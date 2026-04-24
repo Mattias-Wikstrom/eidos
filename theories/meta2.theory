@@ -1,8 +1,8 @@
 /* Theory that demonstrates how to interpret predicate logic using quantified propositional logic */
 {
   signature {
-    D_max : Prop; 
-    D_min : Prop;
+    D_max ⊆ object_theory.D;
+    D_min ⊆ object_theory.D;
 
     T_max : Prop; 
     T_min : Prop;
@@ -13,20 +13,16 @@
   axioms {
     assertions {
       // Make the propositions D_min and D_max delimit the domain of the object_theory
-      D_max = object_theory.D.max;
-      D_min = object_theory.D.min;
+      a ∈ D_min;
+      a ∈ D_max;
 
       // Make the propositions T_min and T_max delimit the propositions of the object_theory
       T_max = object_theory.⊥;
       T_min = object_theory.⊤;
 
-      // This ensures that a is within the domain of object_theory
-      D_min ≤ a;
-      a ≤ D_max;
-
       // This ensures that b is within the domain of object_theory
-      b ⇒ D_min = 0; // Using D_min ≤ b would also work
-      D_max ⇒ b = 0;
+      b ∈ D_min;
+      b ∈ D_max;
 
       // The following will make object_theory prove that either a or b is zero
       object_theory.prod(a, b) = object_theory.zero;

@@ -153,7 +153,9 @@ data SubtheoryDef
 -- ---------------------------------------------------------------------------
 
 data PropExprInclVars = PropExprInclVars
-  { propVars     :: [VarDecl]
+  { propSourceLine :: Int
+  , propSourceCol  :: Int
+  , propVars       :: [VarDecl]
   , propExprBody :: PropExpr
   } deriving (Show, Eq)
 
