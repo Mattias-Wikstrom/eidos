@@ -21,6 +21,7 @@ import           Control.Monad          (void, unless)
 import           Data.Void              (Void)
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
+import           Text.Megaparsec.Pos   (unPos)
 import Data.List (sort, group, intercalate)
 import Data.Maybe (mapMaybe, isNothing)
 import Control.Monad (when)
@@ -295,9 +296,10 @@ pSubtheoryDef =
 
 pPropExprInclVars :: Parser PropExprInclVars
 pPropExprInclVars = do
+  pos <- getSourcePos
   vars <- many (void lbrack *> pVarDecl <* void rbrack)
   expr <- pPropExpr
-  return $ PropExprInclVars vars expr
+  return $ PropExprInclVars (unPos $ sourceLine pos) (unPos $ sourceColumn pos) vars expr
 
 pVarDecl :: Parser VarDecl
 pVarDecl = do

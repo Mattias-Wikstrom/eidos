@@ -339,15 +339,16 @@ addPropFact
   => Theory -> FactKind -> Theory -> PropExprInclVars -> BuildM m Theory
 addPropFact th0 fk th prop = do
   let ctx = emptyVarContext
-  (resolvedExpr, _ctx') <- either throwError return $ 
+      sourceCtx = propSourceContext prop
+  (resolvedExpr, _ctx') <- either throwError return $
     resolvePropExprInclVars th0 ctx prop
-  
+
   case typeCheckResolvedExpr resolvedExpr of
-    Left typeErr -> throwError ("Type error in " ++ show fk ++ ": " ++ typeErr)
+    Left typeErr -> throwError (sourceCtx ++ "Type error in " ++ show fk ++ ": " ++ typeErr)
     Right _ -> return ()
-  
+
   case validateAllTermPairs resolvedExpr of
-    Left opErr -> throwError ("Operation error in " ++ show fk ++ ": " ++ opErr)
+    Left opErr -> throwError (sourceCtx ++ "Operation error in " ++ show fk ++ ": " ++ opErr)
     Right _ -> return ()
   
   let fact = Fact
@@ -357,6 +358,12 @@ addPropFact th0 fk th prop = do
         , factPropExpr                  = resolvedExpr
         }
   return (th { theoryFacts = theoryFacts th ++ [fact] })
+
+propSourceContext :: PropExprInclVars -> String
+propSourceContext (PropExprInclVars line col _ _) =
+  if line > 0 && col > 0
+    then "At line " ++ show line ++ ", column " ++ show col ++ ": "
+    else ""
 
 -- ---------------------------------------------------------------------------
 -- Theory skeleton construction
@@ -1190,7 +1197,7 @@ resolvePropExprInclVars
   -> VarContext
   -> PropExprInclVars
   -> Either BuildError (ResolvedPropExpr, VarContext)
-resolvePropExprInclVars th ctx (PropExprInclVars vars propExprAST) = do
+resolvePropExprInclVars th ctx (PropExprInclVars _ _ vars propExprAST) = do
   ctx' <- foldM resolveAndBindVar ctx vars
   resolved <- resolvePropExpr th ctx' propExprAST
   return (resolved, ctx')
