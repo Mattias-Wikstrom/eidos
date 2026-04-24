@@ -190,12 +190,12 @@ main = hspec $ do
   describe "Gap 6: mereological translation" $ do
 
     it "produces a translated fact for each assertion" $ do
-      th <- buildStr "{ signature { sort S; } axioms { assertions { ⊤; } } }"
+      th <- buildStr "{ signature { sort S; }, axioms { assertions { ⊤; } } }"
       let translated = filter factIsMereologicalTranslation (theoryFacts th)
       length translated `shouldSatisfy` (>= 1)
 
     it "translated facts have the same FactKind as the original" $ do
-      th <- buildStr "{ signature { sort S; } axioms { assertions { ⊤; } } }"
+      th <- buildStr "{ signature { sort S; }, axioms { assertions { ⊤; } } }"
       let translated = filter factIsMereologicalTranslation (theoryFacts th)
           original   = filter (\f -> not (factIsMereologicalTranslation f)
                                   && factKind f == FactKindAssertion) (theoryFacts th)
