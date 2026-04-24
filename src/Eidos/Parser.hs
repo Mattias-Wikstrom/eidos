@@ -58,7 +58,7 @@ theoryParser :: Parser TheoryDecl
 theoryParser = TheoryDecl <$> between lbrace rbrace pTheoryBody
 
 pTheoryBody :: Parser TheoryBody
-pTheoryBody = TheoryBody <$> many (pSection <* optional comma)
+pTheoryBody = TheoryBody <$> (pSection `sepEndBy` comma)
 
 pSection :: Parser Section
 pSection =
@@ -171,7 +171,7 @@ pSortConstant =
 
 pAxiomsWrapper :: Parser AxiomsWrapper
 pAxiomsWrapper =
-  AxiomsWrapper <$> (kwAxioms *> between lbrace rbrace (many (pAxiomsSection <* optional comma)))
+  AxiomsWrapper <$> (kwAxioms *> between lbrace rbrace (pAxiomsSection `sepEndBy` comma))
 
 pAxiomsSection :: Parser AxiomsSection
 pAxiomsSection =
@@ -202,7 +202,7 @@ pMetafactsSection =
 pSubtheoriesSection :: Parser SubtheoriesSection
 pSubtheoriesSection = do
   void kwSubtheories
-  entries <- between lbrace rbrace (many (pSubtheoryEntry <* optional comma))
+  entries <- between lbrace rbrace (pSubtheoryEntry `sepEndBy` comma)
   -- Check for duplicate group keywords
   let groupKws = mapMaybe getGroupKeyword entries
       dupGroups = findDuplicates groupKws
@@ -244,7 +244,7 @@ pSubtheoryEntry =
 pSubtheoryGroup :: Parser SubtheoryGroup
 pSubtheoryGroup = do
   kw    <- pGroupKeyword
-  items <- between lbrace rbrace (many (pSubtheoryItem <* optional comma))
+  items <- between lbrace rbrace (pSubtheoryItem `sepEndBy` comma)
   return $ SubtheoryGroup kw items
 
 pGroupKeyword :: Parser String

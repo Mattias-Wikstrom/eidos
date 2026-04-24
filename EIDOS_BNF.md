@@ -30,7 +30,7 @@ This document describes the **current concrete syntax** accepted by the Haskell 
 
 ```bnf
 <theory>          ::= "{" <theory-body> "}"
-<theory-body>     ::= (<section> [","])*
+<theory-body>     ::= <section> ("," <section>)* [","]
 
 <section>         ::= <signature-section>
                     | <axioms-wrapper>
@@ -73,7 +73,7 @@ This document describes the **current concrete syntax** accepted by the Haskell 
 ## 5) Axioms/assertions/facts/metafacts
 
 ```bnf
-<axioms-wrapper>   ::= "axioms" "{" (<axioms-section> [","])* "}"
+<axioms-wrapper>   ::= "axioms" "{" <axioms-section> ("," <axioms-section>)* [","] "}"
 <axioms-section>   ::= <assertions-section> | <facts-section> | <metafacts-section>
 
 <assertions-section> ::= ("assertions" | "Assertions") "{" (<prop-expr-incl-vars> ";")* "}"
@@ -88,12 +88,12 @@ This document describes the **current concrete syntax** accepted by the Haskell 
 ## 6) Subtheories
 
 ```bnf
-<subtheories-section> ::= "subtheories" "{" (<subtheory-entry> [","])* "}"
+<subtheories-section> ::= "subtheories" "{" <subtheory-entry> ("," <subtheory-entry>)* [","] "}"
 
 <subtheory-entry>     ::= <subtheory-group>
                         | <subtheory-item>   (* currently parsed then rejected unless grouped *)
 
-<subtheory-group>     ::= <group-keyword> "{" (<subtheory-item> [","])* "}"
+<subtheory-group>     ::= <group-keyword> "{" <subtheory-item> ("," <subtheory-item>)* [","] "}"
 <group-keyword>       ::= "implicit" | "named" | "reflection"
 
 <subtheory-item>      ::= <subtheory-alias> ":" <subtheory-def>
