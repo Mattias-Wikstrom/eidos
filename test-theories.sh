@@ -38,16 +38,21 @@ for theory in theories/*.theory; do
     if [ -f "$theory" ]; then
         total=$((total + 1))
         filename=$(basename "$theory")
-        
+
         echo -n "Testing $filename... "
-        
+
+        start=$(date +%s%3N)
+
         if cabal run eidos-parser -- "${RUN_ARGS[@]}" "$theory" > /dev/null 2>&1; then
-            echo -e "${GREEN}PASSED${NC}"
+            end=$(date +%s%3N)
+            elapsed=$((end - start))
+            echo -e "${GREEN}PASSED${NC} (${elapsed} ms)"
             passed=$((passed + 1))
         else
-            echo -e "${RED}FAILED${NC}"
+            end=$(date +%s%3N)
+            elapsed=$((end - start))
+            echo -e "${RED}FAILED${NC} (${elapsed} ms)"
             failed=$((failed + 1))
-            # Show the error for debugging
             echo "  Error details:"
             cabal run eidos-parser -- "${RUN_ARGS[@]}" "$theory" 2>&1 | head -5 | sed 's/^/    /'
         fi
