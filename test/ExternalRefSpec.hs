@@ -71,7 +71,7 @@ main = hspec $ do
               , extRefTheoryType = PlainTheory
               , extRefSource = MemorySource "{ signature { sort Custom; } }"
               }
-        let input = "{ subtheories { named { sub1: @anything sub2: @whatever } } }"
+        let input = "{ subtheories { named { sub1: @anything, sub2: @whatever } } }"
         case parseString input of
           Left err -> fail (show err)
           Right ast -> case buildTheoryWithResolver customResolver Nothing ast of

@@ -68,7 +68,7 @@ main = hspec $ do
     describe "Level 1 type checking" $ do
 
       it "accepts mereological operations on mereological objects" $
-        expectSuccess $ run "{ signature { sort S; x : S; y : S; } axioms { facts { x + y = x; } } }"
+        expectSuccess $ run "{ signature { sort S; x : S; y : S; }, axioms { facts { x + y = x; } } }"
 
       it "rejects mereological operations on sorts" $
         pendingWith "Type checker does not yet reject mereological ops on sorts in FromSyntax"
@@ -82,27 +82,27 @@ main = hspec $ do
     describe "Level 2 type checking - Individuals vs Sets" $ do
 
       it "accepts individual ∈ Set" $
-        expectSuccess $ run "{ signature { sort S; x : S; MySet ⊆ S; } axioms { facts { x ∈ MySet; } } }"
+        expectSuccess $ run "{ signature { sort S; x : S; MySet ⊆ S; }, axioms { facts { x ∈ MySet; } } }"
 
       it "rejects Set ∈ Set" $
-        expectFailure (runExpectFail "{ signature { sort S; Set1 ⊆ S; Set2 ⊆ S; } axioms { facts { Set1 ∈ Set2; } } }")
+        expectFailure (runExpectFail "{ signature { sort S; Set1 ⊆ S; Set2 ⊆ S; }, axioms { facts { Set1 ∈ Set2; } } }")
           (\err -> err `shouldContainString` "Left operand of ∈ must be an individual")
 
       it "rejects individual ⊆ individual" $
-        expectFailure (runExpectFail "{ signature { sort S; x : S; y : S; } axioms { facts { x ⊆ y; } } }")
+        expectFailure (runExpectFail "{ signature { sort S; x : S; y : S; }, axioms { facts { x ⊆ y; } } }")
           (\err -> err `shouldContainString` "Left operand of ⊆ must be a set")
 
       it "accepts Set ⊆ Set" $
-        expectSuccess $ run "{ signature { sort S; Set1 ⊆ S; Set2 ⊆ S; } axioms { facts { Set1 ⊆ Set2; } } }"
+        expectSuccess $ run "{ signature { sort S; Set1 ⊆ S; Set2 ⊆ S; }, axioms { facts { Set1 ⊆ Set2; } } }"
 
       it "accepts Set ∪ Set" $
-        expectSuccess $ run "{ signature { sort S; Set1 ⊆ S; Set2 ⊆ S; } axioms { facts { Set1 ∪ Set2 = Set1; } } }"
+        expectSuccess $ run "{ signature { sort S; Set1 ⊆ S; Set2 ⊆ S; }, axioms { facts { Set1 ∪ Set2 = Set1; } } }"
 
       it "rejects individual ∪ individual" $
         pendingWith "∪ operator type checking not yet enforced in FromSyntax term validation"
 
       it "accepts Set ∩ Set" $
-        expectSuccess $ run "{ signature { sort S; Set1 ⊆ S; Set2 ⊆ S; } axioms { facts { Set1 ∩ Set2 = Set1; } } }"
+        expectSuccess $ run "{ signature { sort S; Set1 ⊆ S; Set2 ⊆ S; }, axioms { facts { Set1 ∩ Set2 = Set1; } } }"
 
     --------------------------------------------------------
     -- Propositions
@@ -110,7 +110,7 @@ main = hspec $ do
     describe "Level 2 type checking - Propositions" $ do
 
       it "accepts proposition → proposition" $
-        expectSuccess $ run "{ signature { P : ℙ; Q : ℙ; } axioms { assertions { P → Q; } } }"
+        expectSuccess $ run "{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P → Q; } } }"
 
       it "rejects set → proposition" $
         pendingWith "→ operator type checking not yet enforced in FromSyntax expression validation"
@@ -119,13 +119,13 @@ main = hspec $ do
         pendingWith "→ operator type checking not yet enforced in FromSyntax expression validation"
 
       it "accepts proposition ∧ proposition" $
-        expectSuccess $ run "{ signature { P : ℙ; Q : ℙ; } axioms { assertions { P ∧ Q; } } }"
+        expectSuccess $ run "{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P ∧ Q; } } }"
 
       it "accepts proposition ∨ proposition" $
-        expectSuccess $ run "{ signature { P : ℙ; Q : ℙ; } axioms { assertions { P ∨ Q; } } }"
+        expectSuccess $ run "{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P ∨ Q; } } }"
 
       it "accepts ¬proposition" $
-        expectSuccess $ run "{ signature { P : ℙ; } axioms { assertions { ¬P; } } }"
+        expectSuccess $ run "{ signature { P : ℙ; }, axioms { assertions { ¬P; } } }"
 
       it "rejects ¬set" $
         pendingWith "¬ operator type checking not yet enforced in FromSyntax expression validation"
@@ -139,10 +139,10 @@ main = hspec $ do
         pendingWith "#max resolves to L2BareMereological rather than L2Set; needs fix in sort type resolution"
 
       it "accepts set#individual as individual" $
-        expectSuccess $ run "{ signature { sort S; MySet ⊆ S; } axioms { facts { MySet#individual ∈ MySet; } } }"
+        expectSuccess $ run "{ signature { sort S; MySet ⊆ S; }, axioms { facts { MySet#individual ∈ MySet; } } }"
 
       it "accepts individual#proposition as proposition" $
-        expectSuccess $ run "{ signature { sort S; x : S; } axioms { assertions { x#proposition → x#proposition; } } }"
+        expectSuccess $ run "{ signature { sort S; x : S; }, axioms { assertions { x#proposition → x#proposition; } } }"
 
       it "accepts proposition#set as set" $
         pendingWith "#max resolves to L2BareMereological rather than L2Set; needs fix in sort type resolution"
@@ -153,10 +153,10 @@ main = hspec $ do
     describe "Singleton sets" $ do
 
       it "accepts {individual} as set" $
-        expectSuccess $ run "{ signature { sort S; x : S; MySet ⊆ S; } axioms { facts { {x} ⊆ MySet; } } }"
+        expectSuccess $ run "{ signature { sort S; x : S; MySet ⊆ S; }, axioms { facts { {x} ⊆ MySet; } } }"
 
       it "rejects {individual} ∈ Set" $
-        expectFailure (runExpectFail "{ signature { sort S; x : S; MySet ⊆ S; } axioms { facts { {x} ∈ MySet; } } }")
+        expectFailure (runExpectFail "{ signature { sort S; x : S; MySet ⊆ S; }, axioms { facts { {x} ∈ MySet; } } }")
           (\err -> err `shouldContainString` "Left operand of ∈ must be an individual")
 
     --------------------------------------------------------
@@ -165,10 +165,10 @@ main = hspec $ do
     describe "Variable declarations" $ do
 
       it "accepts variable with valid sort" $
-        expectSuccess $ run "{ signature { sort S; } axioms { assertions { [x:S] x =_S x; } } }"
+        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { [x:S] x =_S x; } } }"
 
       it "accepts variable with set declaration" $
-        expectSuccess $ run "{ signature { sort S; } axioms { assertions { [x⊆S] x =_S x; } } }"
+        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { [x⊆S] x =_S x; } } }"
 
     --------------------------------------------------------
     -- Quantifiers
@@ -176,10 +176,10 @@ main = hspec $ do
     describe "Quantified formulas" $ do
 
       it "accepts ∀ over individual" $
-        expectSuccess $ run "{ signature { sort S; } axioms { assertions { ∀x:S x =_S x; } } }"
+        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { ∀x:S x =_S x; } } }"
 
       it "accepts ∀ over set" $
-        expectSuccess $ run "{ signature { sort S; } axioms { assertions { ∀x⊆S x ⊆ x; } } }"
+        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { ∀x⊆S x ⊆ x; } } }"
 
       it "accepts ∃ over proposition" $
         pendingWith "Proposition-typed quantifier variables not registered in variable context"
@@ -198,8 +198,7 @@ main = hspec $ do
             P : ℙ; 
             Q : ℙ; 
             MySet ⊆ S; 
-          }
-          axioms { 
+          }, axioms { 
             assertions { 
               [x:S][y:S] (x ∈ MySet) ∧ (y ∈ MySet) → (x =_S y);
               P ∨ Q → ¬(P ∧ Q);
@@ -209,5 +208,5 @@ main = hspec $ do
         }|]
 
       it "rejects mixed type comparison" $
-        expectFailure (runExpectFail "{ signature { sort S; x : S; MySet ⊆ S; } axioms { assertions { x ⊆ MySet; } } }")
+        expectFailure (runExpectFail "{ signature { sort S; x : S; MySet ⊆ S; }, axioms { assertions { x ⊆ MySet; } } }")
           (\err -> err `shouldContainString` "Left operand of ⊆ must be a set")
