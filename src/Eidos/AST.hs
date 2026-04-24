@@ -38,7 +38,6 @@ data SignatureItem
   | SigRelationalSort RelationalSortDeclaration
   | SigSet            SetDeclaration
   | SigFunction       FunctionDeclaration
-  | SigRelation       RelationDeclaration
   | SigIndividual     IndividualDeclaration
   deriving (Show, Eq)
 
@@ -58,13 +57,6 @@ data FunctionDeclaration = FunctionDeclaration
   { funcName     :: String
   , funcDomain   :: [SortExpr]
   , funcCodomain :: SortExpr
-  } deriving (Show, Eq)
-
--- | r : S, T ;  (≥2 sorts, no arrow)
-data RelationDeclaration = RelationDeclaration
-  { relName  :: String
-  , relFirst :: SortExpr
-  , relRest  :: [SortExpr]
   } deriving (Show, Eq)
 
 -- | x : S ;

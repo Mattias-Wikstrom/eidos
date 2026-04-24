@@ -78,16 +78,15 @@ pSignatureSection =
 -- | Disambiguation order mirrors the Go grammar comment:
 --   1. SimpleSortDecl      starts with 'sort'
 --   2. RelationalSortDecl  Ident then subsort/quotient/subquotient
---   3. SetDecl             Ident then '⊆'
---   4. FunctionDecl / RelationDecl / IndividualDecl  all start 'Ident :'
---      — differentiated by presence of '→' and number of domain sorts.
+--   3. SetOrRelationDecl   Ident then '⊆' (1 sort => set, >1 sorts => relation)
+--   4. FunctionDecl / IndividualDecl  both start 'Ident :'
+--      — differentiated by presence of '→'.
 pSignatureItem :: Parser SignatureItem
 pSignatureItem =
       SigSimpleSort     <$> try pSimpleSortDecl
   <|> SigRelationalSort <$> try pRelationalSortDecl
   <|> SigSet            <$> try pSetDecl
   <|> SigFunction       <$> try pFunctionDecl
-  <|> SigRelation       <$> try pRelationDecl
   <|> SigIndividual     <$> pIndividualDecl
 
 pSimpleSortDecl :: Parser SimpleSortDeclaration
@@ -111,17 +110,6 @@ pFunctionDecl = do
   cd <- pSortExpr
   void semi
   return $ FunctionDeclaration n ds cd
-
--- | r : S, T ;  (≥2 sorts, no arrow)
-pRelationDecl :: Parser RelationDeclaration
-pRelationDecl = do
-  n    <- ident
-  void colon
-  s1   <- pSortExpr
-  void comma
-  rest <- pSortExpr `sepBy1` comma
-  void semi
-  return $ RelationDeclaration n s1 rest
 
 -- | x : S ;
 pIndividualDecl :: Parser IndividualDeclaration

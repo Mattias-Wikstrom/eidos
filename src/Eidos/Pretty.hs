@@ -102,10 +102,9 @@ entityToSignatureItem (EntityMereological m) =
       Just $ SigSet $ SetDeclaration (IR.mereoName m) [sortToSortExpr (IR.mereoSort m)]
     _ -> Nothing
 entityToSignatureItem (EntityRelation r) =
-  Just $ SigRelation $ RelationDeclaration 
-    (IR.relName r) 
-    (sortToSortExpr (head (IR.relArgSorts r))) 
-    (map sortToSortExpr (tail (IR.relArgSorts r)))
+  Just $ SigSet $ SetDeclaration
+    (IR.relName r)
+    (map sortToSortExpr (IR.relArgSorts r))
 entityToSignatureItem _ = Nothing
 
 mkSubtheoriesSection :: Theory -> SubtheoriesSection
@@ -223,9 +222,6 @@ prettySignatureItem item =
     SigFunction (FunctionDeclaration nm domain codomain) ->
       nm ++ " : " ++ intercalate ", " (map prettySortExpr domain) ++
       " → " ++ prettySortExpr codomain ++ ";"
-    SigRelation (RelationDeclaration nm first rest) ->
-      nm ++ " : " ++ prettySortExpr first ++
-      (if null rest then "" else ", " ++ intercalate ", " (map prettySortExpr rest)) ++ ";"
     SigIndividual (IndividualDeclaration nm sortExpr) ->
       nm ++ " : " ++ prettySortExpr sortExpr ++ ";"
     SigSet (SetDeclaration nm domain) ->

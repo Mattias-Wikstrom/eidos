@@ -53,8 +53,8 @@ main = hspec $ do
       it "parses a unary function declaration" $
         parseString "{ signature { f : S → T; } }" `shouldSatisfy` isRight
       
-      it "parses a relation declaration" $
-        parseString "{ signature { r : S, T; } }" `shouldSatisfy` isRight
+      it "rejects the old colon-based relation declaration syntax" $
+        parseString "{ signature { r : S, T; } }" `shouldSatisfy` isLeft
       
       it "parses an individual declaration" $
         parseString "{ signature { x : S; } }" `shouldSatisfy` isRight
