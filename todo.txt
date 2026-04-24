@@ -13,11 +13,9 @@ Things to Be Done
   .mereo.theory -- Purely mereological theory (logical constructs are not allowed)
   (Note that these restrictions need to be enforced for subtheories as well as the theory itself.) 
 
-* A theory should only have D ('the domain') if it either uses it or gets it through an implicit import. Same thing for P ('propositions').
+* A theory should only have 𝔻 ('the domain') if it either uses it or gets it through an implicit import. Same thing for ℙ ('propositions').
 
 * Support for reflection is not done by any means. What exists now is likely to be full of errors and there are not many unit tests that reflection works as it is supposed to. A separate document should be created with documentation on how reflection is supposed to work.
-
-* Support for implicit and named subtheories may done (although it is likely that there are errors or problems with the immediate representation), but documentation is needed on how this is supposed to work.
 
 * Documentation is also needed of all the mereological facts that get generated for a theory.
 
@@ -36,5 +34,10 @@ Things to Be Done
 * 'lean4' as the target will involve a 'support library' in Lean 4. This is the equivalent of a run-time library for an ordinary programming language. Having the right support functions should make it possible to make the generated Lean 4 code reasonably readable for humans.
 
 * There is currently support for '--pure', '--debug' and '--pretty'. None of these options was planned and they should probably be removed. They can be kept for a bit longer, though, to simplify debugging.
+
+POSSIBLY DONE:
+
+DONE:
+* Support for implicit and named subtheories may be done (although it is likely that there are errors or problems with the immediate representation), but documentation is needed on how this is supposed to work.
 
 * Enforce commas/semicolons. There are places in the language where commas/semicolons appear optional at this point and where they should arguably be mandatory. In any case, a decision needs to be taken on this and there needs to be unit tests which ensure that the right things are allowed/disallowed.
