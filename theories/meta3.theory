@@ -1,45 +1,3 @@
-<<<<<<< Updated upstream
-/*  */
-{
-  signature {
-    sort D;
-    sort E;
-    sort F;
-    sort G;
-
-    E subsort D;
-    F quotient D;
-    G subquotient D;
-
-    D_max ⊆ D;
-    D_min ⊆ D;
-    d : D;
-
-    f : D → D;
-    g : D, E → Prop; 
-
-    K : E, E → D;
-
-    P : Prop;
-  },
-  axioms {
-    assertions {
-      D_max ∪ D_min = D_min ∪ D_max;
-      D_max ∩ D_min = D_min ∩ D_max;
-      D_min ⊆ D_max;
-      d ∈ D_max;
-    }
-  },
-  subtheories {
-  },
-  metafacts {
-
-    //(f.1 ∸ <D>(f.1)) ⇒ (f.res ∸ <D>(f.res)) ≤ 0;
-    //(f.1 ∸ <D_min, D.max>(f.1)) ⇒ (f.res ∸ <D>(f.res)) ≤ 0;
-  }
-}
-=======
-/*  */
 {
   signature {
     sort D;
@@ -80,4 +38,3 @@
     //(f.1 ∸ <D_min, D_max>(f.1)) ⇒ (f.res ∸ <D>(f.res)) ≤ 𝕌#min;
   }
 }
->>>>>>> Stashed changes
