@@ -1,0 +1,22 @@
+Eidos initially supported the following syntaxes:
+<relation-decl>    ::= <ident> ":" <sort-expr> "," <sort-expr> ("," <sort-expr>)* ";"
+<set-decl>         ::= <ident> "⊆" <sort-expr> ";"\n
+The identifier in a <relation-decl> had to start with a lowercase letter while the identifier in a <set-decl> had to start with an uppercase letter.
+
+The idea behind the original syntax was that a <relation-decl> corresponds to something that you can declare in first-order logic. Lowercase letters are still used at the beginning of functions that pertain to first-order logic.
+
+But while that emphasized the similarity between FOL functions and FOL relations, it deemphasized the similarity between a set and a n-ary relation for n > 1. For all practical purposes, sets are 1-ary relations.
+
+This lead to the following syntax being added by accident:
+<set-decl>         ::= <ident> "⊆" <sort-expr> ("," <sort-expr>)* ";"\n
+
+This provided a new way to get n-ary relations for n > 1, and the syntax was completely unified with the syntax for sets.
+
+This also involved using uppercase letters for relations (even FOL relations). Uppercase letters had always been used for sets, so it seemed very natural to also use them for n-ary relations with n > 1.
+
+The old syntax for <relation-decl> has now been dropped, and sets and relations are supported via a unified syntax:
+<set-or-rel-decl>         ::= <ident> "⊆" <sort-expr> ("," <sort-expr>)* ";"
+
+Note, though, that the 1-ary case remains a bit different from the n-ary case where n > 1. A set is a mereological object as far as Eidos is concerned, and this affects what you can do. For example, you can use S#individual to reinterpret the set S as an individual or S#mereological to get a bare mereological view on S.
+
+Conversely, the case n > 1 involves a product sort behind the scenes along with projections. If the relation is R then you can use R#1 to get the first sort, R#2 to get the second sort, etc., and you can use R#dom to get the product sort.
