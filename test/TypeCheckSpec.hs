@@ -407,8 +407,7 @@ main = hspec $ do
               sort S;
               x     : S;
               MySet ⊆ S;
-            }
-            axioms {
+            }, axioms {
               facts { x ∈ MySet; }
             }
           }
@@ -421,8 +420,7 @@ main = hspec $ do
               sort S;
               x     : S;
               MySet ⊆ S;
-            }
-            axioms {
+            }, axioms {
               facts { MySet(x); }
             }
           }
@@ -434,8 +432,7 @@ main = hspec $ do
               sort S;
               x     : S;
               MyPred ⊆ S, S;
-            }
-            axioms {
+            }, axioms {
               facts { MyPred(x, x); }
             }
           }
@@ -448,8 +445,7 @@ main = hspec $ do
               sort S;
               x     : S;
               f : S → S;
-            }
-            axioms {
+            }, axioms {
               facts { f(x) = x; }
             }
           }
@@ -461,8 +457,7 @@ main = hspec $ do
               sort S;
               A     ⊆  S;
               f : S → S;
-            }
-            axioms {
+            }, axioms {
               facts { f(A) = A; }
             }
           }
@@ -474,8 +469,7 @@ main = hspec $ do
               sort S;
               A     ⊆  S;
               F : S → S;
-            }
-            axioms {
+            }, axioms {
               facts { F(A) = A; }
             }
           }
@@ -488,8 +482,7 @@ main = hspec $ do
               i     :  S;
               A     ⊆  S;
               F : S → S;
-            }
-            axioms {
+            }, axioms {
               facts { F(i) = A; }
             }
           }
@@ -502,8 +495,7 @@ main = hspec $ do
               i     :  S;
               A     ⊆  S;
               F : S → S;
-            }
-            axioms {
+            }, axioms {
               facts { F({i}) = A; }
             }
           }
@@ -516,8 +508,7 @@ main = hspec $ do
               i     :  S;
               A     ⊆  S;
               F : S → S;
-            }
-            axioms {
+            }, axioms {
               facts { F(i#mereological) = A; }
             }
           }
@@ -530,8 +521,7 @@ main = hspec $ do
               i     :  S;
               A     ⊆  S;
               F : S → S;
-            }
-            axioms {
+            }, axioms {
               facts { F(i#set) = A; }
             }
           }
@@ -543,8 +533,7 @@ main = hspec $ do
               sort S;
               A     ⊆  S;
               P ⊆ S;
-            }
-            axioms {
+            }, axioms {
               facts { P(A#individual); }
             }
           }
@@ -555,8 +544,7 @@ main = hspec $ do
           { signature {
               sort S;
               f : S, S → S;
-            }
-            axioms {
+            }, axioms {
               facts { S = f#dom; }
             }
           }
@@ -568,8 +556,7 @@ main = hspec $ do
               sort S;
               A ⊆ S;
               B ⊆ S;
-            }
-            axioms {
+            }, axioms {
               facts { A ⊆ B; }
             }
           }
@@ -581,8 +568,7 @@ main = hspec $ do
               sort S;
               i : S;
               B ⊆ S;
-            }
-            axioms {
+            }, axioms {
               facts { {i} ⊆ B; }
             }
           }
@@ -598,8 +584,7 @@ main = hspec $ do
           { signature {
               sort S;
               MySet ⊆ S;
-            }
-            axioms {
+            }, axioms {
               assertions { ∀x:S x ∈ MySet; }
             }
           }
@@ -620,8 +605,7 @@ main = hspec $ do
           { signature {
               sort S;
               T subsort S;
-            }
-            axioms {
+            }, axioms {
               metafacts { T#max ≤ S#max; }
             }
           }
@@ -632,8 +616,7 @@ main = hspec $ do
           { signature {
               sort S;
               i : S;
-            }
-            axioms {
+            }, axioms {
               metafacts { (i#mereological - S#max) = 𝕌#min; }
             }
           }
@@ -644,8 +627,7 @@ main = hspec $ do
           { signature {
               sort S;
               sort T;
-            }
-            axioms {
+            }, axioms {
               facts { S = T; }
             }
           }
@@ -657,8 +639,7 @@ main = hspec $ do
               sort S;
               i     :  S;
               A     ⊆  S;
-            }
-            axioms {
+            }, axioms {
               facts { i ∈ A#mereological; }
             }
           }
@@ -670,8 +651,7 @@ main = hspec $ do
               sort S;
               i     :  S;
               A     ⊆  S;
-            }
-            axioms {
+            }, axioms {
               facts { A#mereological ∈ A; }
             }
           }
@@ -686,8 +666,7 @@ main = hspec $ do
               sort S;
               A     ⊆  S;
               B     ⊆  S;
-            }
-            axioms {
+            }, axioms {
               facts { B(A); }
             }
           }
@@ -699,8 +678,7 @@ main = hspec $ do
               sort S;
               A     ⊆  S;
               B     ⊆  S, S;
-            }
-            axioms {
+            }, axioms {
               facts { B(A, A); }
             }
           }
@@ -712,8 +690,7 @@ main = hspec $ do
               sort S;
               A     ⊆  S;
               F : S, S → S;
-            }
-            axioms {
+            }, axioms {
               facts { F(A) = A; }
             }
           }
@@ -724,8 +701,7 @@ main = hspec $ do
           { signature {
               sort S;
               i : S;
-            }
-            axioms {
+            }, axioms {
               facts { {i} = i; }
             }
           }
@@ -737,8 +713,7 @@ main = hspec $ do
               sort S;
               A ⊆ S;
               B ⊆ S;
-            }
-            axioms {
+            }, axioms {
               facts { {A} ⊆ B; }
             }
           }
@@ -749,8 +724,7 @@ main = hspec $ do
           { signature {
               sort S;
               s ⊆ S;
-            }
-            axioms {
+            }, axioms {
               facts { }
             }
           }
@@ -761,8 +735,7 @@ main = hspec $ do
           { signature {
               sort S;
               I : S;
-            }
-            axioms {
+            }, axioms {
               facts { }
             }
           }
@@ -778,8 +751,7 @@ main = hspec $ do
           { signature {
               sort S;
               f : S → S;
-            }
-            axioms {
+            }, axioms {
               facts { S = f; }
             }
           }
@@ -790,8 +762,7 @@ main = hspec $ do
           { signature {
               sort S;
               F : S → S;
-            }
-            axioms {
+            }, axioms {
               facts { S = f; }
             }
           }
@@ -803,8 +774,7 @@ main = hspec $ do
               sort S;
               f : S → S;
               F : S → S;
-            }
-            axioms {
+            }, axioms {
               facts { f = F; }
             }
           }
@@ -817,8 +787,7 @@ main = hspec $ do
               sort S;
               f : S → S;
               i : S;
-            }
-            axioms {
+            }, axioms {
               facts { f = i; }
             }
           }
@@ -830,8 +799,7 @@ main = hspec $ do
               sort S;
               f : S → S;
               g : S, S → S;
-            }
-            axioms {
+            }, axioms {
               facts { f = g; }
             }
           }
@@ -844,8 +812,7 @@ main = hspec $ do
               sort S;
               MySet    ⊆ S;
               OtherSet ⊆ S;
-            }
-            axioms {
+            }, axioms {
               facts { MySet ∈ OtherSet; }
             }
           }
@@ -858,8 +825,7 @@ main = hspec $ do
               sort S;
               x : S;
               y : S;
-            }
-            axioms {
+            }, axioms {
               facts { x ∈ y; }
             }
           }
@@ -872,8 +838,7 @@ main = hspec $ do
               sort S;
               x : S;
               y : S;
-            }
-            axioms {
+            }, axioms {
               facts { x ⊆ y; }
             }
           }
@@ -886,8 +851,7 @@ main = hspec $ do
               sort S;
               x     : S;
               MySet ⊆ S;
-            }
-            axioms {
+            }, axioms {
               facts { x ⊆ MySet; }
             }
           }
@@ -900,8 +864,7 @@ main = hspec $ do
               sort S;            
               MySet ⊆ S;
               y     : S;
-            }
-            axioms {
+            }, axioms {
               facts { MySet ⊆ y; }
             }
           }
@@ -913,8 +876,7 @@ main = hspec $ do
               sort S;
               i     :  S;
               A     ⊆  S;
-            }
-            axioms {
+            }, axioms {
               facts { i#set ∈ A; }
             }
           }
@@ -927,8 +889,7 @@ main = hspec $ do
               sort S;
               i     :  S;
               A     ⊆  S;
-            }
-            axioms {
+            }, axioms {
               facts { i ∈ A#individual; }
             }
           }
@@ -950,8 +911,7 @@ main = hspec $ do
               LessThan : D, D → Prop;
               x : D;
               y : D;
-            }
-            axioms {
+            }, axioms {
               facts { lessThan(x, y); }
             }
           }
@@ -963,8 +923,7 @@ main = hspec $ do
               sort D;
               x : D;
               y : D;
-            }
-            axioms {
+            }, axioms {
               facts { LessThan(x, y); }
             }
           }
