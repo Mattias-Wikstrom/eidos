@@ -144,8 +144,15 @@ processItem kw (th, subs) item = do
   
   let th' = addSubtheoryToTheory th sub
   th'' <- either throwError return $ propagateSubtheory th' subName isImplicit isRefl sub
+  let thFinal =
+        if isImplicit
+          then th''
+            { theoryUsesDomain = theoryUsesDomain th'' || theoryUsesDomain sub
+            , theoryUsesProp   = theoryUsesProp th'' || theoryUsesProp sub
+            }
+          else th''
 
-  return (th'', subs ++ [sub])
+  return (thFinal, subs ++ [sub])
 
 -- | Resolve a subtheory definition using the resolver from the monad
 resolveSubtheoryBody
@@ -219,34 +226,36 @@ buildSignatureItem th0 th item = do
     SigRelationalSort (RelationalSortDeclaration nm rel sortExprAST) -> do
       parentSort <- either throwError return $
         lookupSort th (sortConstant (sortRef sortExprAST))
-      let s   = mkRelatedSort th nm
+      let th' = markTheorySortExprUsage th sortExprAST
+          s   = mkRelatedSort th' nm
           entity = EntitySort s
       shouldInsert <- shouldInsertDeclaration nm entity
       if shouldInsert
         then do
-          let th1 = addSortToTh th s
+          let th1 = addSortToTh th' s
               th2 = relationalSortFacts th1 rel s parentSort
           return th2
-        else return th
+        else return th'
 
     SigFunction (FunctionDeclaration nm domainExprs codomainExpr) -> do
       argSorts <- mapM (liftLookup (lookupSortByExpr th)) domainExprs
       resSort <- either throwError return $ lookupSortByExpr th codomainExpr
+      let th' = foldl markTheorySortExprUsage (markTheorySortExprUsage th codomainExpr) domainExprs
       if firstLetterIsUppercase nm
         then do
           -- SOL function (uppercase name)
-          let f = mkSOLFunction th nm FunctionKindSOLFunctionFromTheory argSorts resSort FromSignature
+          let f = mkSOLFunction th' nm FunctionKindSOLFunctionFromTheory argSorts resSort FromSignature
           shouldInsert <- shouldInsertDeclaration nm (EntityFunction f)
-          return (if shouldInsert then addEntityToTh th (EntityFunction f) else th)
+          return (if shouldInsert then addEntityToTh th' (EntityFunction f) else th')
         else do
           -- FOL function (lowercase name): also create domain sort, inverse, image functions
           let (f, domSort, invFn, dirImg, invImg) =
-                mkFOLFunction th nm argSorts resSort FromSignature
+                mkFOLFunction th' nm argSorts resSort FromSignature
           shouldInsert <- shouldInsertDeclaration nm (EntityFunction f)
           if shouldInsert
             then do
               -- Add domain sort (product sort) + its limits
-              let th1 = addEntityToTh th  (EntitySort domSort)
+              let th1 = addEntityToTh th'  (EntitySort domSort)
                   th2 = addEntityToTh th1 (EntityMereological (sortMin domSort))
                   th3 = addEntityToTh th2 (EntityMereological (sortMax domSort))
               -- Add inverse domain sort + limits
@@ -260,10 +269,11 @@ buildSignatureItem th0 th item = do
                   th9 = addEntityToTh th8 (EntityFunction dirImg)
                   th10= addEntityToTh th9 (EntityFunction invImg)
               return th10
-            else return th
+            else return th'
 
     SigIndividual (IndividualDeclaration nm sortExprAST) -> do
       s <- either throwError return $ lookupSortByExpr th sortExprAST
+      let th' = markTheorySortExprUsage th sortExprAST
       let isPropSort = sortKind s == SortKindProp
       when (isPropSort && not (firstLetterIsUppercase nm)) $
         throwError $ "Proposition names must start with uppercase: " ++ nm
@@ -273,25 +283,26 @@ buildSignatureItem th0 th item = do
             if isPropSort
               then MereologicalEntityKindProposition
               else MereologicalEntityKindIndividual
-          mo = mkMereo th moKind nm s FromSignature
+          mo = mkMereo th' moKind nm s FromSignature
       
       shouldInsert <- shouldInsertDeclaration nm (EntityMereological mo)
-      return (if shouldInsert then addEntityToTh th (EntityMereological mo) else th)
+      return (if shouldInsert then addEntityToTh th' (EntityMereological mo) else th')
 
     SigSet (SetDeclaration nm domainExprs) -> do
       when (not (firstLetterIsUppercase nm)) $
         throwError $ "Set/relation names must start with uppercase: " ++ nm
+      let th' = foldl markTheorySortExprUsage th domainExprs
       case domainExprs of
         [sexpr] -> do
           s <- either throwError return $ lookupSortByExpr th sexpr
-          let mo = mkMereo th MereologicalEntityKindSet nm s FromSignature
+          let mo = mkMereo th' MereologicalEntityKindSet nm s FromSignature
           shouldInsert <- shouldInsertDeclaration nm (EntityMereological mo)
-          return (if shouldInsert then addEntityToTh th (EntityMereological mo) else th)
+          return (if shouldInsert then addEntityToTh th' (EntityMereological mo) else th')
         _ -> do
           argSorts <- mapM (liftLookup (lookupSortByExpr th)) domainExprs
-          let rel = mkRelation th nm argSorts FromSignature
+          let rel = mkRelation th' nm argSorts FromSignature
           shouldInsert <- shouldInsertDeclaration nm (EntityRelation rel)
-          return (if shouldInsert then addEntityToTh th (EntityRelation rel) else th)
+          return (if shouldInsert then addEntityToTh th' (EntityRelation rel) else th')
 
 -- Helper to lift lookup functions into BuildM
 liftLookup
@@ -351,13 +362,58 @@ addPropFact th0 fk th prop = do
         , factKind                      = fk
         , factPropExpr                  = resolvedExpr
         }
-  return (th { theoryFacts = theoryFacts th ++ [fact] })
+  let th' = markTheoryPropExprUsage th prop
+  return (th' { theoryFacts = theoryFacts th' ++ [fact] })
 
 propSourceContext :: PropExprInclVars -> String
 propSourceContext (PropExprInclVars line col _ _) =
   if line > 0 && col > 0
     then "At line " ++ show line ++ ", column " ++ show col ++ ": "
     else ""
+
+markTheorySortExprUsage :: Theory -> SortExpr -> Theory
+markTheorySortExprUsage th sexpr =
+  let tok = sortConstant (sortRef sexpr)
+  in th
+      { theoryUsesDomain = theoryUsesDomain th || tok == "𝔻"
+      , theoryUsesProp   = theoryUsesProp th   || tok == "ℙ" || tok == "Prop"
+      }
+
+markTheoryPropExprUsage :: Theory -> PropExprInclVars -> Theory
+markTheoryPropExprUsage th (PropExprInclVars _ _ vars expr) =
+  let thWithVars = foldl (\acc v -> markTheorySortExprUsage acc (varSort v)) th vars
+  in if propExprUsesLogicalConnective expr
+      then thWithVars { theoryUsesProp = True }
+      else thWithVars
+
+propExprUsesLogicalConnective :: PropExpr -> Bool
+propExprUsesLogicalConnective (PropExpr left rests) =
+  (not . null) rests || rightImplUsesLogicalConnective left
+
+rightImplUsesLogicalConnective :: RightImpl -> Bool
+rightImplUsesLogicalConnective (RightImpl li mRight) =
+  leftImplUsesLogicalConnective li || case mRight of
+    Nothing -> False
+    Just _  -> True
+
+leftImplUsesLogicalConnective :: LeftImpl -> Bool
+leftImplUsesLogicalConnective (LeftImpl d rests) =
+  disjUsesLogicalConnective d || (not . null) rests
+
+disjUsesLogicalConnective :: Disj -> Bool
+disjUsesLogicalConnective (Disj c rests) =
+  conjUsesLogicalConnective c || (not . null) rests
+
+conjUsesLogicalConnective :: Conj -> Bool
+conjUsesLogicalConnective (Conj n rests) =
+  negUsesLogicalConnective n || (not . null) rests
+
+negUsesLogicalConnective :: Neg -> Bool
+negUsesLogicalConnective (NegNot _)   = True
+negUsesLogicalConnective (NegChild q) = quantifiedUsesLogicalConnective q
+
+quantifiedUsesLogicalConnective :: Quantified -> Bool
+quantifiedUsesLogicalConnective (Quantified qs _) = not (null qs)
 
 -- ---------------------------------------------------------------------------
 -- Theory skeleton construction
@@ -382,6 +438,8 @@ createTheory parentMaybe name isRefl =
         , theoryName                         = name
         , theoryFullyQualifiedName           = fqn
         , theoryReflection                   = isRefl
+        , theoryUsesDomain                   = False
+        , theoryUsesProp                     = False
         , theoryClosestReflectionAncestor    = closestRefl
         , theorySubtheories                  = []
         , theoryObjects                      = builtins

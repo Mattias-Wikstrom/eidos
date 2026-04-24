@@ -772,6 +772,47 @@ main = hspec $ do
       let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
       mergeFacts `shouldSatisfy` any (mergeFactMentionsLhs "LessThanOrEq")
 
+  describe "Theory usage flags (𝔻/ℙ)" $ do
+    it "marks theoryUsesDomain when 𝔻 is referenced in signature" $ do
+      th <- buildStr "{ signature { x : 𝔻; } }"
+      theoryUsesDomain th `shouldBe` True
+
+    it "marks theoryUsesProp when ℙ is referenced in signature" $ do
+      th <- buildStr "{ signature { P : ℙ; } }"
+      theoryUsesProp th `shouldBe` True
+
+    it "marks theoryUsesProp when logical connectives are used in axioms" $ do
+      th <- buildStr "{ axioms { assertions { ⊤ ∧ ⊤; } } }"
+      theoryUsesProp th `shouldBe` True
+
+    it "inherits usage flags from implicit subtheories" $ do
+      th <- buildStr [r|{
+        subtheories {
+          implicit {
+            sub: {
+              signature { x : 𝔻; },
+              axioms { assertions { ⊤ ∧ ⊤; } }
+            }
+          }
+        }
+      }|]
+      theoryUsesDomain th `shouldBe` True
+      theoryUsesProp th `shouldBe` True
+
+    it "does not inherit usage flags from named subtheories" $ do
+      th <- buildStr [r|{
+        subtheories {
+          named {
+            sub: {
+              signature { x : 𝔻; },
+              axioms { assertions { ⊤ ∧ ⊤; } }
+            }
+          }
+        }
+      }|]
+      theoryUsesDomain th `shouldBe` False
+      theoryUsesProp th `shouldBe` False
+
 -- | Extract the (lhsName, rhsName) pair from a merge equality fact.
 -- Returns Nothing for any other shape.
 mergeFactNames :: Fact -> Maybe (String, String)
