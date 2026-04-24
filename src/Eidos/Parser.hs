@@ -294,7 +294,6 @@ dottedIdent = do
 pSubtheoryDef :: Parser SubtheoryDef
 pSubtheoryDef =
       SubtheoryBody        <$> between lbrace rbrace pTheoryBody
-  <|> SubtheoryExternalRef <$> (doubleLbrack *> dottedIdent <* doubleRbrack)
   <|> SubtheoryExternalRef <$> (at *> dottedIdent)
 
 -- ---------------------------------------------------------------------------

@@ -14,7 +14,7 @@ module Eidos.Lexer
     -- * Punctuation
   , lbrace, rbrace, lparen, rparen, lbrack, rbrack
   , semi, colon, comma, dot, hash, at, underscore, caret
-  , lt, gt, doubleLt, doubleGt, doubleLbrack, doubleRbrack
+  , lt, gt, doubleLt, doubleGt
     -- * Operators
   , arrow, bicond, impliedBy, impliesOp
   , subset, inOp, leq
@@ -66,14 +66,14 @@ rbrace  = symbol "}"
 lparen  = symbol "("
 rparen  = symbol ")"
 
--- | '[' that is NOT the start of '[['.
+-- | '[' token.
 lbrack :: Parser String
 lbrack = lexeme $ try $ do
   c <- char '['
   notFollowedBy (char '[')
   return [c]
 
--- | ']' that is NOT the start of ']]'.
+-- | ']' token.
 rbrack :: Parser String
 rbrack = lexeme $ try $ do
   c <- char ']'
@@ -90,11 +90,9 @@ at        = symbol "@"
 underscore = symbol "_"
 caret      = symbol "^"
 
-lt, gt, doubleLt, doubleGt, doubleLbrack, doubleRbrack :: Parser String
+lt, gt, doubleLt, doubleGt :: Parser String
 doubleLt     = symbol "<<"
 doubleGt     = symbol ">>"
-doubleLbrack = symbol "[["
-doubleRbrack = symbol "]]"
 -- '<' / '>' must not match when '<<' / '>>' follows.
 lt = lexeme $ try $ char '<' <* notFollowedBy (char '<') >>= \c -> return [c]
 gt = lexeme $ try $ char '>' <* notFollowedBy (char '>') >>= \c -> return [c]

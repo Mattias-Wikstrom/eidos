@@ -102,7 +102,6 @@ This document describes the **current concrete syntax** accepted by the Haskell 
 <subtheory-alias>     ::= <ident-like-including-structural-keywords>
 
 <subtheory-def>       ::= "{" <theory-body> "}"
-                        | "[[" <dotted-ident> "]]"
                         | "@" <dotted-ident>
 
 <dotted-ident>        ::= <ident> ("." <ident>)*
