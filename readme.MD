@@ -273,8 +273,8 @@ If T is a quotient sort of S then it is possible two different individuals of so
 ```
 
 #### Sets
-The following declares mySet to be a set of sort S:
-  mySet ⊆ S;
+The following declares MySet to be a set of sort S:
+  MySet ⊆ S;
 
 The following illustrates how individuals and sets may be combined in a theory:
 ```
@@ -322,27 +322,27 @@ Here is an example of a theory that uses a function:
 This theory specifies that f(x, y) is identical to f(y, x), where x and y have sort S.
 
 #### First-Order Relations
-First-order relations have names that start with lowercase letters and have declaratations that resemble the declarations for sets (see above):
-  myRelation ⊆ S, T, U;
+First-order relations have names that start with uppercase letters and have declaratations that resemble the declarations for sets (see above):
+  MyRelation ⊆ S, T, U;
 
-This example declares myRelation to be a 3-ary relation where the first argument has sort S, where the second argument has sort T, and where the third argument has sort U.
+This example declares MyRelation to be a 3-ary relation where the first argument has sort S, where the second argument has sort T, and where the third argument has sort U.
 
 Here is an example of a theory that uses a relation:
 ```
 {
   signature {
     sort S;
-    r: S, S;
+    R ⊆ S, S;
   },
   axioms {
     assertions {
-      [x:S][y:S]r(x, y) ↔ r(y, x);
+      [x:S][y:S]R(x, y) ↔ R(y, x);
     }
   }
 }
 ```
 
-This theory specifies that r(x, y) holds just in case r(y, x) holds, where x and y are individuals of sort S.
+This theory specifies that R(x, y) holds just in case R(y, x) holds, where x and y are individuals of sort S.
 
 #### Propositional Constants
 Propositional constants start with uppercase letters and have sort ℙ.
@@ -536,18 +536,25 @@ The following asserts that any two sets of sort S are identical:
   },
   axioms {
     assertions {
-      ∀x⊆S ∀y⊆S x =_S y
+      ∀X⊆S ∀Y⊆S X =_S Y
     }
   }
 }
 ```
 
+### Free Variables
+Eidos requires all variables to have sorts, including free variables (variables that are not bound through quantifiers).
+
+Free variables are listed at the beginning of an expression using a bracket notation. Here are two examples:
+  [x:S] x ∈ MySet
+  [x:S] [X ⊆ S] x ∈ Y
+
 ### Sets as Properties
-There is no distinction between 'sets of sort S' and 'properties of sort S'. THe following two lines assert exactly the same thing:
+There is no distinction between 'sets of sort S' and 'properties of sort S'. The following two lines assert exactly the same thing:
   i ∈ MySet
   MySet(i)
 
-(For practical purposes, sets/properties may be thought of as 1-ary relations and propositions may be thought of as 0-ary relations.)
+(For practical purposes, sets/properties may be thought of as 1-ary relations.)
 
 ### Singleton sets
 For an individual x, {x} is the set whose only member is x.
@@ -615,6 +622,8 @@ The following may all be referenced:
 * r#dom#max.
 
 ### The Arguments of a Function
+
+
 
 
 ### The metafacts Section
