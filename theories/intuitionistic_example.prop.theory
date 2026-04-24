@@ -3,6 +3,7 @@
     P1 : ℙ;
     P2 : ℙ;
     Q : ℙ;
+    MyOtherProp : ℙ;
     MyProp : ℙ;
   },
   axioms {
@@ -12,6 +13,7 @@
       Q → (MyProp ∧ ¬P1);
       (P2 → ⊥) ↔ (¬MyProp);
       [X : ℙ] (X → (¬¬X));
+      Q ← P1;
     }
   }
 }
