@@ -298,6 +298,66 @@ main = hspec $ do
         parseString "{ subtheories { named { sub: {} } reflection { sub: {} } } }"
           `shouldSatisfy` isLeft
           
+    describe "Suffix syntax" $ do
+      -- Valid hash suffixes
+      it "accepts #res suffix on a term" $
+        parseString "{ axioms { assertions { f#res = f#res; } } }" `shouldSatisfy` isRight
+
+      it "accepts #arg suffix on a term" $
+        parseString "{ axioms { assertions { f#arg = f#arg; } } }" `shouldSatisfy` isRight
+
+      it "accepts #dom suffix on a term" $
+        parseString "{ axioms { assertions { f#dom = f#dom; } } }" `shouldSatisfy` isRight
+
+      it "accepts #min and #max suffixes" $
+        parseString "{ axioms { assertions { S#min ≤ S#max; } } }" `shouldSatisfy` isRight
+
+      -- .res / .arg / .dom must be rejected (these are NOT valid dot-attr suffixes;
+      -- use #res, #arg, #dom instead). We use a parenthesised base term so that
+      -- the dot cannot be parsed as a qualified-ref separator, forcing the suffix path.
+      it "rejects .res as a dot-attribute suffix" $
+        parseString "{ axioms { assertions { (f).res = (f).res; } } }" `shouldSatisfy` isLeft
+
+      it "rejects .arg as a dot-attribute suffix" $
+        parseString "{ axioms { assertions { (f).arg = (f).arg; } } }" `shouldSatisfy` isLeft
+
+      it "rejects .dom as a dot-attribute suffix" $
+        parseString "{ axioms { assertions { (f).dom = (f).dom; } } }" `shouldSatisfy` isLeft
+
+      -- .min and .max remain valid dot-attr alternatives
+      it "accepts .min as a dot-attribute suffix" $
+        parseString "{ axioms { assertions { S.min ≤ S.max; } } }" `shouldSatisfy` isRight
+
+      it "accepts .max as a dot-attribute suffix" $
+        parseString "{ axioms { assertions { S.max = S.max; } } }" `shouldSatisfy` isRight
+
+    describe "Subtheory structure" $ do
+      -- Bare items at top level of subtheories {} are not allowed
+      it "rejects a bare named item at top level of subtheories block" $
+        parseString "{ subtheories { sub: { signature { sort S; } } } }"
+          `shouldSatisfy` isLeft
+
+      it "rejects a bare external reference at top level of subtheories block" $
+        parseString "{ subtheories { sub: @ext } }"
+          `shouldSatisfy` isLeft
+
+      -- [bracket] qualifier syntax is forbidden
+      it "rejects [implicit] qualifier inside an implicit block" $
+        parseString "{ subtheories { implicit { [implicit] sub: { } } } }"
+          `shouldSatisfy` isLeft
+
+      it "rejects [named] qualifier inside a named block" $
+        parseString "{ subtheories { named { [named] sub: { } } } }"
+          `shouldSatisfy` isLeft
+
+      it "rejects [implicit] qualifier inside a named block" $
+        parseString "{ subtheories { named { [implicit] sub: { } } } }"
+          `shouldSatisfy` isLeft
+
+      it "rejects [reflection] qualifier inside a reflection block" $
+        parseString "{ subtheories { reflection { [reflection] sub: { } } } }"
+          `shouldSatisfy` isLeft
+
 -- Helper functions
 isRight :: Either a b -> Bool
 isRight (Right _) = True

@@ -1,8 +1,11 @@
 /* Equational theory that axiomatizes the concept of a semiring without unity */
 {
   subtheories {
-    additive_monoid: @commutative_monoid,
-    multiplicative_semigroup: @semigroup
+    implicit
+    {
+      additive_monoid: @commutative_monoid,
+      multiplicative_semigroup: @semigroup
+    }
   },
   signature {
     sort D;

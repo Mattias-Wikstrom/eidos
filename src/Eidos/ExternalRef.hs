@@ -28,6 +28,7 @@ data TheoryType
   | RegularTheory
   | FOLTheory
   | SOLTheory
+  | PropositionalTheory
   deriving (Show, Eq, Enum, Bounded)
 
 -- | Result of resolving an external reference
@@ -58,6 +59,7 @@ theoryTypeToSuffix EquationalTheory = ".eq"
 theoryTypeToSuffix RegularTheory   = ".reg"
 theoryTypeToSuffix FOLTheory       = ".fol"
 theoryTypeToSuffix SOLTheory       = ".sol"
+theoryTypeToSuffix PropositionalTheory       = ".prop"
 
 theoryTypeToExtension :: TheoryType -> String
 theoryTypeToExtension tt = theoryTypeToSuffix tt ++ ".theory"

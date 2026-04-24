@@ -768,14 +768,14 @@ main = hspec $ do
       Map.lookup "sub.f#dir_img" (theoryObjectsByName th) `shouldSatisfy` maybe False (not . null)
 
     -- Three-deep inheritance chain (preorder → partial_order → lattice)
-    it "item1+3: three-deep implicit chain merges lessThanOrEq with exactly one canonical" $ do
+    it "item1+3: three-deep implicit chain merges LessThanOrEq with exactly one canonical" $ do
       th <- buildStr [r|{
         subtheories { implicit {
           lat: {
             subtheories { implicit {
               po: {
                 subtheories { implicit {
-                  pre: { signature { lessThanOrEq ⊆ 𝔻, 𝔻; } }
+                  pre: { signature { LessThanOrEq ⊆ 𝔻, 𝔻; } }
                 }}
               }
             }}
@@ -783,13 +783,13 @@ main = hspec $ do
         }}
       }|]
       -- Exactly one unqualified entry
-      case Map.lookup "lessThanOrEq" (theoryObjectsByName th) of
+      case Map.lookup "LessThanOrEq" (theoryObjectsByName th) of
         Just [_] -> return ()
         Just es  -> fail $ "Expected 1 canonical, got " ++ show (length es)
-        Nothing  -> fail "lessThanOrEq not found"
-      -- At least one merge fact mentioning lessThanOrEq on the LHS
+        Nothing  -> fail "LessThanOrEq not found"
+      -- At least one merge fact mentioning LessThanOrEq on the LHS
       let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
-      mergeFacts `shouldSatisfy` any (mergeFactMentionsLhs "lessThanOrEq")
+      mergeFacts `shouldSatisfy` any (mergeFactMentionsLhs "LessThanOrEq")
 
 -- | Extract the (lhsName, rhsName) pair from a merge equality fact.
 -- Returns Nothing for any other shape.

@@ -132,6 +132,7 @@ The language uses the file ending ".theory" for all its files, but it is possibl
 * files with the ending ".coh.theory" define  theories in *coherent logic*,
 * files with the ending ".fol.theory" define  theories in *first-order logic*, and
 * files with the ending ".sol.theory" define  theories in *second-order logic*.
+* files with the ending ".prop.theory" define  theories in (unquantified) *propositional logic*.
 
 These are all sublanguages of the full language.
 

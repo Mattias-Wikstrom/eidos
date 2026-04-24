@@ -7,7 +7,7 @@
   },
   axioms {
     assertions {
-      [x : D] [y : D] [z : D] lessThanOrEq(x, z) → join(x, meet(y, z)) = meet(join(x, y), z);
+      [x : D] [y : D] [z : D] LessThanOrEq(x, z) → join(x, meet(y, z)) = meet(join(x, y), z);
     }
   }
 }

@@ -43,8 +43,8 @@ Example:
   axioms {
     assertions {
       T = sub.S; /* The individuals in T correspond to subsets of the original sort S */
-      t1 = sub.pred; /* Since pred has been reflected into an individual, equating it with t1 is fine */
-      sub.F(t1, t2) = sub.pred; /* sub.F has been reflected into a FOL function and is applied to individuals */
+      t1 = sub.Pred; /* Since Pred has been reflected into an individual, equating it with t1 is fine */
+      sub.F(t1, t2) = sub.Pred; /* sub.F has been reflected into a FOL function and is applied to individuals */
     }
   },
   subtheories {
@@ -53,7 +53,7 @@ Example:
         signature {
           sort S;
           i : S;
-          pred ⊆ S;
+          Pred ⊆ S;
           F: S, S → S;
         },
         axioms {

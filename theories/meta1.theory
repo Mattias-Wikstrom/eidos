@@ -9,12 +9,12 @@
   },
   Assertions {
     // The following will make the sort S encompass everything in object_theory
-    (S).max = object_theory.1;
-    (S).min = object_theory.0;
+    S#max = object_theory.𝕌#max;
+    S#min = object_theory.𝕌#min;
 
     // The following will make T encompass the propositions in object_theory
-    (T).max = object_theory.⊥;
-    (T).min = object_theory.⊤;
+    T#max = object_theory.⊥;
+    T#min = object_theory.⊤;
     
     U = object_theory.D;
 
