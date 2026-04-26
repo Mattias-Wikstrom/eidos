@@ -22,6 +22,8 @@ Things to Be Done
 
 * There is currently support for '--pure', '--debug' and '--pretty'. None of these options was planned and they should probably be removed. They can be kept for a bit longer, though, to simplify debugging.
 
+* The facts, assertions, and metafacts should all involve their own restrictions and interpretations. They are currently interchangeable, but that is very wrong.
+
 * File endings such as ".coh.theory" and ".reg.theory" should impose restrictions on what you are allowed to express in the theory:
   .theory -- Maximally permissive, needed for 'mereological' things
   .sol.theory -- Second-order logic (with many sorts, where FOL and SOL can be used for each sort)
