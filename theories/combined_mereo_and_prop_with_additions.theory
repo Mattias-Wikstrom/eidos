@@ -1,5 +1,7 @@
 {
   signature {
+    MySet4 ⊆ 𝔻;
+
     sort S;
     MySet1 ⊆ S;
     MySet2 ⊆ S;
@@ -31,6 +33,8 @@
       Q ← P1;
     },
     metafacts {
+      MySet4 - 𝔻#min;
+
       MySet1 - S#min;
       MySet2 - S#max;
       MySet3 - T#max;

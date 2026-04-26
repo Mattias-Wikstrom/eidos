@@ -10,14 +10,18 @@
 --   axiom U_Max : Prop
 --   axiom P_Min  : Prop    -- = ℙ#min
 --   axiom P_Max  : Prop    -- = ℙ#max
+--   axiom D_Min  : Prop    -- = 𝔻#min
+--   axiom D_Max  : Prop    -- = 𝔻#max
 --   -- ordering: U_Max ≤ P_Max ≤ P_Min ≤ U_Min
 --   axiom sort_order_1: U_Max → P_Max
 --   axiom sort_order_2: P_Max  → P_Min
 --   axiom sort_order_3: P_Min  → U_Min
+--   axiom D_sort_order: D_Max → D_Min
 -- @
 --
 -- 𝕌-kinded objects get boundedness axioms @P → U_Min@ and @U_Max → P@.
 -- ℙ-kinded objects get boundedness axioms @P → P_Min@  and @P_Max → P@.
+-- 𝔻-kinded objects (sets) get boundedness axioms @S → D_Min@ and @D_Max → S@.
 --
 -- The mereological difference operation @A - B@ is rendered as @B → A@
 -- (operand swap).  All other operations (+, ×, ∸) map to (∧, ∨, ↔).
@@ -42,8 +46,10 @@ exportToLeanProps theory =
     ++ userSortLimitDecls
     ++ mereoDecls
     ++ propDecls
+    ++ setDecls  -- Add declarations for 𝔻-sorted sets
     ++ mereoBoundsAxioms
     ++ propBoundsAxioms
+    ++ setBoundsAxioms  -- Add bounds axioms for 𝔻-sorted sets
     ++ userSortSetBoundsAxioms
     ++ sortOrderAxioms
     ++ userFactAxioms
@@ -60,6 +66,8 @@ exportToLeanProps theory =
       , "axiom U_Max : Prop"
       , "axiom P_Min  : Prop"
       , "axiom P_Max  : Prop"
+      , "axiom D_Min  : Prop"
+      , "axiom D_Max  : Prop"
       , ""
       ]
 
@@ -110,11 +118,37 @@ exportToLeanProps theory =
          ]
 
     -- -----------------------------------------------------------------------
+    -- 𝔻-kinded (set) signature objects
+    -- These are sets with sort 𝔻 (e.g., MySet4 ⊆ 𝔻)
+    -- -----------------------------------------------------------------------
+    setObjects :: [IR.MereologicalObject]
+    setObjects =
+      [ m
+      | IR.EntityMereological m <- IR.theoryObjects theory
+      , IR.mereoKind m == IR.MereologicalEntityKindSet
+      , IR.mereoOrigin m == IR.FromSignature
+      , IR.sortKind (IR.mereoSort m) == IR.SortKindDomain
+      , IR.sortName (IR.mereoSort m) == "𝔻"
+      ]
+
+    setDecls = map (\m -> "axiom " ++ IR.mereoName m ++ " : Prop") setObjects
+
+    setBoundsAxioms = concatMap setBoundsFor setObjects
+
+    setBoundsFor :: IR.MereologicalObject -> [String]
+    setBoundsFor m =
+      let n = IR.mereoName m
+      in [ "axiom " ++ n ++ "_top: " ++ n ++ " → D_Min"
+         , "axiom " ++ n ++ "_bot: D_Max → " ++ n
+         ]
+
+    -- -----------------------------------------------------------------------
     -- User-declared sorts: declare their min/max limit objects and emit
     -- bounds axioms for every set that lives inside one of those sorts.
     -- -----------------------------------------------------------------------
 
-    -- User sorts (excluding the three built-ins 𝕌, 𝔻, ℙ)
+    -- User sorts (excluding the three built-ins 𝕌, 𝔻, ℙ, and also excluding
+    -- 𝔻 since we're handling it separately above with its own bounds)
     userSorts :: [IR.Sort]
     userSorts =
       [ s
@@ -162,7 +196,7 @@ exportToLeanProps theory =
              ]
 
     -- -----------------------------------------------------------------------
-    -- Sort-ordering axioms: U_Min ≤ P_Min ≤ P_Max ≤ U_Max
+    -- Sort-ordering axioms: U_Min ≤ P_Min ≤ P_Max ≤ U_Max, and D_Max → D_Min
     -- -----------------------------------------------------------------------
     sortOrderAxioms =
       [ ""
@@ -170,6 +204,7 @@ exportToLeanProps theory =
       , "axiom sort_order_1: U_Max → P_Max"
       , "axiom sort_order_2: P_Max  → P_Min"
       , "axiom sort_order_3: P_Min  → U_Min"
+      , "axiom D_sort_order: D_Max → D_Min"
       ]
       ++ userSortOrderAxioms
       ++ [""]
@@ -237,6 +272,7 @@ exportToLeanProps theory =
       in case sortName of
            "ℙ" -> "∀ " ++ varName ++ " : Prop, (P_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → P_Min) → "
            "𝕌" -> "∀ " ++ varName ++ " : Prop, (U_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → U_Min) → "
+           "𝔻" -> "∀ " ++ varName ++ " : Prop, (D_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → D_Min) → "
            _   -> "∀ " ++ varName ++ " : " ++ sortName ++ ", "
 
 -- ---------------------------------------------------------------------------
@@ -299,6 +335,7 @@ renderExplicitQuantifier (IR.ResolvedQForall vd) =
   in case sortName of
        "ℙ" -> "∀ " ++ varName ++ " : Prop, (P_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → P_Min) → "
        "𝕌" -> "∀ " ++ varName ++ " : Prop, (U_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → U_Min) → "
+       "𝔻" -> "∀ " ++ varName ++ " : Prop, (D_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → D_Min) → "
        _   -> "∀ " ++ varName ++ " : " ++ sortName ++ ", "
 renderExplicitQuantifier (IR.ResolvedQExists vd) =
   let varName  = IR.resolvedVarName vd
@@ -306,6 +343,7 @@ renderExplicitQuantifier (IR.ResolvedQExists vd) =
   in case sortName of
        "ℙ" -> "∃ " ++ varName ++ " : Prop, (P_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → P_Min) ∧ "
        "𝕌" -> "∃ " ++ varName ++ " : Prop, (U_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → U_Min) ∧ "
+       "𝔻" -> "∃ " ++ varName ++ " : Prop, (D_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → D_Min) ∧ "
        _   -> "∃ " ++ varName ++ " : " ++ sortName ++ ", "
 
 renderAtomicProp :: IR.ResolvedAtomicProp -> String
@@ -319,6 +357,8 @@ renderConstantRef ref =
     "ℙ#max" -> "P_Max"
     "𝕌#min" -> "U_Min"
     "𝕌#max" -> "U_Max"
+    "𝔻#min" -> "D_Min"
+    "𝔻#max" -> "D_Max"
     "⊤"     -> "P_Min"
     "⊥"     -> "P_Max"
     other   -> other
@@ -374,7 +414,7 @@ renderFactor (IR.ResolvedFactor base [] _) = renderBaseTerm base
 renderFactor (IR.ResolvedFactor base suffixes _) =
   -- When a sort constant (ℙ, 𝕌, 𝔻) is followed by a #min or #max suffix,
   -- the combination denotes a named limit object with its own Lean name.
-  -- We resolve the pair here: e.g. ℙ#min → P_Min, 𝕌#max → U_Max.
+  -- We resolve the pair here: e.g. ℙ#min → P_Min, 𝕌#max → U_Max, 𝔻#min → D_Min
   case (base, suffixes) of
     (IR.ResolvedBTAtomic ref, IR.ResolvedSuffixSpecialOp attr : rest)
       | attr `elem` ["min", "max"] ->
@@ -384,8 +424,8 @@ renderFactor (IR.ResolvedFactor base suffixes _) =
                 ("ℙ", "max") -> "P_Max"
                 ("𝕌", "min") -> "U_Min"
                 ("𝕌", "max") -> "U_Max"
-                ("𝔻", "min") -> "U_Min"
-                ("𝔻", "max") -> "U_Max"
+                ("𝔻", "min") -> "D_Min"
+                ("𝔻", "max") -> "D_Max"
                 -- User-declared sort S: S#min → S_Min, S#max → S_Max
                 (s, "min") -> s ++ "_Min"
                 (s, "max") -> s ++ "_Max"
