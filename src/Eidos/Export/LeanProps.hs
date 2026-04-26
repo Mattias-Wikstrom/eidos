@@ -309,7 +309,23 @@ renderTermChain leftStr (off : rest) =
 renderFactor :: IR.ResolvedFactor -> String
 renderFactor (IR.ResolvedFactor base [] _) = renderBaseTerm base
 renderFactor (IR.ResolvedFactor base suffixes _) =
-  renderBaseTerm base ++ concatMap renderSuffix suffixes
+  -- When a sort constant (ℙ, 𝕌, 𝔻) is followed by a #min or #max suffix,
+  -- the combination denotes a named limit object with its own Lean name.
+  -- We resolve the pair here: e.g. ℙ#min → _Top, 𝕌#max → U_Max.
+  case (base, suffixes) of
+    (IR.ResolvedBTAtomic ref, IR.ResolvedSuffixSpecialOp attr : rest)
+      | attr `elem` ["min", "max"] ->
+          let combined = IR.resolvedConstRefName ref ++ "#" ++ attr
+              leanName = case combined of
+                "ℙ#min" -> "_Top"
+                "ℙ#max" -> "_Bot"
+                "𝕌#min" -> "U_Min"
+                "𝕌#max" -> "U_Max"
+                "𝔻#min" -> "U_Min"
+                "𝔻#max" -> "U_Max"
+                other   -> other
+          in leanName ++ concatMap renderSuffix rest
+    _ -> renderBaseTerm base ++ concatMap renderSuffix suffixes
 
 renderSuffix :: IR.ResolvedTermSuffix -> String
 renderSuffix (IR.ResolvedSuffixDotAttr attr) = "." ++ attr
