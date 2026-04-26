@@ -7,7 +7,7 @@
     a : U; 
     b : U;
   },
-  Assertions {
+  assertions {
     // The following will make the sort S encompass everything in object_theory
     S#max = object_theory.𝕌#max;
     S#min = object_theory.𝕌#min;

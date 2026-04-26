@@ -591,43 +591,51 @@ mkSOLFunction th nm k argSorts resSort orig = Function
 mkFOLFunction :: Theory -> String -> [Sort] -> Sort -> Origin
               -> (Function, Sort, Function, Function, Function)
 mkFOLFunction th nm argSorts resSort orig =
-  let f0 = mkSOLFunction th nm FunctionKindFOLFunctionFromTheory argSorts resSort orig
+  -- The function itself carries the caller-supplied origin (e.g. FromSignature,
+  -- FromSubtheory).  All *auxiliary* objects generated as a consequence of
+  -- declaring the function — domain sorts, limit objects, image functions,
+  -- the inverse — are tagged FromFunction so that queries can distinguish
+  -- "was explicitly written" from "was auto-generated".
+  let auxOrig = FromFunction
+      f0 = mkSOLFunction th nm FunctionKindFOLFunctionFromTheory argSorts resSort orig
       domSort = Sort
         { sortKind             = SortKindProduct
         , sortTheory           = th
-        , sortOrigin           = orig
-        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "#dom#min") domSort orig
-        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "#dom#max") domSort orig
+        , sortOrigin           = auxOrig
+        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "#dom#min") domSort auxOrig
+        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "#dom#max") domSort auxOrig
         , sortName             = nm ++ "#dom"
         , sortComponentSorts   = argSorts
         , sortAssociatedEntity = Just (EntityFunction f)
         , sortReflectedFrom    = Nothing
         }
-      domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "#arg") domSort orig
+      domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "#arg") domSort auxOrig
       -- Direct-image SOL function: dom → res
-      dirImg = mkSOLFunction th (nm ++ "#dir_img") FunctionKindDirectImageFunction [domSort] resSort orig
+      dirImg = mkSOLFunction th (nm ++ "#dir_img") FunctionKindDirectImageFunction [domSort] resSort auxOrig
       -- Inverse-image SOL function: res → dom
-      invImg = mkSOLFunction th (nm ++ "#inv_img") FunctionKindInverseImageFunction [resSort] domSort orig
+      invImg = mkSOLFunction th (nm ++ "#inv_img") FunctionKindInverseImageFunction [resSort] domSort auxOrig
       -- The main function, wired with domain, domArg, and image functions
       f = f0 { funcDomain      = Just domSort
              , funcArgument    = Just domArg
              , funcDirectImage  = Just dirImg
              , funcInverseImage = Just invImg
              }
-      -- Inverse function f_inv: resSort → domSort (also a FOL function)
-      inv0 = mkSOLFunction th (nm ++ "_inv") FunctionKindFOLFunctionFromTheory [resSort] domSort orig
+      -- Inverse function f_inv: resSort → domSort (also a FOL function).
+      -- The inverse is an *automatically generated* companion, so it gets
+      -- FromFunction origin even though it is a first-class FOL function.
+      inv0 = mkSOLFunction th (nm ++ "_inv") FunctionKindFOLFunctionFromTheory [resSort] domSort auxOrig
       invDomSort = Sort
         { sortKind             = SortKindProduct
         , sortTheory           = th
-        , sortOrigin           = orig
-        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_inv#dom#min") invDomSort orig
-        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_inv#dom#max") invDomSort orig
+        , sortOrigin           = auxOrig
+        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_inv#dom#min") invDomSort auxOrig
+        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_inv#dom#max") invDomSort auxOrig
         , sortName             = nm ++ "_inv#dom"
         , sortComponentSorts   = [resSort]
         , sortAssociatedEntity = Just (EntityFunction invFn)
         , sortReflectedFrom    = Nothing
         }
-      invArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_inv#arg") invDomSort orig
+      invArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_inv#arg") invDomSort auxOrig
       invFn = inv0 { funcDomain   = Just invDomSort
                    , funcArgument = Just invArg
                    }
@@ -1590,32 +1598,35 @@ validateTermPairSemantics (ResolvedTermPair left rights _) = do
   let leftClass = resolvedTermType left
   forM_ rights $ \(ResolvedRelationFollowedByTerm _ op _ right) -> do
     let rightClass = resolvedTermType right
-    case op of
-      "∈" -> do
-        let leftOk = leftClass == IndividualClass || leftClass == OtherMereologicalClass
-        let rightOk = rightClass == RelationClass 1 || rightClass == OtherMereologicalClass
-        if not leftOk
-          then Left $ "Left operand of ∈ must be an individual or mereological, got " ++ show leftClass
-          else if not rightOk
-            then Left $ "Right operand of ∈ must be a set or mereological, got " ++ show rightClass
-            else Right ()
-      "⊆" -> do
-        let leftOk = leftClass == RelationClass 1 || leftClass == OtherMereologicalClass
-        let rightOk = rightClass == RelationClass 1 || rightClass == OtherMereologicalClass
-        if not leftOk
-          then Left $ "Left operand of ⊆ must be a set or mereological, got " ++ show leftClass
-          else if not rightOk
-            then Left $ "Right operand of ⊆ must be a set or mereological, got " ++ show rightClass
-            else Right ()
-      "≤" -> Right ()
-      "=" -> do
-        if leftClass == rightClass
-          then Right ()
-          else if (leftClass == PropositionClass && rightClass == OtherMereologicalClass) ||
-                  (leftClass == OtherMereologicalClass && rightClass == PropositionClass)
+    -- OtherMereologicalClass is a wildcard: any operation is permitted when
+    -- either operand has this class (analogous to 'any' in TypeScript).
+    let eitherIsWildcard = leftClass  == OtherMereologicalClass
+                        || rightClass == OtherMereologicalClass
+    if eitherIsWildcard
+      then Right ()
+      else case op of
+        "∈" -> do
+          let leftOk  = leftClass  == IndividualClass
+          let rightOk = rightClass == RelationClass 1
+          if not leftOk
+            then Left $ "Left operand of ∈ must be an individual or mereological, got " ++ show leftClass
+            else if not rightOk
+              then Left $ "Right operand of ∈ must be a set or mereological, got " ++ show rightClass
+              else Right ()
+        "⊆" -> do
+          let leftOk  = leftClass  == RelationClass 1
+          let rightOk = rightClass == RelationClass 1
+          if not leftOk
+            then Left $ "Left operand of ⊆ must be a set or mereological, got " ++ show leftClass
+            else if not rightOk
+              then Left $ "Right operand of ⊆ must be a set or mereological, got " ++ show rightClass
+              else Right ()
+        "≤" -> Right ()
+        "=" ->
+          if leftClass == rightClass
             then Right ()
             else Left $ "Cannot equate " ++ show leftClass ++ " with " ++ show rightClass
-      _ -> Left $ "Unknown operator: " ++ op
+        _ -> Left $ "Unknown operator: " ++ op
 
 
 -- | Helper to get the Level2Type from a ResolvedTerm

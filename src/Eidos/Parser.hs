@@ -144,8 +144,24 @@ pSortRef = do
   return $ SortRef specs c
 
 -- | One dot-qualified path segment: "name."
+--
+-- We must NOT consume "S.min", "S.max", "S.res", "S.arg", "S.dom", etc. as
+-- a theory-path prefix, because those dot-suffixes are illegal (only the hash
+-- form S#min / S#max is valid).  After consuming the dot we therefore check
+-- that the very next token is NOT one of the reserved attribute keywords or a
+-- digit run (argument selectors).  If it is, the whole 'try' backtracks.
 pTheoryRef :: Parser TheoryRef
-pTheoryRef = TheoryRef <$> (ident <* dot)
+pTheoryRef = TheoryRef <$> try (ident <* dot <* notFollowedBy pAttrKeywordOrArgNr)
+
+-- | Succeeds (consuming nothing) when the next token is a reserved
+--   dot-attribute keyword or a digit argument selector.
+pAttrKeywordOrArgNr :: Parser ()
+pAttrKeywordOrArgNr =
+      void (try kwMin)  <|> void (try kwMax)
+  <|> void (try kwRes)  <|> void (try kwArg)  <|> void (try kwDom)
+  <|> void (try kwSet)  <|> void (try kwIndividual)
+  <|> void (try kwMereological) <|> void (try kwProposition)
+  <|> void (try argNr)
 
 -- | A sort constant: identifier or built-in sort symbol or attribute keyword.
 pSortConstant :: Parser String

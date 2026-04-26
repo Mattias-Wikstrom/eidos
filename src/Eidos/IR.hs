@@ -515,3 +515,158 @@ isUniverseSort s = sortKind s == SortKindUniverse
 
 isDomainSort :: Sort -> Bool
 isDomainSort s = sortKind s == SortKindDomain
+
+-- ---------------------------------------------------------------------------
+-- Theory query helpers  (inspired by the Go version's explicit accessors)
+--
+-- The Go code exposed typed accessors like FOLFunctions(), Sorts(), etc.
+-- on the theory struct. Here we provide pure functions over 'Theory' that
+-- filter 'theoryObjects' by entity class, returning strongly-typed lists.
+-- ---------------------------------------------------------------------------
+
+-- | All user-declared FOL functions in this theory (not inherited, not
+--   auto-generated auxiliary functions).
+theoryFOLFunctions :: Theory -> [Function]
+theoryFOLFunctions th =
+  [ f | EntityFunction f <- theoryObjects th
+      , funcKind f == FunctionKindFOLFunctionFromTheory ]
+
+-- | All SOL functions declared directly in this theory (uppercase names).
+theorySOLFunctions :: Theory -> [Function]
+theorySOLFunctions th =
+  [ f | EntityFunction f <- theoryObjects th
+      , funcKind f == FunctionKindSOLFunctionFromTheory ]
+
+-- | All sorts declared directly in this theory (excludes built-ins and
+--   auto-generated product sorts).
+theorySorts :: Theory -> [Sort]
+theorySorts th =
+  [ s | EntitySort s <- theoryObjects th
+      , sortKind s == SortKindFromSignature ]
+
+-- | All individual mereological objects declared in this theory.
+theoryIndividuals :: Theory -> [MereologicalObject]
+theoryIndividuals th =
+  [ m | EntityMereological m <- theoryObjects th
+      , mereoKind m == MereologicalEntityKindIndividual ]
+
+-- | All proposition objects declared in this theory.
+theoryPropositions :: Theory -> [MereologicalObject]
+theoryPropositions th =
+  [ m | EntityMereological m <- theoryObjects th
+      , mereoKind m == MereologicalEntityKindProposition ]
+
+-- | All set objects declared in this theory (singleton-sort relations).
+theorySets :: Theory -> [MereologicalObject]
+theorySets th =
+  [ m | EntityMereological m <- theoryObjects th
+      , mereoKind m == MereologicalEntityKindSet ]
+
+-- | All n-ary relations declared in this theory.
+theoryRelations :: Theory -> [Relation]
+theoryRelations th =
+  [ r | EntityRelation r <- theoryObjects th ]
+
+-- | All auto-generated auxiliary entities (image functions, domain sorts,
+--   arg/result objects) — i.e. everything whose origin is 'FromFunction'.
+theoryFunctionAuxEntities :: Theory -> [Entity]
+theoryFunctionAuxEntities th =
+  filter (\e -> entityOrigin e == FromFunction) (theoryObjects th)
+
+-- ---------------------------------------------------------------------------
+-- Fully-qualified name
+--
+-- Mirrors Go's FullyQualifiedName(entity Entity) string.
+-- Walks up theoryParent links and prepends ancestor theory names.
+-- ---------------------------------------------------------------------------
+
+-- | Return the fully-qualified name of a theory (dot-separated ancestors).
+theoryFQN :: Theory -> String
+theoryFQN = theoryFullyQualifiedName
+
+-- | Return the fully-qualified name of an entity, prefixing ancestor
+--   theory names when the entity is nested inside subtheories.
+entityFullyQualifiedName :: Entity -> String
+entityFullyQualifiedName e =
+  let nm = entityName e
+      th = entityTheory e
+  in qualifyWithAncestors th nm
+  where
+    qualifyWithAncestors th nm =
+      case theoryParent th of
+        Nothing  -> nm
+        Just par -> qualifyWithAncestors par (theoryName th ++ "." ++ nm)
+
+-- ---------------------------------------------------------------------------
+-- Flexible entity search  (inspired by the Go version's bit-flag lookup)
+--
+-- Rather than raw Int bit-flags we use a proper Haskell sum type.
+-- 'SearchCriteria' values can be combined with '(<>)' / 'mconcat'.
+-- The search is performed with 'lookupEntities' and 'lookupEntity''.
+-- ---------------------------------------------------------------------------
+
+-- | Each constructor corresponds to one Go FindRefInclude* constant.
+data SearchCriterion
+  = IncludeFOLFunctions   -- ^ FOL (lowercase) functions
+  | IncludeSOLFunctions   -- ^ SOL (uppercase) functions
+  | IncludeSorts          -- ^ User-declared sorts
+  | IncludePropositions   -- ^ Proposition objects (live in ℙ)
+  | IncludeIndividuals    -- ^ Individual mereological objects
+  | IncludeSets           -- ^ Set mereological objects
+  | IncludeRelations      -- ^ n-ary relations
+  deriving (Show, Eq, Ord, Enum, Bounded)
+
+-- | A set of search criteria.  Use 'allEntityCriteria', 'mempty', or
+--   explicit lists together with 'mkSearchCriteria'.
+newtype SearchCriteria = SearchCriteria { unSearchCriteria :: [SearchCriterion] }
+  deriving (Show, Eq)
+
+instance Semigroup SearchCriteria where
+  SearchCriteria a <> SearchCriteria b = SearchCriteria (a ++ b)
+
+instance Monoid SearchCriteria where
+  mempty = SearchCriteria []
+
+-- | Build a 'SearchCriteria' from a list of criteria.
+mkSearchCriteria :: [SearchCriterion] -> SearchCriteria
+mkSearchCriteria = SearchCriteria
+
+-- | Match everything — equivalent to all Go flags OR-ed together.
+allEntityCriteria :: SearchCriteria
+allEntityCriteria = SearchCriteria [minBound .. maxBound]
+
+-- | Test whether an entity satisfies any criterion in the set.
+entityMatchesCriteria :: SearchCriteria -> Entity -> Bool
+entityMatchesCriteria (SearchCriteria criteria) e = any (matchOne e) criteria
+  where
+    matchOne (EntityFunction f) IncludeFOLFunctions =
+      funcKind f `elem` [ FunctionKindFOLFunctionFromTheory
+                         , FunctionKindFOLFunctionFromReflection ]
+    matchOne (EntityFunction f) IncludeSOLFunctions =
+      funcKind f `elem` [ FunctionKindSOLFunctionFromTheory
+                         , FunctionKindDirectImageFunction
+                         , FunctionKindInverseImageFunction ]
+    matchOne (EntitySort _)         IncludeSorts        = True
+    matchOne (EntityMereological m) IncludePropositions =
+      mereoKind m == MereologicalEntityKindProposition
+    matchOne (EntityMereological m) IncludeIndividuals  =
+      mereoKind m == MereologicalEntityKindIndividual
+    matchOne (EntityMereological m) IncludeSets         =
+      mereoKind m == MereologicalEntityKindSet
+    matchOne (EntityRelation _)     IncludeRelations    = True
+    matchOne _                      _                   = False
+
+-- | Return all entities in the theory (local only, not inherited subtheory
+--   objects) whose name equals @nm@ and that match the given criteria.
+lookupEntities :: Theory -> String -> SearchCriteria -> [Entity]
+lookupEntities th nm criteria =
+  case Map.lookup nm (theoryObjectsByName th) of
+    Nothing -> []
+    Just es -> filter (entityMatchesCriteria criteria) es
+
+-- | Like 'lookupEntities' but returns the first match or 'Nothing'.
+lookupEntity' :: Theory -> String -> SearchCriteria -> Maybe Entity
+lookupEntity' th nm criteria =
+  case lookupEntities th nm criteria of
+    []    -> Nothing
+    (e:_) -> Just e

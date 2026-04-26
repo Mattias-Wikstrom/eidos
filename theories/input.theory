@@ -10,24 +10,24 @@
         D quotient B;
         f : S, S → B;
         g : 𝔻;
-        p ⊆ 𝔻;
-        r ⊆ S, B;
-        r2 ⊆ S, B, B;
+        P ⊆ 𝔻;
+        R ⊆ S, B;
+        R2 ⊆ S, B, B;
         d : S, B → C;
         G : S, B, B → C;
     },
     axioms {
         assertions {
             // Comment 2
-            [x : sub.S]∀z : S ∃y : S (y ⊆ y)↔((x ⊆ y)→((z ⊆ y)←((y ⊆ y)∨(y ⊆ y))));
-            [x : sub.S][y : sub.S](y ⊆ y)↔((y ⊆ <<sub>>(∃y : S y))→((f(y, y) ⊆ f(f(x, x), y))←((y ⊆ y)∨(y ⊆ y))));
-            [x : Q][y ⊆ Q](y ⊆ y)↔(y ⊆ y);
+            [X ⊆ sub.S][Y ⊆ sub.S]∀Z ⊆ S (∃Y ⊆ S (Y ⊆ Y)↔((X ⊆ Y)→((Z ⊆ Y)←((Y ⊆ Y)∨(Y ⊆ Y)))));
+            [X ⊆ sub.S][Y ⊆ sub.S](Y ⊆ Y)↔((Y ⊆ <<sub>>(∃Y ⊆ S Y))→((f(Y, Y) ⊆ f(f(X, X), Y))←((Y ⊆ Y)∨(Y ⊆ Y))));
+            [x : Q][Y ⊆ Q](Y ⊆ Y)↔(Y ⊆ Y);
             [x : S][y : S] f(y, x) =_S f(x, y);
             ⊥ ∨ ¬sub.⊤;
             [y : S] (f(f(y, y), y) ⊆ f(f(y, y), Σy(y)));
             [x : S] x = x;
             ¬⊥;
-            [x : S] ⊥ ∨ ¬x⊆x ∨ x≤x ∧ ¬sub.h(x)=sub.h(x) ∧ ¬sub.h(x)=sub.h(x);
+            //[x : S] ⊥ ∨ ¬x⊆x ∨ x≤x ∧ ¬sub.h(x)=sub.h(x) ∧ ¬sub.h(x)=sub.h(x);
         },
         facts {
         },
@@ -50,11 +50,11 @@
                 signature {
                     sort Z;
                     a : Z;
-                    F : Z, Z → Z;
+                    f : Z, Z → Z;
                 },
                 axioms {
                     assertions {
-                        a = F(a, a + a);
+                        a = f(a, a + a);
                     }
                 }
             }
