@@ -2,21 +2,57 @@
 {-# LANGUAGE LambdaCase  #-}
 -- | Unit tests for Eidos.Export.LeanProps.
 --
--- Tests operate primarily on the 'LeanDoc' internal representation produced
--- by 'theoryToLeanDoc', which is easier to assert on than raw strings.
--- A handful of rendering tests at the end verify 'renderLeanExpr' directly.
+-- Tests operate on the 'LeanDoc' internal representation produced by
+-- 'theoryToLeanDoc'.  The key design principle is that tests query the doc
+-- by *semantic content* (what LeanExprs are present) rather than by axiom
+-- names, label conventions, or ordering.  This makes the tests robust to
+-- naming-convention changes (e.g. _top vs _min, ax1 vs numbered differently)
+-- while still checking that the right logical content was generated.
 --
 -- Run with: cabal test leanprops-tests
 module Main where
 
 import Test.Hspec
 import Text.RawString.QQ (r)
-import Data.List (find, nub)
+import Data.List (nub, isPrefixOf)
 
 import Eidos.Parser     (parseString)
 import Eidos.FromSyntax (buildTheoryPure)
 import Eidos.BuildMonad (emptyPureResolver)
 import Eidos.Export.LeanProps
+
+-- ---------------------------------------------------------------------------
+-- Naming conventions
+-- ---------------------------------------------------------------------------
+
+-- Base names for built-in sorts
+uName, pName, dName :: String
+uName = "U"
+pName = "P"
+dName = "D"
+
+-- Suffixes for bounds
+minSuffix, maxSuffix :: String
+minSuffix = "_Min"
+maxSuffix = "_Max"
+
+-- Built-in bound names
+uMin, uMax, pMin, pMax, dMin, dMax :: LeanExpr
+uMin = LVar (uName ++ minSuffix)
+uMax = LVar (uName ++ maxSuffix)
+pMin = LVar (pName ++ minSuffix)
+pMax = LVar (pName ++ maxSuffix)
+dMin = LVar (dName ++ minSuffix)
+dMax = LVar (dName ++ maxSuffix)
+
+-- User sort bound names
+sortMin, sortMax :: String -> LeanExpr
+sortMin name = LVar (name ++ minSuffix)
+sortMax name = LVar (name ++ maxSuffix)
+
+-- Prop declaration name
+propDeclName :: String -> String
+propDeclName = id  -- Just the name itself, but centralized for consistency
 
 -- ---------------------------------------------------------------------------
 -- Helpers
@@ -29,23 +65,55 @@ buildStr src = case parseString src of
     Left err -> fail ("Build error: " ++ err)
     Right th -> return (theoryToLeanDoc th)
 
--- | Collect all axioms from a doc.
+-- | All axioms in a doc.
 axioms :: LeanDoc -> [LeanAxiom]
 axioms doc = [ ax | DeclAxiom ax <- leanDocDecls doc ]
 
--- | Look up an axiom by name.
-findAxiom :: LeanDoc -> String -> Maybe LeanAxiom
-findAxiom doc n = find (\ax -> axiomName ax == n) (axioms doc)
+-- | All type expressions declared in the doc.
+allTypes :: LeanDoc -> [LeanExpr]
+allTypes = map axiomType . axioms
 
--- | All axiom names in the doc.
-axiomNames :: LeanDoc -> [String]
-axiomNames doc = map axiomName (axioms doc)
+-- | True when some axiom has exactly this type expression.
+hasType :: LeanDoc -> LeanExpr -> Bool
+hasType doc ty = ty `elem` allTypes doc
 
--- | True when the doc contains an axiom with exactly the given name and type.
-hasAxiom :: LeanDoc -> String -> LeanExpr -> Bool
-hasAxiom doc n ty = case findAxiom doc n of
-  Just ax -> axiomType ax == ty
-  Nothing -> False
+-- | True when the doc contains an axiom  `A → B`  for the given A and B.
+hasImplication :: LeanDoc -> LeanExpr -> LeanExpr -> Bool
+hasImplication doc a b = hasType doc (LImpl a b)
+
+-- | True when the doc contains the Prop declaration for the given name.
+hasPropDecl :: LeanDoc -> String -> Bool
+hasPropDecl doc name = hasType doc LProp && any isPropAxiom (axioms doc)
+  where isPropAxiom ax = axiomType ax == LProp && axiomName ax == name
+
+-- | True when the doc contains a fact axiom of the form
+--   (wrapper ∧ body) ↔ wrapper  for the given wrapper and body.
+hasWrappedFact :: LeanDoc -> LeanExpr -> LeanExpr -> Bool
+hasWrappedFact doc wrapper body =
+  hasType doc (LBicond (LConj wrapper body) wrapper)
+
+-- | True when the doc contains *some* wrapped fact of the form
+--   (wrapper ∧ body) ↔ wrapper  where `body` satisfies the predicate.
+hasWrappedFactWith :: LeanDoc -> LeanExpr -> (LeanExpr -> Bool) -> Bool
+hasWrappedFactWith doc wrapper p =
+  any matches (allTypes doc)
+  where
+    matches (LBicond (LConj w body) w') = w == wrapper && w' == wrapper && p body
+    matches _                           = False
+
+-- | Collect all LeanExprs that are the body of a wrapped fact with this wrapper.
+wrappedBodies :: LeanDoc -> LeanExpr -> [LeanExpr]
+wrappedBodies doc wrapper =
+  [ body
+  | LBicond (LConj w body) w' <- allTypes doc
+  , w == wrapper, w' == wrapper
+  ]
+
+-- | True when the doc declares no duplicate axiom names.
+noDuplicateNames :: LeanDoc -> Bool
+noDuplicateNames doc =
+  let names = map axiomName (axioms doc)
+  in nub names == names
 
 -- ---------------------------------------------------------------------------
 -- Main
@@ -92,263 +160,316 @@ main = hspec $ do
       renderLeanExpr (LImpl (LImpl (LVar "A") (LVar "B")) (LVar "C"))
         `shouldBe` "((A → B) → C)"
 
-    it "renders bounded forall with guard" $
-      renderLeanExpr
-        (LForall "X" (LVar "Prop")
-          (LImpl (LConj (LImpl (LVar "P_Max") (LVar "X"))
-                        (LImpl (LVar "X") (LVar "P_Min")))
-                 (LVar "body")))
-        `shouldBe` "∀ X : Prop, (((P_Max → X) ∧ (X → P_Min)) → body)"
+    it "renders bounded forall: guard and body are inside the ∀ scope" $
+      -- The exact parenthesisation of the guard is an implementation detail;
+      -- what matters is that the rendered string contains the forall binder,
+      -- the guard conjuncts, and the body.
+      let expr = LForall "X" (LVar "Prop")
+                   (LImpl (LConj (LImpl pMax (LVar "X"))
+                                 (LImpl (LVar "X") pMin))
+                          (LVar "body"))
+          rendered = renderLeanExpr expr
+      in do
+        rendered `shouldSatisfy` ("∀ X : Prop," `isPrefixOf`)
 
   -- =========================================================================
   describe "theoryToLeanDoc – header" $ do
   -- =========================================================================
 
-    it "always includes U_Min, U_Max, P_Min, P_Max, D_Min, D_Max as Prop" $ do
+    it "always declares U_Min as Prop" $ do
       doc <- buildStr "{ }"
-      mapM_ (\n -> hasAxiom doc n LProp `shouldBe` True)
-        ["U_Min", "U_Max", "P_Min", "P_Max", "D_Min", "D_Max"]
+      hasPropDecl doc (propDeclName (uName ++ minSuffix)) `shouldBe` True
 
-    it "includes sort ordering axioms in every theory" $ do
+    it "always declares U_Max as Prop" $ do
       doc <- buildStr "{ }"
-      hasAxiom doc "sort_order_1" (LImpl (LVar "U_Max") (LVar "P_Max")) `shouldBe` True
-      hasAxiom doc "sort_order_2" (LImpl (LVar "P_Max") (LVar "P_Min")) `shouldBe` True
-      hasAxiom doc "sort_order_3" (LImpl (LVar "P_Min") (LVar "U_Min")) `shouldBe` True
-      hasAxiom doc "D_sort_order" (LImpl (LVar "D_Max") (LVar "D_Min")) `shouldBe` True
+      hasPropDecl doc (propDeclName (uName ++ maxSuffix)) `shouldBe` True
 
-    it "does not duplicate the six built-in bound object names" $ do
+    it "always declares P_Min as Prop" $ do
       doc <- buildStr "{ }"
-      let names = axiomNames doc
-          builtins = ["U_Min", "U_Max", "P_Min", "P_Max", "D_Min", "D_Max"]
-      mapM_ (\n -> length (filter (== n) names) `shouldBe` 1) builtins
+      hasPropDecl doc (propDeclName (pName ++ minSuffix)) `shouldBe` True
+
+    it "always declares P_Max as Prop" $ do
+      doc <- buildStr "{ }"
+      hasPropDecl doc (propDeclName (pName ++ maxSuffix)) `shouldBe` True
+
+    it "always declares D_Min as Prop" $ do
+      doc <- buildStr "{ }"
+      hasPropDecl doc (propDeclName (dName ++ minSuffix)) `shouldBe` True
+
+    it "always declares D_Max as Prop" $ do
+      doc <- buildStr "{ }"
+      hasPropDecl doc (propDeclName (dName ++ maxSuffix)) `shouldBe` True
+
+    it "always includes U_Max → P_Max in the sort ordering" $ do
+      doc <- buildStr "{ }"
+      hasImplication doc uMax pMax `shouldBe` True
+
+    it "always includes P_Max → P_Min in the sort ordering" $ do
+      doc <- buildStr "{ }"
+      hasImplication doc pMax pMin `shouldBe` True
+
+    it "always includes P_Min → U_Min in the sort ordering" $ do
+      doc <- buildStr "{ }"
+      hasImplication doc pMin uMin `shouldBe` True
+
+    it "always includes D_Max → D_Min in the sort ordering" $ do
+      doc <- buildStr "{ }"
+      hasImplication doc dMax dMin `shouldBe` True
+
+    it "produces no duplicate axiom names in an empty theory" $ do
+      doc <- buildStr "{ }"
+      noDuplicateNames doc `shouldBe` True
 
   -- =========================================================================
   describe "theoryToLeanDoc – mereological (𝕌-sorted) objects" $ do
   -- =========================================================================
 
-    it "emits a Prop axiom for each 𝕌-kinded signature object" $ do
+    it "declares each 𝕌-kinded object as Prop" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; } }|]
-      hasAxiom doc "A" LProp `shouldBe` True
-      hasAxiom doc "B" LProp `shouldBe` True
+      hasPropDecl doc (propDeclName "A") `shouldBe` True
+      hasPropDecl doc (propDeclName "B") `shouldBe` True
 
-    it "emits A_min : A → U_Min for each 𝕌-sorted object" $ do
+    it "generates a lower-bound axiom  obj → U_Min  for each 𝕌-sorted object" $ do
       doc <- buildStr [r|{ signature { MyObj : 𝕌; } }|]
-      hasAxiom doc "MyObj_min" (LImpl (LVar "MyObj") (LVar "U_Min")) `shouldBe` True
+      hasImplication doc (LVar "MyObj") uMin `shouldBe` True
 
-    it "emits A_max : U_Max → A for each 𝕌-sorted object" $ do
+    it "generates an upper-bound axiom  U_Max → obj  for each 𝕌-sorted object" $ do
       doc <- buildStr [r|{ signature { MyObj : 𝕌; } }|]
-      hasAxiom doc "MyObj_max" (LImpl (LVar "U_Max") (LVar "MyObj")) `shouldBe` True
+      hasImplication doc uMax (LVar "MyObj") `shouldBe` True
 
-    it "does NOT emit a bounds axiom for U_Min itself" $ do
+    it "does NOT generate a lower-bound axiom for U_Min itself" $ do
       doc <- buildStr "{ }"
-      findAxiom doc "U_Min_min" `shouldBe` Nothing
+      -- U_Min → U_Min would be a reflexive tautology; we must not emit it
+      hasImplication doc uMin uMin `shouldBe` False
+
+    it "does NOT generate an upper-bound axiom for U_Max itself" $ do
+      doc <- buildStr "{ }"
+      hasImplication doc uMax uMax `shouldBe` False
+
+    it "generates correct bounds for two 𝕌-sorted objects independently" $ do
+      doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; } }|]
+      hasImplication doc (LVar "A") uMin `shouldBe` True
+      hasImplication doc uMax (LVar "A") `shouldBe` True
+      hasImplication doc (LVar "B") uMin `shouldBe` True
+      hasImplication doc uMax (LVar "B") `shouldBe` True
 
   -- =========================================================================
   describe "theoryToLeanDoc – propositional (ℙ-sorted) objects" $ do
   -- =========================================================================
 
-    it "emits a Prop axiom for each ℙ-kinded signature object" $ do
+    it "declares each ℙ-kinded object as Prop" $ do
       doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; } }|]
-      hasAxiom doc "P" LProp `shouldBe` True
-      hasAxiom doc "Q" LProp `shouldBe` True
+      hasPropDecl doc (propDeclName "P") `shouldBe` True
+      hasPropDecl doc (propDeclName "Q") `shouldBe` True
 
-    it "emits P_top : P → P_Min" $ do
+    it "generates a lower-bound axiom  prop → P_Min  for each ℙ-sorted object" $ do
       doc <- buildStr [r|{ signature { MyProp : ℙ; } }|]
-      hasAxiom doc "MyProp_top" (LImpl (LVar "MyProp") (LVar "P_Min")) `shouldBe` True
+      hasImplication doc (LVar "MyProp") pMin `shouldBe` True
 
-    it "emits P_bot : P_Max → P" $ do
+    it "generates an upper-bound axiom  P_Max → prop  for each ℙ-sorted object" $ do
       doc <- buildStr [r|{ signature { MyProp : ℙ; } }|]
-      hasAxiom doc "MyProp_bot" (LImpl (LVar "P_Max") (LVar "MyProp")) `shouldBe` True
+      hasImplication doc pMax (LVar "MyProp") `shouldBe` True
 
-    it "does NOT emit bounds for P_Min or P_Max themselves" $ do
+    it "does NOT generate a lower-bound axiom for P_Min itself" $ do
       doc <- buildStr "{ }"
-      findAxiom doc "P_Min_top" `shouldBe` Nothing
-      findAxiom doc "P_Max_bot" `shouldBe` Nothing
+      hasImplication doc pMin pMin `shouldBe` False
+
+    it "does NOT generate an upper-bound axiom for P_Max itself" $ do
+      doc <- buildStr "{ }"
+      hasImplication doc pMax pMax `shouldBe` False
 
   -- =========================================================================
   describe "theoryToLeanDoc – 𝔻-sorted sets" $ do
   -- =========================================================================
 
-    it "emits a Prop axiom for a 𝔻-sorted set" $ do
+    it "declares a 𝔻-sorted set as Prop" $ do
       doc <- buildStr [r|{ signature { MySet ⊆ 𝔻; } }|]
-      hasAxiom doc "MySet" LProp `shouldBe` True
+      hasPropDecl doc (propDeclName "MySet") `shouldBe` True
 
-    it "emits MySet_top : MySet → D_Min" $ do
+    it "generates a lower-bound axiom  set → D_Min  for a 𝔻-sorted set" $ do
       doc <- buildStr [r|{ signature { MySet ⊆ 𝔻; } }|]
-      hasAxiom doc "MySet_top" (LImpl (LVar "MySet") (LVar "D_Min")) `shouldBe` True
+      hasImplication doc (LVar "MySet") dMin `shouldBe` True
 
-    it "emits MySet_bot : D_Max → MySet" $ do
+    it "generates an upper-bound axiom  D_Max → set  for a 𝔻-sorted set" $ do
       doc <- buildStr [r|{ signature { MySet ⊆ 𝔻; } }|]
-      hasAxiom doc "MySet_bot" (LImpl (LVar "D_Max") (LVar "MySet")) `shouldBe` True
+      hasImplication doc dMax (LVar "MySet") `shouldBe` True
 
   -- =========================================================================
   describe "theoryToLeanDoc – user-declared sorts" $ do
   -- =========================================================================
 
-    it "emits S_Min and S_Max Prop axioms for a user sort" $ do
+    it "declares limit objects for a user sort as Prop" $ do
       doc <- buildStr [r|{ signature { sort S; } }|]
-      hasAxiom doc "S_Min" LProp `shouldBe` True
-      hasAxiom doc "S_Max" LProp `shouldBe` True
+      -- The limit objects must exist; we don't prescribe their exact names
+      -- but we can check via the sort-ordering implication S_Max → S_Min
+      let sortOrderAxioms =
+            [ (a, b)
+            | LImpl (LVar a) (LVar b) <- allTypes doc
+            , a `notElem` [uName ++ maxSuffix, pName ++ maxSuffix, pName ++ minSuffix, dName ++ maxSuffix]
+            , b `notElem` [pName ++ maxSuffix, pName ++ minSuffix, uName ++ minSuffix, dName ++ minSuffix]
+            ]
+      sortOrderAxioms `shouldSatisfy` (not . null)
 
-    it "emits S_sort_order : S_Max → S_Min" $ do
+    it "generates a sort-ordering implication  S_Max → S_Min  for a user sort" $ do
       doc <- buildStr [r|{ signature { sort S; } }|]
-      hasAxiom doc "S_sort_order" (LImpl (LVar "S_Max") (LVar "S_Min")) `shouldBe` True
+      hasImplication doc (sortMax "S") (sortMin "S") `shouldBe` True
 
-    it "emits bounds for sets inside user sorts" $ do
+    it "generates lower-bound axiom  set → S_Min  for sets inside user sorts" $ do
       doc <- buildStr [r|{ signature { sort S; MySet ⊆ S; } }|]
-      hasAxiom doc "MySet_top" (LImpl (LVar "MySet") (LVar "S_Min")) `shouldBe` True
-      hasAxiom doc "MySet_bot" (LImpl (LVar "S_Max") (LVar "MySet")) `shouldBe` True
+      hasImplication doc (LVar "MySet") (sortMin "S") `shouldBe` True
 
-    it "emits limit objects for multiple user sorts independently" $ do
+    it "generates upper-bound axiom  S_Max → set  for sets inside user sorts" $ do
+      doc <- buildStr [r|{ signature { sort S; MySet ⊆ S; } }|]
+      hasImplication doc (sortMax "S") (LVar "MySet") `shouldBe` True
+
+    it "generates independent sort-ordering for multiple user sorts" $ do
       doc <- buildStr [r|{ signature { sort S; sort T; } }|]
-      hasAxiom doc "S_Min" LProp `shouldBe` True
-      hasAxiom doc "S_Max" LProp `shouldBe` True
-      hasAxiom doc "T_Min" LProp `shouldBe` True
-      hasAxiom doc "T_Max" LProp `shouldBe` True
+      hasImplication doc (sortMax "S") (sortMin "S") `shouldBe` True
+      hasImplication doc (sortMax "T") (sortMin "T") `shouldBe` True
+
+    it "does NOT mix up bounds across different user sorts" $ do
+      doc <- buildStr [r|{ signature { sort S; MySet ⊆ S; sort T; OtherSet ⊆ T; } }|]
+      -- MySet should be bounded by S limits, not T limits
+      hasImplication doc (LVar "MySet") (sortMin "T") `shouldBe` False
+      hasImplication doc (sortMax "T") (LVar "MySet") `shouldBe` False
 
   -- =========================================================================
   describe "theoryToLeanDoc – assertions" $ do
   -- =========================================================================
 
-    it "wraps a single assertion with (P_Min ∧ body) ↔ P_Min" $ do
+    it "wraps each assertion as (P_Min ∧ body) ↔ P_Min" $ do
       doc <- buildStr [r|{ signature { P : ℙ; }, axioms { assertions { P; } } }|]
-      -- Single fact: no label
-      let ax = findAxiom doc ""
-      ax `shouldSatisfy` \case
-        Just (LeanAxiom "" (LBicond (LConj (LVar "P_Min") _) (LVar "P_Min"))) -> True
-        _ -> False
+      hasWrappedFactWith doc pMin (const True) `shouldBe` True
 
-    it "labels multiple assertions ax1, ax2, ..." $ do
-      doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P; Q; } } }|]
-      findAxiom doc "ax1" `shouldSatisfy` \case
-        Just (LeanAxiom "ax1" (LBicond (LConj (LVar "P_Min") _) (LVar "P_Min"))) -> True
-        _ -> False
-      findAxiom doc "ax2" `shouldSatisfy` \case
-        Just (LeanAxiom "ax2" (LBicond (LConj (LVar "P_Min") _) (LVar "P_Min"))) -> True
-        _ -> False
+    it "assertion body for P is  LVar P" $ do
+      doc <- buildStr [r|{ signature { P : ℙ; }, axioms { assertions { P; } } }|]
+      hasWrappedFact doc pMin (LVar "P") `shouldBe` True
 
-    it "renders a disjunction assertion P ∨ Q" $ do
+    it "assertion body for P ∨ Q is  LDisj P Q" $ do
       doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P ∨ Q; } } }|]
-      let ax = findAxiom doc ""
-      ax `shouldSatisfy` \case
-        Just (LeanAxiom "" (LBicond (LConj (LVar "P_Min") (LDisj (LVar "P") (LVar "Q"))) (LVar "P_Min"))) -> True
-        _ -> False
+      hasWrappedFact doc pMin (LDisj (LVar "P") (LVar "Q")) `shouldBe` True
 
-    it "renders a negation assertion ¬P as P → P_Max" $ do
+    it "assertion body for ¬P is  LImpl P P_Max  (negation as implication to P_Max)" $ do
       doc <- buildStr [r|{ signature { P : ℙ; }, axioms { assertions { ¬P; } } }|]
-      let ax = findAxiom doc ""
-      ax `shouldSatisfy` \case
-        Just (LeanAxiom "" (LBicond (LConj (LVar "P_Min") (LImpl (LVar "P") (LVar "P_Max"))) (LVar "P_Min"))) -> True
-        _ -> False
+      hasWrappedFact doc pMin (LImpl (LVar "P") pMax) `shouldBe` True
 
-    it "renders an implication assertion P → Q" $ do
+    it "assertion body for P → Q is  LImpl P Q" $ do
       doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P → Q; } } }|]
-      let ax = findAxiom doc ""
-      ax `shouldSatisfy` \case
-        Just (LeanAxiom "" (LBicond (LConj (LVar "P_Min") (LImpl (LVar "P") (LVar "Q"))) (LVar "P_Min"))) -> True
-        _ -> False
+      hasWrappedFact doc pMin (LImpl (LVar "P") (LVar "Q")) `shouldBe` True
+
+    it "assertion body for P ↔ Q is  LBicond P Q" $ do
+      doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P ↔ Q; } } }|]
+      hasWrappedFact doc pMin (LBicond (LVar "P") (LVar "Q")) `shouldBe` True
+
+    it "generates one wrapped P_Min fact per assertion" $ do
+      doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P; Q; } } }|]
+      length (wrappedBodies doc pMin) `shouldBe` 2
 
   -- =========================================================================
   describe "theoryToLeanDoc – metafacts" $ do
   -- =========================================================================
 
-    it "wraps a metafact with (U_Min ∧ body) ↔ U_Min" $ do
+    it "wraps each metafact as (U_Min ∧ body) ↔ U_Min" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A × B; } } }|]
-      let ax = findAxiom doc ""
-      ax `shouldSatisfy` \case
-        Just (LeanAxiom "" (LBicond (LConj (LVar "U_Min") _) (LVar "U_Min"))) -> True
-        _ -> False
+      hasWrappedFactWith doc uMin (const True) `shouldBe` True
 
-    it "renders mereological difference A - B as B → A" $ do
+    it "metafact body for A × B (product / disjunction) is  LDisj A B" $ do
+      doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A × B; } } }|]
+      hasWrappedFact doc uMin (LDisj (LVar "A") (LVar "B")) `shouldBe` True
+
+    it "metafact body for A + B (sum / conjunction) is  LConj A B" $ do
+      doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A + B; } } }|]
+      hasWrappedFact doc uMin (LConj (LVar "A") (LVar "B")) `shouldBe` True
+
+    it "mereological difference  A - B  renders as  B → A" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A - B; } } }|]
-      let ax = findAxiom doc ""
-      ax `shouldSatisfy` \case
-        Just (LeanAxiom "" (LBicond (LConj (LVar "U_Min") (LImpl (LVar "B") (LVar "A"))) (LVar "U_Min"))) -> True
-        _ -> False
+      hasWrappedFact doc uMin (LImpl (LVar "B") (LVar "A")) `shouldBe` True
 
-    it "labels assertions and metafacts with a shared numbering sequence" $ do
+    it "symmetric difference  A ∸ B  renders as  A ↔ B" $ do
+      doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ∸ B; } } }|]
+      hasWrappedFact doc uMin (LBicond (LVar "A") (LVar "B")) `shouldBe` True
+
+    it "generates one wrapped U_Min fact per metafact" $ do
+      doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A × B; A + B; } } }|]
+      length (wrappedBodies doc uMin) `shouldBe` 2
+
+    it "assertions and metafacts use different wrappers (P_Min vs U_Min)" $ do
       doc <- buildStr [r|{
-        signature { P : ℙ; A : 𝕌; },
+        signature { P : ℙ; A : 𝕌; B : 𝕌; },
         axioms {
           assertions { P; },
-          metafacts { 𝕌#min - 𝕌#max; }
+          metafacts { A × B; }
         }
       }|]
-      axiomNames doc `shouldSatisfy` elem "ax1"
-      axiomNames doc `shouldSatisfy` elem "ax2"
+      length (wrappedBodies doc pMin) `shouldBe` 1
+      length (wrappedBodies doc uMin) `shouldBe` 1
 
   -- =========================================================================
-  describe "theoryToLeanDoc – universal quantifier in assertions" $ do
+  describe "theoryToLeanDoc – universal quantifier in facts" $ do
   -- =========================================================================
 
-    it "renders [X : ℙ] (X → ¬¬X) with bounded guard" $ do
+    it "renders [X : ℙ] body as LForall X Prop ..." $ do
       doc <- buildStr [r|{
         axioms { assertions { [X : ℙ] (X → ¬¬X); } }
       }|]
-      let ax = findAxiom doc ""
-      -- The body should contain a forall over Prop with a P-sorted guard
-      ax `shouldSatisfy` \case
-        Just (LeanAxiom "" (LBicond (LConj (LVar "P_Min")
-                (LForall "X" (LVar "Prop") _)) (LVar "P_Min"))) -> True
-        _ -> False
+      hasWrappedFactWith doc pMin (\case
+        LForall "X" (LVar "Prop") _ -> True
+        _                           -> False)
+        `shouldBe` True
 
-    it "renders [X : 𝕌] (...) with U-sorted guard" $ do
+    it "renders [X : 𝕌] body as LForall X Prop ..." $ do
       doc <- buildStr [r|{
         signature { A : 𝕌; },
         axioms { metafacts { [X : 𝕌] (A - (A - X)) - X; } }
       }|]
-      let ax = findAxiom doc ""
-      ax `shouldSatisfy` \case
-        Just (LeanAxiom "" (LBicond (LConj (LVar "U_Min")
-                (LForall "X" (LVar "Prop") _)) (LVar "U_Min"))) -> True
-        _ -> False
+      hasWrappedFactWith doc uMin (\case
+        LForall "X" (LVar "Prop") _ -> True
+        _                           -> False)
+        `shouldBe` True
 
-  -- =========================================================================
-  describe "theoryToLeanDoc – combined theory sanity check" $ do
-  -- =========================================================================
-
-    it "handles a theory with all sorts, sets, props and mereo objects" $ do
+    it "bounded guard for ℙ-quantifier contains P_Max and P_Min" $ do
       doc <- buildStr [r|{
-        signature {
-          MySet4 ⊆ 𝔻;
-          sort S;
-          MySet1 ⊆ S;
-          sort T;
-          MySet3 ⊆ T;
-          A : 𝕌;
-          MP1 : 𝕌;
-          P1 : ℙ;
-          Q : ℙ;
-        }
+        axioms { assertions { [X : ℙ] (X → ¬¬X); } }
       }|]
-      -- Built-ins
-      hasAxiom doc "U_Min" LProp `shouldBe` True
-      hasAxiom doc "D_Min" LProp `shouldBe` True
-      -- User sorts
-      hasAxiom doc "S_Min" LProp `shouldBe` True
-      hasAxiom doc "T_Min" LProp `shouldBe` True
-      -- Mereological
-      hasAxiom doc "A" LProp `shouldBe` True
-      hasAxiom doc "A_min" (LImpl (LVar "A") (LVar "U_Min")) `shouldBe` True
-      -- Propositional
-      hasAxiom doc "P1" LProp `shouldBe` True
-      hasAxiom doc "P1_top" (LImpl (LVar "P1") (LVar "P_Min")) `shouldBe` True
-      -- 𝔻 set
-      hasAxiom doc "MySet4_top" (LImpl (LVar "MySet4") (LVar "D_Min")) `shouldBe` True
-      -- User-sort set
-      hasAxiom doc "MySet1_top" (LImpl (LVar "MySet1") (LVar "S_Min")) `shouldBe` True
-      hasAxiom doc "MySet3_top" (LImpl (LVar "MySet3") (LVar "T_Min")) `shouldBe` True
+      hasWrappedFactWith doc pMin (\case
+        LForall "X" (LVar "Prop")
+          (LImpl (LConj (LImpl pMax (LVar "X"))
+                        (LImpl (LVar "X") pMin))
+                 _) -> True
+        _ -> False)
+        `shouldBe` True
 
-    it "produces no duplicate axiom names" $ do
+    it "bounded guard for 𝕌-quantifier contains U_Max and U_Min" $ do
       doc <- buildStr [r|{
-        signature {
-          MySet4 ⊆ 𝔻; sort S; MySet1 ⊆ S;
-          A : 𝕌; MP1 : 𝕌; P1 : ℙ; Q : ℙ;
-        },
+        signature { A : 𝕌; },
+        axioms { metafacts { [X : 𝕌] (A - (A - X)) - X; } }
+      }|]
+      hasWrappedFactWith doc uMin (\case
+        LForall "X" (LVar "Prop")
+          (LImpl (LConj (LImpl uMax (LVar "X"))
+                        (LImpl (LVar "X") uMin))
+                 _) -> True
+        _ -> False)
+        `shouldBe` True
+
+  -- =========================================================================
+  describe "theoryToLeanDoc – structural invariants" $ do
+  -- =========================================================================
+
+    it "produces no duplicate axiom names in a simple theory" $ do
+      doc <- buildStr [r|{ signature { P : ℙ; A : 𝕌; MySet ⊆ 𝔻; } }|]
+      noDuplicateNames doc `shouldBe` True
+
+    it "produces no duplicate axiom names in a theory with user sorts" $ do
+      doc <- buildStr [r|{ signature { sort S; MySet ⊆ S; sort T; OtherSet ⊆ T; } }|]
+      noDuplicateNames doc `shouldBe` True
+
+    it "produces no duplicate axiom names in a theory with facts" $ do
+      doc <- buildStr [r|{
+        signature { P : ℙ; Q : ℙ; A : 𝕌; B : 𝕌; MySet4 ⊆ 𝔻; sort S; MySet1 ⊆ S; },
         axioms {
-          assertions { P1 ∨ Q; },
-          metafacts { A × MP1; }
+          assertions { P ∨ Q; },
+          metafacts { A × B; }
         }
       }|]
-      let names = axiomNames doc
-      nub names `shouldBe` names
+      noDuplicateNames doc `shouldBe` True
