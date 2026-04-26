@@ -2,6 +2,10 @@
 Things to Be Done
 =================
 
+* There is already information in a theory on whether it uses D and/or P. Only include D/P in the output if it is used.
+
+* The notation [x : S][y: T]some_expr for free variables was chosen to simplify parsing, not for any deep reasons. A better notation might be this: x : S, y: T, some_expr .
+
 * Support for reflection is not done by any means. What exists now is likely to be full of errors and there are not many unit tests that reflection works as it is supposed to. A separate document should be created with documentation on how reflection is supposed to work.
 
 * Documentation is also needed of all the mereological facts that get generated for a theory.
