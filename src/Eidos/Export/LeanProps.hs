@@ -8,22 +8,22 @@
 -- @
 --   axiom U_Min : Prop
 --   axiom U_Max : Prop
---   axiom _Top  : Prop    -- = ℙ#min
---   axiom _Bot  : Prop    -- = ℙ#max
---   -- ordering: U_Max ≤ _Bot ≤ _Top ≤ U_Min
---   axiom sort_order_1: U_Max → _Bot
---   axiom sort_order_2: _Bot  → _Top
---   axiom sort_order_3: _Top  → U_Min
+--   axiom P_Min  : Prop    -- = ℙ#min
+--   axiom P_Max  : Prop    -- = ℙ#max
+--   -- ordering: U_Max ≤ P_Max ≤ P_Min ≤ U_Min
+--   axiom sort_order_1: U_Max → P_Max
+--   axiom sort_order_2: P_Max  → P_Min
+--   axiom sort_order_3: P_Min  → U_Min
 -- @
 --
 -- 𝕌-kinded objects get boundedness axioms @P → U_Min@ and @U_Max → P@.
--- ℙ-kinded objects get boundedness axioms @P → _Top@  and @_Bot → P@.
+-- ℙ-kinded objects get boundedness axioms @P → P_Min@  and @P_Max → P@.
 --
 -- The mereological difference operation @A - B@ is rendered as @B → A@
 -- (operand swap).  All other operations (+, ×, ∸) map to (∧, ∨, ↔).
 --
 -- Facts from both @FactKindAssertion@ and @FactKindMetafactsFact@ are
--- emitted; assertions are wrapped with @_Top@, metafacts with @U_Min@.
+-- emitted; assertions are wrapped with @P_Min@, metafacts with @U_Min@.
 module Eidos.Export.LeanProps
   ( exportToLeanProps
   ) where
@@ -58,8 +58,8 @@ exportToLeanProps theory =
       , "-- Bound objects"
       , "axiom U_Min : Prop"
       , "axiom U_Max : Prop"
-      , "axiom _Top  : Prop"
-      , "axiom _Bot  : Prop"
+      , "axiom P_Min  : Prop"
+      , "axiom P_Max  : Prop"
       , ""
       ]
 
@@ -95,7 +95,7 @@ exportToLeanProps theory =
       | IR.EntityMereological m <- IR.theoryObjects theory
       , IR.mereoKind m == IR.MereologicalEntityKindProposition
       , IR.mereoOrigin m == IR.FromSignature
-      , IR.mereoName m `notElem` ["_Top", "_Bot", "⊤", "⊥", "ℙ#min", "ℙ#max"]
+      , IR.mereoName m `notElem` ["P_Min", "P_Max", "⊤", "⊥", "ℙ#min", "ℙ#max"]
       ]
 
     propDecls = map (\m -> "axiom " ++ IR.mereoName m ++ " : Prop") propObjects
@@ -105,8 +105,8 @@ exportToLeanProps theory =
     propBoundsFor :: IR.MereologicalObject -> [String]
     propBoundsFor m =
       let n = IR.mereoName m
-      in [ "axiom " ++ n ++ "_top: " ++ n ++ " → _Top"
-         , "axiom " ++ n ++ "_bot: _Bot → " ++ n
+      in [ "axiom " ++ n ++ "_top: " ++ n ++ " → P_Min"
+         , "axiom " ++ n ++ "_bot: P_Max → " ++ n
          ]
 
     -- -----------------------------------------------------------------------
@@ -162,14 +162,14 @@ exportToLeanProps theory =
              ]
 
     -- -----------------------------------------------------------------------
-    -- Sort-ordering axioms: U_Min ≤ _Top ≤ _Bot ≤ U_Max
+    -- Sort-ordering axioms: U_Min ≤ P_Min ≤ P_Max ≤ U_Max
     -- -----------------------------------------------------------------------
     sortOrderAxioms =
       [ ""
-      , "-- Sort ordering: U_Min ≤ _Top ≤ _Bot ≤ U_Max"
-      , "axiom sort_order_1: U_Max → _Bot"
-      , "axiom sort_order_2: _Bot  → _Top"
-      , "axiom sort_order_3: _Top  → U_Min"
+      , "-- Sort ordering: U_Min ≤ P_Min ≤ P_Max ≤ U_Max"
+      , "axiom sort_order_1: U_Max → P_Max"
+      , "axiom sort_order_2: P_Max  → P_Min"
+      , "axiom sort_order_3: P_Min  → U_Min"
       ]
       ++ userSortOrderAxioms
       ++ [""]
@@ -183,7 +183,7 @@ exportToLeanProps theory =
           ++ sortMaxName s ++ " → " ++ sortMinName s
 
     -- -----------------------------------------------------------------------
-    -- User facts: assertions (ℙ, wrapped with _Top) and
+    -- User facts: assertions (ℙ, wrapped with P_Min) and
     --             metafacts    (𝕌, wrapped with U_Min)
     -- -----------------------------------------------------------------------
     userAssertions =
@@ -211,7 +211,7 @@ exportToLeanProps theory =
     renderAssertion idx fact =
       let fvs  = renderFreeVars (IR.factFreeVars fact)
           body = renderPropExpr (IR.factPropExpr fact)
-      in "axiom " ++ mkLabel idx ++ "(_Top ∧ " ++ fvs ++ body ++ ") ↔ _Top"
+      in "axiom " ++ mkLabel idx ++ "(P_Min ∧ " ++ fvs ++ body ++ ") ↔ P_Min"
 
     renderMetafact :: Int -> IR.Fact -> String
     renderMetafact idx fact =
@@ -235,7 +235,7 @@ exportToLeanProps theory =
       let varName  = IR.resolvedVarName vd
           sortName = IR.sortName (IR.resolvedVarSort vd)
       in case sortName of
-           "ℙ" -> "∀ " ++ varName ++ " : Prop, (_Bot → " ++ varName ++ ") ∧ (" ++ varName ++ " → _Top) → "
+           "ℙ" -> "∀ " ++ varName ++ " : Prop, (P_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → P_Min) → "
            "𝕌" -> "∀ " ++ varName ++ " : Prop, (U_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → U_Min) → "
            _   -> "∀ " ++ varName ++ " : " ++ sortName ++ ", "
 
@@ -280,7 +280,7 @@ renderConj (IR.ResolvedConj lhs rests) =
 
 renderNeg :: IR.ResolvedNeg -> String
 renderNeg (IR.ResolvedNegNot inner) =
-  "(" ++ renderNeg inner ++ " → _Bot)"
+  "(" ++ renderNeg inner ++ " → P_Max)"
 renderNeg (IR.ResolvedNegChild q) =
   renderQuantified q
 
@@ -297,14 +297,14 @@ renderExplicitQuantifier (IR.ResolvedQForall vd) =
   let varName  = IR.resolvedVarName vd
       sortName = IR.sortName (IR.resolvedVarSort vd)
   in case sortName of
-       "ℙ" -> "∀ " ++ varName ++ " : Prop, (_Bot → " ++ varName ++ ") ∧ (" ++ varName ++ " → _Top) → "
+       "ℙ" -> "∀ " ++ varName ++ " : Prop, (P_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → P_Min) → "
        "𝕌" -> "∀ " ++ varName ++ " : Prop, (U_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → U_Min) → "
        _   -> "∀ " ++ varName ++ " : " ++ sortName ++ ", "
 renderExplicitQuantifier (IR.ResolvedQExists vd) =
   let varName  = IR.resolvedVarName vd
       sortName = IR.sortName (IR.resolvedVarSort vd)
   in case sortName of
-       "ℙ" -> "∃ " ++ varName ++ " : Prop, (_Bot → " ++ varName ++ ") ∧ (" ++ varName ++ " → _Top) ∧ "
+       "ℙ" -> "∃ " ++ varName ++ " : Prop, (P_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → P_Min) ∧ "
        "𝕌" -> "∃ " ++ varName ++ " : Prop, (U_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → U_Min) ∧ "
        _   -> "∃ " ++ varName ++ " : " ++ sortName ++ ", "
 
@@ -315,12 +315,12 @@ renderAtomicProp (IR.ResolvedAtomicTermPair tp)  = renderTermPair tp
 renderConstantRef :: IR.ResolvedConstantRef -> String
 renderConstantRef ref =
   case IR.resolvedConstRefName ref of
-    "ℙ#min" -> "_Top"
-    "ℙ#max" -> "_Bot"
+    "ℙ#min" -> "P_Min"
+    "ℙ#max" -> "P_Max"
     "𝕌#min" -> "U_Min"
     "𝕌#max" -> "U_Max"
-    "⊤"     -> "_Top"
-    "⊥"     -> "_Bot"
+    "⊤"     -> "P_Min"
+    "⊥"     -> "P_Max"
     other   -> other
 
 -- ---------------------------------------------------------------------------
@@ -374,14 +374,14 @@ renderFactor (IR.ResolvedFactor base [] _) = renderBaseTerm base
 renderFactor (IR.ResolvedFactor base suffixes _) =
   -- When a sort constant (ℙ, 𝕌, 𝔻) is followed by a #min or #max suffix,
   -- the combination denotes a named limit object with its own Lean name.
-  -- We resolve the pair here: e.g. ℙ#min → _Top, 𝕌#max → U_Max.
+  -- We resolve the pair here: e.g. ℙ#min → P_Min, 𝕌#max → U_Max.
   case (base, suffixes) of
     (IR.ResolvedBTAtomic ref, IR.ResolvedSuffixSpecialOp attr : rest)
       | attr `elem` ["min", "max"] ->
           let baseName = IR.resolvedConstRefName ref
               leanName = case (baseName, attr) of
-                ("ℙ", "min") -> "_Top"
-                ("ℙ", "max") -> "_Bot"
+                ("ℙ", "min") -> "P_Min"
+                ("ℙ", "max") -> "P_Max"
                 ("𝕌", "min") -> "U_Min"
                 ("𝕌", "max") -> "U_Max"
                 ("𝔻", "min") -> "U_Min"
