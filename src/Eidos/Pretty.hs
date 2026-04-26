@@ -182,9 +182,6 @@ isEmptySection :: Section -> Bool
 isEmptySection (SectionSignature (SignatureSection [])) = True
 isEmptySection (SectionAxioms (AxiomsWrapper [])) = True
 isEmptySection (SectionSubtheories (SubtheoriesSection [])) = True
-isEmptySection (SectionBareAxioms (AxAssertions (AssertionsSection []))) = True
-isEmptySection (SectionBareAxioms (AxFacts (FactsSection []))) = True
-isEmptySection (SectionBareAxioms (AxMetafacts (MetafactsSection []))) = True
 isEmptySection _ = False
 
 -- ---------------------------------------------------------------------------
@@ -201,8 +198,6 @@ prettySectionWithOpts opts level sec =
         "axioms " ++ prettyAxiomsWrapperWithOpts opts axs
       SectionSubtheories subs ->
         "subtheories " ++ prettySubtheoriesSectionWithOpts opts subs
-      SectionBareAxioms axs ->
-        prettyAxiomsSectionWithOpts opts axs
 
 prettySignatureSectionWithOpts :: PrettyOptions -> SignatureSection -> Doc
 prettySignatureSectionWithOpts opts (SignatureSection items) =

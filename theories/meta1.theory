@@ -7,25 +7,27 @@
     a : U; 
     b : U;
   },
-  assertions {
-    // The following will make the sort S encompass everything in object_theory
-    S#max = object_theory.𝕌#max;
-    S#min = object_theory.𝕌#min;
+  axioms {
+    assertions {
+      // The following will make the sort S encompass everything in object_theory
+      S#max = object_theory.𝕌#max;
+      S#min = object_theory.𝕌#min;
 
-    // The following will make T encompass the propositions in object_theory
-    T#max = object_theory.⊥;
-    T#min = object_theory.⊤;
+      // The following will make T encompass the propositions in object_theory
+      T#max = object_theory.⊥;
+      T#min = object_theory.⊤;
     
-    U = object_theory.D;
+      U = object_theory.D;
 
-    // The following will make object_theory prove that either a or b is zero
-    object_theory.prod(a, b) = object_theory.zero; 
+      // The following will make object_theory prove that either a or b is zero
+      object_theory.prod(a, b) = object_theory.zero; 
     
-    // That does /not/ mean that the following is provable here:
-    (a = object_theory.zero) ∨ (b = object_theory.zero);
+      // That does /not/ mean that the following is provable here:
+      (a = object_theory.zero) ∨ (b = object_theory.zero);
 
-    // The following is what is actually provable
-    // object_theory.⊤ → ((a = object_theory.zero) ∨ (b = object_theory.zero));
+      // The following is what is actually provable
+      // object_theory.⊤ → ((a = object_theory.zero) ∨ (b = object_theory.zero));
+    },
   },
   subtheories {
     /* Using a coherent theory as the object_theory for demo purposes */

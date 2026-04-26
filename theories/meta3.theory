@@ -28,13 +28,12 @@
       D_max ∩ D_min = D_min ∩ D_max;
       D_min ⊆ D_max;
       d ∈ D_max;
+    },
+    metafacts {
+      //(f.1 ∸ <D>(f.1)) ⇒ (f.res ∸ <D>(f.res)) ≤ 𝕌#min;
+      //(f.1 ∸ <D_min, D_max>(f.1)) ⇒ (f.res ∸ <D>(f.res)) ≤ 𝕌#min;
     }
   },
   subtheories {
-  },
-  metafacts {
-
-    //(f.1 ∸ <D>(f.1)) ⇒ (f.res ∸ <D>(f.res)) ≤ 𝕌#min;
-    //(f.1 ∸ <D_min, D_max>(f.1)) ⇒ (f.res ∸ <D>(f.res)) ≤ 𝕌#min;
   }
 }

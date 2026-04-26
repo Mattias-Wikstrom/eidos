@@ -65,7 +65,6 @@ pSection =
       SectionSignature   <$> pSignatureSection
   <|> SectionAxioms      <$> pAxiomsWrapper
   <|> SectionSubtheories <$> pSubtheoriesSection
-  <|> SectionBareAxioms  <$> pAxiomsSection
 
 -- ---------------------------------------------------------------------------
 -- Signature

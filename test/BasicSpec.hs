@@ -78,9 +78,6 @@ main = hspec $ do
       it "parses metafacts section" $
         parseString "{ axioms { metafacts { ⊤; } } }" `shouldSatisfy` isRight
       
-      it "parses bare axioms" $
-        parseString "{ assertions { ⊤; } }" `shouldSatisfy` isRight
-      
       it "parses quantified formulas" $
         parseString "{ axioms { assertions { ∀x:S x =_S x; } } }" `shouldSatisfy` isRight
       
