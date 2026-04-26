@@ -1,0 +1,21 @@
+================================
+Facts, Assertions, and Metafacts
+================================
+
+What are the rules for facts, assertions, and metafacts in Eidos?
+* Facts are what you need to use in equational theories. A fact is either an equation or an inequality. Inequalities are permitted in facts sections as a convenience: An inequatity in Eidos can be rewritten as an equation.
+* Facts cannot use propositional connectives or the sort for propositions. are also forbidden in facts.
+* As an exception to the rule, the propositional connective ⊤ should perhaps be permitted as a fact. ⊤ would have the same effect as a trivial identity (a=a), and there may be cases where things get simplified if ⊤ can be used. In addition, 'ℙ#min' should probably be permitted too, since ℙ#min and ⊤ are the same thing.
+* Facts can involve mereological sums (+) and mereological products (×), but equational theories (files that end with .eq.theory) cannot.
+* Assertions are unlike facts in that they can use propositional connectives, the sort for propositions, and quantifiers.
+* Things are guaranteed to be as stated by facts. An identity that appears as a fact will /identify/ the two objects.
+* Things are not guaranteed to be as stated by assertions. (This is inevitable, since assertions can be contradictory.)
+* Metafacts offer maximum expressive power but have little direct support in the syntax of Eidos. They are only meant to be used in special situations where facts and assertions fail to suffice.
+* Metafacts differ from facts by involving a more fine-grained view on things. Having a=b among the facts means less than having a=b among the metafacts. 
+* The sort 𝕌 can only be used in metafacts.
+* With facts and assertions, the object ⊤ (or ℙ#min) corresponds to what (trivially) true. With metafacts, that role is instead taken on by the object 𝕌#min. For something to hold as a metafact is for it to be 𝕌#min. One may think of 𝕌#min as expressing 'fine-grained truth,' with ⊤ merely expressing 'course-grained truth.'
+* An implication among metafacts is written using ⇒instead of →. Using → in metafacts is not forbidden, but P→P evaluates to ⊤, not 𝕌#min.
+* The converse of ⇒is -, and the symmetric version is ∸ (corresponds to ↔, but with P↔P evaluating to 𝕌#min instead of ⊤).
+* Instead of ∧ and ∨, metafacts will normally use + and ×, respectively. X ∧ Y is the same thing as (X + Y) + ⊤ while X ∨ Y is the same thing as (X × Y) + ⊤.
+* While 𝕌#min plays a role analogous to that of ⊤, there is no counterpart among metafacts for ⊥. It is rather as if one is working in a negation-free logic.
+
