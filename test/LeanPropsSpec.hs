@@ -451,6 +451,19 @@ main = hspec $ do
                  _) -> True
         _ -> False)
         `shouldBe` True
+        
+    it "bounded guard for user-defined sort quantifier contains S_Max and S_Min" $ do
+      doc <- buildStr [r|{
+        signature { sort S; },
+        axioms { assertions { [X : S] (X ↔ X); } }
+      }|]
+      hasWrappedFactWith doc pMin (\case
+        LForall "X" (LVar "Prop")
+          (LImpl (LConj (LImpl (LVar "S_Max") (LVar "X"))
+                        (LImpl (LVar "X") (LVar "S_Min")))
+                _) -> True
+        _ -> False)
+        `shouldBe` True
 
   -- =========================================================================
   describe "theoryToLeanDoc – structural invariants" $ do

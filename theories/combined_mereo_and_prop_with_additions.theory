@@ -31,6 +31,7 @@
       (P2 → ⊥) ↔ (¬MyProp);
       [X : ℙ] (X → (¬¬X));
       Q ← P1;
+      [X : S] X = X;
     },
     metafacts {
       MySet4 - 𝔻#min;

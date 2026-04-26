@@ -177,8 +177,8 @@ theoryToLeanDoc theory = LeanDoc
       where
         propBoundsFor m =
           let n = IR.mereoName m
-          in [ DeclAxiom (LeanAxiom (n ++ "_top") (LImpl (LVar n) (LVar "P_Min")))
-             , DeclAxiom (LeanAxiom (n ++ "_bot") (LImpl (LVar "P_Max") (LVar n)))
+          in [ DeclAxiom (LeanAxiom (n ++ "_min") (LImpl (LVar n) (LVar "P_Min")))
+             , DeclAxiom (LeanAxiom (n ++ "_max") (LImpl (LVar "P_Max") (LVar n)))
              ]
 
     -- -----------------------------------------------------------------------
@@ -202,8 +202,8 @@ theoryToLeanDoc theory = LeanDoc
       where
         setBoundsFor m =
           let n = IR.mereoName m
-          in [ DeclAxiom (LeanAxiom (n ++ "_top") (LImpl (LVar n) (LVar "D_Min")))
-             , DeclAxiom (LeanAxiom (n ++ "_bot") (LImpl (LVar "D_Max") (LVar n)))
+          in [ DeclAxiom (LeanAxiom (n ++ "_min") (LImpl (LVar n) (LVar "D_Min")))
+             , DeclAxiom (LeanAxiom (n ++ "_max") (LImpl (LVar "D_Max") (LVar n)))
              ]
 
     -- -----------------------------------------------------------------------
@@ -225,8 +225,8 @@ theoryToLeanDoc theory = LeanDoc
           let n    = IR.mereoName m
               sMin = sortMinName (IR.mereoSort m)
               sMax = sortMaxName (IR.mereoSort m)
-          in [ DeclAxiom (LeanAxiom (n ++ "_top") (LImpl (LVar n) (LVar sMin)))
-             , DeclAxiom (LeanAxiom (n ++ "_bot") (LImpl (LVar sMax) (LVar n)))
+          in [ DeclAxiom (LeanAxiom (n ++ "_min") (LImpl (LVar n) (LVar sMin)))
+             , DeclAxiom (LeanAxiom (n ++ "_max") (LImpl (LVar sMax) (LVar n)))
              ]
 
     -- -----------------------------------------------------------------------
@@ -235,20 +235,30 @@ theoryToLeanDoc theory = LeanDoc
     sortOrderDecls :: [LeanDecl]
     sortOrderDecls =
       [ DeclBlankLine
-      , DeclComment "Sort ordering: U_Min <= P_Min <= P_Max <= U_Max"
-      , DeclAxiom (LeanAxiom "sort_order_1" (LImpl (LVar "U_Max") (LVar "P_Max")))
-      , DeclAxiom (LeanAxiom "sort_order_2" (LImpl (LVar "P_Max") (LVar "P_Min")))
-      , DeclAxiom (LeanAxiom "sort_order_3" (LImpl (LVar "P_Min") (LVar "U_Min")))
-      , DeclAxiom (LeanAxiom "D_sort_order" (LImpl (LVar "D_Max") (LVar "D_Min")))
+      , DeclComment "Sort ordering lattice"
+      , DeclComment "U_Max is the top, U_Min is the bottom"
+      , DeclAxiom (LeanAxiom "U_ordering" (LImpl (LVar "U_Max") (LVar "U_Min")))
+      , DeclComment "P sits between user sorts and U_Min"
+      , DeclAxiom (LeanAxiom "U_to_P" (LImpl (LVar "U_Max") (LVar "P_Max")))
+      , DeclAxiom (LeanAxiom "P_ordering" (LImpl (LVar "P_Max") (LVar "P_Min")))
+      , DeclAxiom (LeanAxiom "P_to_U" (LImpl (LVar "P_Min") (LVar "U_Min")))
+      , DeclComment "D and all user sorts sit between U_Max and P_Max"
+      , DeclAxiom (LeanAxiom "D_upper" (LImpl (LVar "U_Max") (LVar "D_Max")))
+      , DeclAxiom (LeanAxiom "D_ordering" (LImpl (LVar "D_Max") (LVar "D_Min")))
+      , DeclAxiom (LeanAxiom "D_lower" (LImpl (LVar "D_Min") (LVar "P_Max")))
       ]
-      ++ map userSortOrderAxiom userSorts
+      ++ concatMap userSortOrderAxioms userSorts
       ++ [DeclBlankLine]
       where
-        userSortOrderAxiom s =
-          DeclAxiom (LeanAxiom
-            (IR.sortName s ++ "_sort_order")
-            (LImpl (LVar (sortMaxName s)) (LVar (sortMinName s))))
-
+        userSortOrderAxioms s =
+          let sortName = IR.sortName s
+              sMax = sortMaxName s
+              sMin = sortMinName s
+          in [ DeclAxiom (LeanAxiom (sortName ++ "_upper") (LImpl (LVar "U_Max") (LVar sMax)))
+            , DeclAxiom (LeanAxiom (sortName ++ "_ordering") (LImpl (LVar sMax) (LVar sMin)))
+            , DeclAxiom (LeanAxiom (sortName ++ "_lower") (LImpl (LVar sMin) (LVar "P_Max")))
+            ]
+            
     -- -----------------------------------------------------------------------
     -- User facts
     -- -----------------------------------------------------------------------
@@ -324,7 +334,9 @@ addBoundedGuard sortN varN body =
     "𝔻" -> LImpl (LConj (LImpl (LVar "D_Max") (LVar varN))
                         (LImpl (LVar varN) (LVar "D_Min")))
                  body
-    _   -> body  -- user sort: no extra guard
+    _   -> LImpl (LConj (LImpl (LVar (sortN ++ "_Max")) (LVar varN))
+                        (LImpl (LVar varN) (LVar (sortN ++ "_Min"))))
+                 body  -- user sort: add guard with S_Max and S_Min
 
 -- ---------------------------------------------------------------------------
 -- Converting IR prop-expressions to LeanExpr
