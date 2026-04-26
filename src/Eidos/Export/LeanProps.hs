@@ -1,154 +1,117 @@
 -- | Export an Eidos theory to Lean 4 using the "all Props" strategy.
 --
--- Handles propositional (ℙ-sorted), mereological (𝕌-sorted), and mixed
--- theories uniformly.  Both kinds of signature object are always emitted.
--- The four bound objects and the three ordering axioms linking them are
--- always present:
+-- The pipeline has two stages:
 --
--- @
---   axiom U_Min : Prop
---   axiom U_Max : Prop
---   axiom P_Min  : Prop    -- = ℙ#min
---   axiom P_Max  : Prop    -- = ℙ#max
---   axiom D_Min  : Prop    -- = 𝔻#min
---   axiom D_Max  : Prop    -- = 𝔻#max
---   -- ordering: U_Max ≤ P_Max ≤ P_Min ≤ U_Min
---   axiom sort_order_1: U_Max → P_Max
---   axiom sort_order_2: P_Max  → P_Min
---   axiom sort_order_3: P_Min  → U_Min
---   axiom D_sort_order: D_Max → D_Min
--- @
+--   1. 'theoryToLeanDoc' – converts an 'IR.Theory' into a 'LeanDoc', a
+--      structured internal representation of every declaration the output
+--      will contain.  This is the stage you unit-test.
 --
--- 𝕌-kinded objects get boundedness axioms @P → U_Min@ and @U_Max → P@.
--- ℙ-kinded objects get boundedness axioms @P → P_Min@  and @P_Max → P@.
--- 𝔻-kinded objects (sets) get boundedness axioms @S → D_Min@ and @D_Max → S@.
+--   2. 'renderLeanDoc' – pretty-prints a 'LeanDoc' to a 'String' of Lean 4
+--      source.
 --
--- The mereological difference operation @A - B@ is rendered as @B → A@
--- (operand swap).  All other operations (+, ×, ∸) map to (∧, ∨, ↔).
+-- The public entry point 'exportToLeanProps' just composes the two.
 --
--- Facts from both @FactKindAssertion@ and @FactKindMetafactsFact@ are
--- emitted; assertions are wrapped with @P_Min@, metafacts with @U_Min@.
+-- == Encoding conventions
+--
+-- * A 𝕌-kinded object @P@ gets bounds axioms @P → U_Min@ and @U_Max → P@.
+-- * A ℙ-kinded object @P@ gets bounds axioms @P → P_Min@ and @P_Max → P@.
+-- * A 𝔻-kinded set @S@ gets bounds axioms @S → D_Min@ and @D_Max → S@.
+-- * A user-sort set @S ⊆ T@ gets bounds axioms @S → T_Min@ and @T_Max → S@.
+-- * @A - B@ (mereological difference) renders as @B → A@.
+-- * @+, ×, ∸@ map to @∧, ∨, ↔@.
+-- * Assertions are wrapped with @P_Min@; metafacts with @U_Min@.
 module Eidos.Export.LeanProps
-  ( exportToLeanProps
+  ( -- * Internal representation
+    LeanDoc (..)
+  , LeanDecl (..)
+  , LeanAxiom (..)
+  , LeanExpr (..)
+    -- * Pipeline stages
+  , theoryToLeanDoc
+  , renderLeanDoc
+  , renderLeanExpr
+    -- * Convenience entry point
+  , exportToLeanProps
   ) where
 
-import Data.List (intercalate)
 import qualified Eidos.IR as IR
 
 -- ---------------------------------------------------------------------------
--- Top-level entry point
+-- Internal representation
 -- ---------------------------------------------------------------------------
 
-exportToLeanProps :: IR.Theory -> String
-exportToLeanProps theory =
-  unlines $
-       header
-    ++ userSortLimitDecls
-    ++ mereoDecls
-    ++ propDecls
-    ++ setDecls  -- Add declarations for 𝔻-sorted sets
-    ++ mereoBoundsAxioms
-    ++ propBoundsAxioms
-    ++ setBoundsAxioms  -- Add bounds axioms for 𝔻-sorted sets
-    ++ userSortSetBoundsAxioms
-    ++ sortOrderAxioms
-    ++ userFactAxioms
+-- | A complete Lean 4 document ready to be printed.
+data LeanDoc = LeanDoc
+  { leanDocTheoryName :: String
+  , leanDocDecls      :: [LeanDecl]
+  } deriving (Eq, Show)
+
+-- | A single top-level item in a Lean 4 file.
+data LeanDecl
+  = DeclComment  String       -- ^ @-- comment@
+  | DeclBlankLine              -- ^ empty line
+  | DeclAxiom    LeanAxiom    -- ^ @axiom name : body@
+  deriving (Eq, Show)
+
+-- | An @axiom@ statement with a name and a type expression.
+data LeanAxiom = LeanAxiom
+  { axiomName :: String
+  , axiomType :: LeanExpr
+  } deriving (Eq, Show)
+
+-- | A Lean 4 proposition (the expression language we need).
+data LeanExpr
+  = LProp                              -- ^ @Prop@
+  | LVar   String                      -- ^ atomic name
+  | LImpl  LeanExpr LeanExpr           -- ^ @A → B@
+  | LConj  LeanExpr LeanExpr           -- ^ @A ∧ B@
+  | LDisj  LeanExpr LeanExpr           -- ^ @A ∨ B@
+  | LBicond LeanExpr LeanExpr          -- ^ @A ↔ B@
+  | LForall String LeanExpr LeanExpr   -- ^ @∀ x : T, body@
+  | LExists String LeanExpr LeanExpr   -- ^ @∃ x : T, body@
+  deriving (Eq, Show)
+
+-- ---------------------------------------------------------------------------
+-- Stage 1 – Theory → LeanDoc
+-- ---------------------------------------------------------------------------
+
+-- | Convert an Eidos 'IR.Theory' into a structured 'LeanDoc'.
+theoryToLeanDoc :: IR.Theory -> LeanDoc
+theoryToLeanDoc theory = LeanDoc
+  { leanDocTheoryName = IR.theoryFullyQualifiedName theory
+  , leanDocDecls      = concat
+      [ headerDecls
+      , userSortLimitDecls
+      , mereoDecls
+      , propDecls
+      , setDecls
+      , mereoBoundsAxioms
+      , propBoundsAxioms
+      , setBoundsAxioms
+      , userSortSetBoundsAxioms
+      , sortOrderDecls
+      , userFactDecls
+      ]
+  }
   where
     -- -----------------------------------------------------------------------
-    -- Header
+    -- Header – the six built-in bound objects
     -- -----------------------------------------------------------------------
-    header =
-      [ "-- Generated by Eidos compiler"
-      , "-- Theory: " ++ IR.theoryFullyQualifiedName theory
-      , ""
-      , "-- Bound objects"
-      , "axiom U_Min : Prop"
-      , "axiom U_Max : Prop"
-      , "axiom P_Min  : Prop"
-      , "axiom P_Max  : Prop"
-      , "axiom D_Min  : Prop"
-      , "axiom D_Max  : Prop"
-      , ""
+    headerDecls :: [LeanDecl]
+    headerDecls =
+      [ DeclComment "Bound objects"
+      , DeclAxiom (LeanAxiom "U_Min" LProp)
+      , DeclAxiom (LeanAxiom "U_Max" LProp)
+      , DeclAxiom (LeanAxiom "P_Min" LProp)
+      , DeclAxiom (LeanAxiom "P_Max" LProp)
+      , DeclAxiom (LeanAxiom "D_Min" LProp)
+      , DeclAxiom (LeanAxiom "D_Max" LProp)
+      , DeclBlankLine
       ]
 
     -- -----------------------------------------------------------------------
-    -- 𝕌-kinded (mereological) signature objects
+    -- User-declared sorts: S_Min / S_Max limit objects
     -- -----------------------------------------------------------------------
-    mereoObjects :: [IR.MereologicalObject]
-    mereoObjects =
-      [ m
-      | IR.EntityMereological m <- IR.theoryObjects theory
-      , IR.mereoKind m == IR.MereologicalEntityKindMereological
-      , IR.mereoOrigin m == IR.FromSignature
-      , IR.mereoName m `notElem` ["U_Min", "U_Max", "⊤", "⊥"]
-      ]
-
-    mereoDecls = map (\m -> "axiom " ++ IR.mereoName m ++ " : Prop") mereoObjects
-
-    mereoBoundsAxioms = concatMap mereoBoundsFor mereoObjects
-
-    mereoBoundsFor :: IR.MereologicalObject -> [String]
-    mereoBoundsFor m =
-      let n = IR.mereoName m
-      in [ "axiom " ++ n ++ "_min: " ++ n ++ " → U_Min"
-         , "axiom " ++ n ++ "_max: U_Max → " ++ n
-         ]
-
-    -- -----------------------------------------------------------------------
-    -- ℙ-kinded (propositional) signature objects
-    -- -----------------------------------------------------------------------
-    propObjects :: [IR.MereologicalObject]
-    propObjects =
-      [ m
-      | IR.EntityMereological m <- IR.theoryObjects theory
-      , IR.mereoKind m == IR.MereologicalEntityKindProposition
-      , IR.mereoOrigin m == IR.FromSignature
-      , IR.mereoName m `notElem` ["P_Min", "P_Max", "⊤", "⊥", "ℙ#min", "ℙ#max"]
-      ]
-
-    propDecls = map (\m -> "axiom " ++ IR.mereoName m ++ " : Prop") propObjects
-
-    propBoundsAxioms = concatMap propBoundsFor propObjects
-
-    propBoundsFor :: IR.MereologicalObject -> [String]
-    propBoundsFor m =
-      let n = IR.mereoName m
-      in [ "axiom " ++ n ++ "_top: " ++ n ++ " → P_Min"
-         , "axiom " ++ n ++ "_bot: P_Max → " ++ n
-         ]
-
-    -- -----------------------------------------------------------------------
-    -- 𝔻-kinded (set) signature objects
-    -- These are sets with sort 𝔻 (e.g., MySet4 ⊆ 𝔻)
-    -- -----------------------------------------------------------------------
-    setObjects :: [IR.MereologicalObject]
-    setObjects =
-      [ m
-      | IR.EntityMereological m <- IR.theoryObjects theory
-      , IR.mereoKind m == IR.MereologicalEntityKindSet
-      , IR.mereoOrigin m == IR.FromSignature
-      , IR.sortKind (IR.mereoSort m) == IR.SortKindDomain
-      , IR.sortName (IR.mereoSort m) == "𝔻"
-      ]
-
-    setDecls = map (\m -> "axiom " ++ IR.mereoName m ++ " : Prop") setObjects
-
-    setBoundsAxioms = concatMap setBoundsFor setObjects
-
-    setBoundsFor :: IR.MereologicalObject -> [String]
-    setBoundsFor m =
-      let n = IR.mereoName m
-      in [ "axiom " ++ n ++ "_top: " ++ n ++ " → D_Min"
-         , "axiom " ++ n ++ "_bot: D_Max → " ++ n
-         ]
-
-    -- -----------------------------------------------------------------------
-    -- User-declared sorts: declare their min/max limit objects and emit
-    -- bounds axioms for every set that lives inside one of those sorts.
-    -- -----------------------------------------------------------------------
-
-    -- User sorts (excluding the three built-ins 𝕌, 𝔻, ℙ, and also excluding
-    -- 𝔻 since we're handling it separately above with its own bounds)
     userSorts :: [IR.Sort]
     userSorts =
       [ s
@@ -156,71 +119,140 @@ exportToLeanProps theory =
       , IR.sortKind s == IR.SortKindFromSignature
       ]
 
-    -- Lean name for a sort's lower limit (S#min → "S_Min")
     sortMinName :: IR.Sort -> String
     sortMinName s = IR.sortName s ++ "_Min"
 
-    -- Lean name for a sort's upper limit (S#max → "S_Max")
     sortMaxName :: IR.Sort -> String
     sortMaxName s = IR.sortName s ++ "_Max"
 
-    -- "axiom S_Min : Prop" / "axiom S_Max : Prop" for each user sort
-    userSortLimitDecls :: [String]
-    userSortLimitDecls = concatMap sortLimitDecls userSorts
+    userSortLimitDecls :: [LeanDecl]
+    userSortLimitDecls = concatMap mkSortLimitDecls userSorts
       where
-        sortLimitDecls s =
-          [ "axiom " ++ sortMinName s ++ " : Prop"
-          , "axiom " ++ sortMaxName s ++ " : Prop"
+        mkSortLimitDecls s =
+          [ DeclAxiom (LeanAxiom (sortMinName s) LProp)
+          , DeclAxiom (LeanAxiom (sortMaxName s) LProp)
           ]
 
-    -- Sets declared against user sorts (MereologicalEntityKindSet, FromSignature)
+    -- -----------------------------------------------------------------------
+    -- 𝕌-kinded (mereological) objects
+    -- -----------------------------------------------------------------------
+    mereoObjects :: [IR.MereologicalObject]
+    mereoObjects =
+      [ m
+      | IR.EntityMereological m <- IR.theoryObjects theory
+      , IR.mereoKind   m == IR.MereologicalEntityKindMereological
+      , IR.mereoOrigin m == IR.FromSignature
+      , IR.mereoName   m `notElem` ["U_Min", "U_Max", "⊤", "⊥"]
+      ]
+
+    mereoDecls :: [LeanDecl]
+    mereoDecls = map (\m -> DeclAxiom (LeanAxiom (IR.mereoName m) LProp)) mereoObjects
+
+    mereoBoundsAxioms :: [LeanDecl]
+    mereoBoundsAxioms = concatMap mereoBoundsFor mereoObjects
+      where
+        mereoBoundsFor m =
+          let n = IR.mereoName m
+          in [ DeclAxiom (LeanAxiom (n ++ "_min") (LImpl (LVar n) (LVar "U_Min")))
+             , DeclAxiom (LeanAxiom (n ++ "_max") (LImpl (LVar "U_Max") (LVar n)))
+             ]
+
+    -- -----------------------------------------------------------------------
+    -- ℙ-kinded (propositional) objects
+    -- -----------------------------------------------------------------------
+    propObjects :: [IR.MereologicalObject]
+    propObjects =
+      [ m
+      | IR.EntityMereological m <- IR.theoryObjects theory
+      , IR.mereoKind   m == IR.MereologicalEntityKindProposition
+      , IR.mereoOrigin m == IR.FromSignature
+      , IR.mereoName   m `notElem` ["P_Min", "P_Max", "⊤", "⊥", "ℙ#min", "ℙ#max"]
+      ]
+
+    propDecls :: [LeanDecl]
+    propDecls = map (\m -> DeclAxiom (LeanAxiom (IR.mereoName m) LProp)) propObjects
+
+    propBoundsAxioms :: [LeanDecl]
+    propBoundsAxioms = concatMap propBoundsFor propObjects
+      where
+        propBoundsFor m =
+          let n = IR.mereoName m
+          in [ DeclAxiom (LeanAxiom (n ++ "_top") (LImpl (LVar n) (LVar "P_Min")))
+             , DeclAxiom (LeanAxiom (n ++ "_bot") (LImpl (LVar "P_Max") (LVar n)))
+             ]
+
+    -- -----------------------------------------------------------------------
+    -- 𝔻-kinded sets
+    -- -----------------------------------------------------------------------
+    setObjects :: [IR.MereologicalObject]
+    setObjects =
+      [ m
+      | IR.EntityMereological m <- IR.theoryObjects theory
+      , IR.mereoKind   m == IR.MereologicalEntityKindSet
+      , IR.mereoOrigin m == IR.FromSignature
+      , IR.sortKind  (IR.mereoSort m) == IR.SortKindDomain
+      , IR.sortName  (IR.mereoSort m) == "𝔻"
+      ]
+
+    setDecls :: [LeanDecl]
+    setDecls = map (\m -> DeclAxiom (LeanAxiom (IR.mereoName m) LProp)) setObjects
+
+    setBoundsAxioms :: [LeanDecl]
+    setBoundsAxioms = concatMap setBoundsFor setObjects
+      where
+        setBoundsFor m =
+          let n = IR.mereoName m
+          in [ DeclAxiom (LeanAxiom (n ++ "_top") (LImpl (LVar n) (LVar "D_Min")))
+             , DeclAxiom (LeanAxiom (n ++ "_bot") (LImpl (LVar "D_Max") (LVar n)))
+             ]
+
+    -- -----------------------------------------------------------------------
+    -- Sets declared against user-defined sorts
+    -- -----------------------------------------------------------------------
     userSortSets :: [IR.MereologicalObject]
     userSortSets =
       [ m
       | IR.EntityMereological m <- IR.theoryObjects theory
-      , IR.mereoKind m == IR.MereologicalEntityKindSet
+      , IR.mereoKind   m == IR.MereologicalEntityKindSet
       , IR.mereoOrigin m == IR.FromSignature
-      , IR.sortKind (IR.mereoSort m) == IR.SortKindFromSignature
+      , IR.sortKind  (IR.mereoSort m) == IR.SortKindFromSignature
       ]
 
-    -- "axiom MySet_top: MySet → S_Min" / "axiom MySet_bot: S_Max → MySet"
-    userSortSetBoundsAxioms :: [String]
+    userSortSetBoundsAxioms :: [LeanDecl]
     userSortSetBoundsAxioms = concatMap setBounds userSortSets
       where
         setBounds m =
           let n    = IR.mereoName m
               sMin = sortMinName (IR.mereoSort m)
               sMax = sortMaxName (IR.mereoSort m)
-          in [ "axiom " ++ n ++ "_top: " ++ n ++ " → " ++ sMin
-             , "axiom " ++ n ++ "_bot: " ++ sMax ++ " → " ++ n
+          in [ DeclAxiom (LeanAxiom (n ++ "_top") (LImpl (LVar n) (LVar sMin)))
+             , DeclAxiom (LeanAxiom (n ++ "_bot") (LImpl (LVar sMax) (LVar n)))
              ]
 
     -- -----------------------------------------------------------------------
-    -- Sort-ordering axioms: U_Min ≤ P_Min ≤ P_Max ≤ U_Max, and D_Max → D_Min
+    -- Sort-ordering axioms
     -- -----------------------------------------------------------------------
-    sortOrderAxioms =
-      [ ""
-      , "-- Sort ordering: U_Min ≤ P_Min ≤ P_Max ≤ U_Max"
-      , "axiom sort_order_1: U_Max → P_Max"
-      , "axiom sort_order_2: P_Max  → P_Min"
-      , "axiom sort_order_3: P_Min  → U_Min"
-      , "axiom D_sort_order: D_Max → D_Min"
+    sortOrderDecls :: [LeanDecl]
+    sortOrderDecls =
+      [ DeclBlankLine
+      , DeclComment "Sort ordering: U_Min <= P_Min <= P_Max <= U_Max"
+      , DeclAxiom (LeanAxiom "sort_order_1" (LImpl (LVar "U_Max") (LVar "P_Max")))
+      , DeclAxiom (LeanAxiom "sort_order_2" (LImpl (LVar "P_Max") (LVar "P_Min")))
+      , DeclAxiom (LeanAxiom "sort_order_3" (LImpl (LVar "P_Min") (LVar "U_Min")))
+      , DeclAxiom (LeanAxiom "D_sort_order" (LImpl (LVar "D_Max") (LVar "D_Min")))
       ]
-      ++ userSortOrderAxioms
-      ++ [""]
-
-    -- S_Max → S_Min for each user-declared sort
-    userSortOrderAxioms :: [String]
-    userSortOrderAxioms = map sortOrderAxiom userSorts
+      ++ map userSortOrderAxiom userSorts
+      ++ [DeclBlankLine]
       where
-        sortOrderAxiom s =
-          "axiom " ++ IR.sortName s ++ "_sort_order: "
-          ++ sortMaxName s ++ " → " ++ sortMinName s
+        userSortOrderAxiom s =
+          DeclAxiom (LeanAxiom
+            (IR.sortName s ++ "_sort_order")
+            (LImpl (LVar (sortMaxName s)) (LVar (sortMinName s))))
 
     -- -----------------------------------------------------------------------
-    -- User facts: assertions (ℙ, wrapped with P_Min) and
-    --             metafacts    (𝕌, wrapped with U_Min)
+    -- User facts
     -- -----------------------------------------------------------------------
+    userAssertions :: [IR.Fact]
     userAssertions =
       [ f
       | f <- IR.theoryFacts theory
@@ -229,6 +261,7 @@ exportToLeanProps theory =
       , not (IR.factIsMereologicalTranslation f)
       ]
 
+    userMetafacts :: [IR.Fact]
     userMetafacts =
       [ f
       | f <- IR.theoryFacts theory
@@ -237,121 +270,133 @@ exportToLeanProps theory =
       , not (IR.factIsMereologicalTranslation f)
       ]
 
+    totalFacts :: Int
     totalFacts = length userAssertions + length userMetafacts
 
     mkLabel :: Int -> String
-    mkLabel idx = if totalFacts > 1 then "ax" ++ show idx ++ ": " else ""
+    mkLabel idx = if totalFacts > 1 then "ax" ++ show idx else ""
 
-    renderAssertion :: Int -> IR.Fact -> String
-    renderAssertion idx fact =
-      let fvs  = renderFreeVars (IR.factFreeVars fact)
-          body = renderPropExpr (IR.factPropExpr fact)
-      in "axiom " ++ mkLabel idx ++ "(P_Min ∧ " ++ fvs ++ body ++ ") ↔ P_Min"
+    -- Wrap fact body in (P_Min ∧ body) ↔ P_Min  or  (U_Min ∧ body) ↔ U_Min
+    mkFactAxiom :: String -> LeanExpr -> LeanExpr -> LeanDecl
+    mkFactAxiom label wrapper body =
+      DeclAxiom (LeanAxiom label (LBicond (LConj wrapper body) wrapper))
 
-    renderMetafact :: Int -> IR.Fact -> String
-    renderMetafact idx fact =
-      let fvs  = renderFreeVars (IR.factFreeVars fact)
-          body = renderPropExpr (IR.factPropExpr fact)
-      in "axiom " ++ mkLabel idx ++ "(U_Min ∧ " ++ fvs ++ body ++ ") ↔ U_Min"
+    factBody :: IR.Fact -> LeanExpr
+    factBody fact = wrapFreeVars (IR.factFreeVars fact) (propExprToLean (IR.factPropExpr fact))
 
-    userFactAxioms =
-         zipWith renderAssertion [1..] userAssertions
-      ++ zipWith renderMetafact  [1 + length userAssertions..] userMetafacts
+    assertionDecl :: Int -> IR.Fact -> LeanDecl
+    assertionDecl idx fact = mkFactAxiom (mkLabel idx) (LVar "P_Min") (factBody fact)
 
-    -- -----------------------------------------------------------------------
-    -- Free-variable rendering
-    -- -----------------------------------------------------------------------
-    renderFreeVars :: [IR.ResolvedVarDecl] -> String
-    renderFreeVars [] = ""
-    renderFreeVars vs = concatMap renderFreeVar vs ++ " "
+    metafactDecl :: Int -> IR.Fact -> LeanDecl
+    metafactDecl idx fact = mkFactAxiom (mkLabel idx) (LVar "U_Min") (factBody fact)
 
-    renderFreeVar :: IR.ResolvedVarDecl -> String
-    renderFreeVar vd =
-      let varName  = IR.resolvedVarName vd
-          sortName = IR.sortName (IR.resolvedVarSort vd)
-      in case sortName of
-           "ℙ" -> "∀ " ++ varName ++ " : Prop, (P_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → P_Min) → "
-           "𝕌" -> "∀ " ++ varName ++ " : Prop, (U_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → U_Min) → "
-           "𝔻" -> "∀ " ++ varName ++ " : Prop, (D_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → D_Min) → "
-           _   -> "∀ " ++ varName ++ " : " ++ sortName ++ ", "
+    userFactDecls :: [LeanDecl]
+    userFactDecls =
+         zipWith assertionDecl [1 ..] userAssertions
+      ++ zipWith metafactDecl  [1 + length userAssertions ..] userMetafacts
 
 -- ---------------------------------------------------------------------------
--- Expression rendering
+-- Free-variable wrapping
 -- ---------------------------------------------------------------------------
 
-renderPropExpr :: IR.ResolvedPropExpr -> String
-renderPropExpr (IR.ResolvedPropBicond lhs rests) =
+wrapFreeVars :: [IR.ResolvedVarDecl] -> LeanExpr -> LeanExpr
+wrapFreeVars [] body = body
+wrapFreeVars (vd : rest) body =
+  varDeclToForall vd (wrapFreeVars rest body)
+
+varDeclToForall :: IR.ResolvedVarDecl -> LeanExpr -> LeanExpr
+varDeclToForall vd body =
+  let varN = IR.resolvedVarName vd
+      sn   = IR.sortName (IR.resolvedVarSort vd)
+  in LForall varN (LVar "Prop") (addBoundedGuard sn varN body)
+
+-- | For built-in sorts, add the membership-guard @(Max → x) ∧ (x → Min) → body@.
+-- For user-defined sorts, no guard is added.
+addBoundedGuard :: String -> String -> LeanExpr -> LeanExpr
+addBoundedGuard sortN varN body =
+  case sortN of
+    "ℙ" -> LImpl (LConj (LImpl (LVar "P_Max") (LVar varN))
+                        (LImpl (LVar varN) (LVar "P_Min")))
+                 body
+    "𝕌" -> LImpl (LConj (LImpl (LVar "U_Max") (LVar varN))
+                        (LImpl (LVar varN) (LVar "U_Min")))
+                 body
+    "𝔻" -> LImpl (LConj (LImpl (LVar "D_Max") (LVar varN))
+                        (LImpl (LVar varN) (LVar "D_Min")))
+                 body
+    _   -> body  -- user sort: no extra guard
+
+-- ---------------------------------------------------------------------------
+-- Converting IR prop-expressions to LeanExpr
+-- ---------------------------------------------------------------------------
+
+propExprToLean :: IR.ResolvedPropExpr -> LeanExpr
+propExprToLean (IR.ResolvedPropBicond lhs rests) =
   case rests of
-    [] -> renderRightImpl lhs
-    _  ->
-      let left  = renderRightImpl lhs
-          pairs = [ renderRightImpl (IR.resolvedPropRestRight r) | r <- rests ]
-      in foldl (\acc p -> "(" ++ acc ++ " ↔ " ++ p ++ ")") left pairs
+    []    -> rightImplToLean lhs
+    (r:_) -> LBicond (rightImplToLean lhs)
+                     (rightImplToLean (IR.resolvedPropRestRight r))
 
-renderRightImpl :: IR.ResolvedRightImpl -> String
-renderRightImpl (IR.ResolvedRightImpl lhs Nothing) =
-  renderLeftImpl lhs
-renderRightImpl (IR.ResolvedRightImpl lhs (Just (_, rhs))) =
-  "(" ++ renderLeftImpl lhs ++ " → " ++ renderRightImpl rhs ++ ")"
+rightImplToLean :: IR.ResolvedRightImpl -> LeanExpr
+rightImplToLean (IR.ResolvedRightImpl lhs Nothing) =
+  leftImplToLean lhs
+rightImplToLean (IR.ResolvedRightImpl lhs (Just (_, rhs))) =
+  LImpl (leftImplToLean lhs) (rightImplToLean rhs)
 
-renderLeftImpl :: IR.ResolvedLeftImpl -> String
-renderLeftImpl (IR.ResolvedLeftImpl lhs []) =
-  renderDisj lhs
-renderLeftImpl (IR.ResolvedLeftImpl lhs rests) =
-  let base  = renderDisj lhs
-      steps = map (renderDisj . IR.resolvedLirRight) rests
-  in foldl (\acc s -> "(" ++ s ++ " → " ++ acc ++ ")") base steps
+leftImplToLean :: IR.ResolvedLeftImpl -> LeanExpr
+leftImplToLean (IR.ResolvedLeftImpl lhs []) =
+  disjToLean lhs
+leftImplToLean (IR.ResolvedLeftImpl lhs rests) =
+  foldr (\r acc -> LImpl (disjToLean (IR.resolvedLirRight r)) acc)
+        (disjToLean lhs)
+        rests
 
-renderDisj :: IR.ResolvedDisj -> String
-renderDisj (IR.ResolvedDisj lhs []) = renderConj lhs
-renderDisj (IR.ResolvedDisj lhs rests) =
-  let parts = renderConj lhs : map (renderConj . IR.resolvedDisjRestRight) rests
-  in "(" ++ intercalate " ∨ " parts ++ ")"
+disjToLean :: IR.ResolvedDisj -> LeanExpr
+disjToLean (IR.ResolvedDisj lhs []) = conjToLean lhs
+disjToLean (IR.ResolvedDisj lhs rests) =
+  foldl (\acc r -> LDisj acc (conjToLean (IR.resolvedDisjRestRight r)))
+        (conjToLean lhs)
+        rests
 
-renderConj :: IR.ResolvedConj -> String
-renderConj (IR.ResolvedConj lhs []) = renderNeg lhs
-renderConj (IR.ResolvedConj lhs rests) =
-  let parts = renderNeg lhs : map (renderNeg . IR.resolvedConjRestRight) rests
-  in "(" ++ intercalate " ∧ " parts ++ ")"
+conjToLean :: IR.ResolvedConj -> LeanExpr
+conjToLean (IR.ResolvedConj lhs []) = negToLean lhs
+conjToLean (IR.ResolvedConj lhs rests) =
+  foldl (\acc r -> LConj acc (negToLean (IR.resolvedConjRestRight r)))
+        (negToLean lhs)
+        rests
 
-renderNeg :: IR.ResolvedNeg -> String
-renderNeg (IR.ResolvedNegNot inner) =
-  "(" ++ renderNeg inner ++ " → P_Max)"
-renderNeg (IR.ResolvedNegChild q) =
-  renderQuantified q
+negToLean :: IR.ResolvedNeg -> LeanExpr
+negToLean (IR.ResolvedNegNot inner) =
+  LImpl (negToLean inner) (LVar "P_Max")
+negToLean (IR.ResolvedNegChild q) =
+  quantifiedToLean q
 
-renderQuantified :: IR.ResolvedQuantified -> String
-renderQuantified (IR.ResolvedQuantified [] atom) =
-  renderAtomicProp atom
-renderQuantified (IR.ResolvedQuantified qs atom) =
-  let quantStrings = map renderExplicitQuantifier qs
-      body = renderAtomicProp atom
-  in foldr (\q acc -> q ++ acc) body quantStrings
+quantifiedToLean :: IR.ResolvedQuantified -> LeanExpr
+quantifiedToLean (IR.ResolvedQuantified [] atom) =
+  atomicPropToLean atom
+quantifiedToLean (IR.ResolvedQuantified qs atom) =
+  foldr quantifierToLean (atomicPropToLean atom) qs
 
-renderExplicitQuantifier :: IR.ResolvedQuantifier -> String
-renderExplicitQuantifier (IR.ResolvedQForall vd) =
-  let varName  = IR.resolvedVarName vd
-      sortName = IR.sortName (IR.resolvedVarSort vd)
-  in case sortName of
-       "ℙ" -> "∀ " ++ varName ++ " : Prop, (P_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → P_Min) → "
-       "𝕌" -> "∀ " ++ varName ++ " : Prop, (U_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → U_Min) → "
-       "𝔻" -> "∀ " ++ varName ++ " : Prop, (D_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → D_Min) → "
-       _   -> "∀ " ++ varName ++ " : " ++ sortName ++ ", "
-renderExplicitQuantifier (IR.ResolvedQExists vd) =
-  let varName  = IR.resolvedVarName vd
-      sortName = IR.sortName (IR.resolvedVarSort vd)
-  in case sortName of
-       "ℙ" -> "∃ " ++ varName ++ " : Prop, (P_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → P_Min) ∧ "
-       "𝕌" -> "∃ " ++ varName ++ " : Prop, (U_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → U_Min) ∧ "
-       "𝔻" -> "∃ " ++ varName ++ " : Prop, (D_Max → " ++ varName ++ ") ∧ (" ++ varName ++ " → D_Min) ∧ "
-       _   -> "∃ " ++ varName ++ " : " ++ sortName ++ ", "
+quantifierToLean :: IR.ResolvedQuantifier -> LeanExpr -> LeanExpr
+quantifierToLean (IR.ResolvedQForall vd) body =
+  let varN = IR.resolvedVarName vd
+      sn   = IR.sortName (IR.resolvedVarSort vd)
+  in LForall varN (LVar "Prop") (addBoundedGuard sn varN body)
+quantifierToLean (IR.ResolvedQExists vd) body =
+  let varN = IR.resolvedVarName vd
+      sn   = IR.sortName (IR.resolvedVarSort vd)
+  in LExists varN (LVar "Prop") (addBoundedGuard sn varN body)
 
-renderAtomicProp :: IR.ResolvedAtomicProp -> String
-renderAtomicProp (IR.ResolvedAtomicConstant ref) = renderConstantRef ref
-renderAtomicProp (IR.ResolvedAtomicTermPair tp)  = renderTermPair tp
+atomicPropToLean :: IR.ResolvedAtomicProp -> LeanExpr
+atomicPropToLean (IR.ResolvedAtomicConstant ref) = LVar (resolveConstRef ref)
+atomicPropToLean (IR.ResolvedAtomicTermPair tp)  = termPairToLean tp
 
-renderConstantRef :: IR.ResolvedConstantRef -> String
-renderConstantRef ref =
+-- ---------------------------------------------------------------------------
+-- Constant-reference resolution
+-- ---------------------------------------------------------------------------
+
+resolveConstRef :: IR.ResolvedConstantRef -> String
+resolveConstRef ref =
   case IR.resolvedConstRefName ref of
     "ℙ#min" -> "P_Min"
     "ℙ#max" -> "P_Max"
@@ -364,59 +409,51 @@ renderConstantRef ref =
     other   -> other
 
 -- ---------------------------------------------------------------------------
--- Term-pair rendering (relation-level: A - B, A × B, etc.)
--- Left-folding chain so operand-swap for - is correct.
+-- Term-pair → LeanExpr  (relation-level operations, left-fold)
 -- ---------------------------------------------------------------------------
 
-renderTermPair :: IR.ResolvedTermPair -> String
-renderTermPair (IR.ResolvedTermPair lhs rights _) =
-  renderTermPairChain (renderTerm lhs) rights
+termPairToLean :: IR.ResolvedTermPair -> LeanExpr
+termPairToLean (IR.ResolvedTermPair lhs rights _) =
+  foldl applyRelOp (termToLean lhs) rights
 
-renderTermPairChain :: String -> [IR.ResolvedRelationFollowedByTerm] -> String
-renderTermPairChain leftStr [] = leftStr
-renderTermPairChain leftStr (rfbt : rest) =
+applyRelOp :: LeanExpr -> IR.ResolvedRelationFollowedByTerm -> LeanExpr
+applyRelOp leftExpr rfbt =
   let op    = IR.resolvedRFTOp rfbt
-      right = renderTerm (IR.resolvedRFTRight rfbt)
-      combined = case op of
-                   "+"  -> "(" ++ leftStr ++ " ∧ " ++ right ++ ")"
-                   "×"  -> "(" ++ leftStr ++ " ∨ " ++ right ++ ")"
-                   "-"  -> "(" ++ right ++ " → " ++ leftStr ++ ")"  -- A - B  ⟹  B → A
-                   "∸"  -> "(" ++ leftStr ++ " ↔ " ++ right ++ ")"
-                   "="  -> "(" ++ leftStr ++ " ↔ " ++ right ++ ")"
-                   "≤"  -> "(" ++ leftStr ++ " → " ++ right ++ ")"
-                   _    -> "(" ++ leftStr ++ " " ++ op ++ " " ++ right ++ ")"
-  in renderTermPairChain combined rest
+      right = termToLean (IR.resolvedRFTRight rfbt)
+  in case op of
+       "+"  -> LConj   leftExpr right
+       "×"  -> LDisj   leftExpr right
+       "-"  -> LImpl   right leftExpr   -- A - B  =>  B -> A
+       "∸"  -> LBicond leftExpr right
+       "="  -> LBicond leftExpr right
+       "≤"  -> LImpl   leftExpr right
+       _    -> LVar ("(" ++ op ++ ")")  -- fallback
 
 -- ---------------------------------------------------------------------------
--- Term rendering (factor-level arithmetic inside a term)
+-- Term / factor -> LeanExpr  (arithmetic inside a term, left-fold)
 -- ---------------------------------------------------------------------------
 
-renderTerm :: IR.ResolvedTerm -> String
-renderTerm (IR.ResolvedTerm lhs [] _) = renderFactor lhs
-renderTerm (IR.ResolvedTerm lhs rests _) =
-  renderTermChain (renderFactor lhs) rests
+termToLean :: IR.ResolvedTerm -> LeanExpr
+termToLean (IR.ResolvedTerm lhs [] _) = factorToLean lhs
+termToLean (IR.ResolvedTerm lhs rests _) =
+  foldl applyArithOp (factorToLean lhs) rests
 
-renderTermChain :: String -> [IR.ResolvedOperationFollowedByFactor] -> String
-renderTermChain leftStr [] = leftStr
-renderTermChain leftStr (off : rest) =
+applyArithOp :: LeanExpr -> IR.ResolvedOperationFollowedByFactor -> LeanExpr
+applyArithOp leftExpr off =
   let op    = IR.resolvedOFFOp off
-      right = renderFactor (IR.resolvedOFFRight off)
-      combined = case op of
-                   "+"  -> "(" ++ leftStr ++ " ∧ " ++ right ++ ")"
-                   "×"  -> "(" ++ leftStr ++ " ∨ " ++ right ++ ")"
-                   "-"  -> "(" ++ right ++ " → " ++ leftStr ++ ")"  -- A - B  ⟹  B → A
-                   "∸"  -> "(" ++ leftStr ++ " ↔ " ++ right ++ ")"
-                   _    -> "(" ++ leftStr ++ " " ++ op ++ " " ++ right ++ ")"
-  in renderTermChain combined rest
+      right = factorToLean (IR.resolvedOFFRight off)
+  in case op of
+       "+"  -> LConj   leftExpr right
+       "×"  -> LDisj   leftExpr right
+       "-"  -> LImpl   right leftExpr   -- A - B  =>  B -> A
+       "∸"  -> LBicond leftExpr right
+       _    -> LVar ("(" ++ op ++ ")")  -- fallback
 
-renderFactor :: IR.ResolvedFactor -> String
-renderFactor (IR.ResolvedFactor base [] _) = renderBaseTerm base
-renderFactor (IR.ResolvedFactor base suffixes _) =
-  -- When a sort constant (ℙ, 𝕌, 𝔻) is followed by a #min or #max suffix,
-  -- the combination denotes a named limit object with its own Lean name.
-  -- We resolve the pair here: e.g. ℙ#min → P_Min, 𝕌#max → U_Max, 𝔻#min → D_Min
+factorToLean :: IR.ResolvedFactor -> LeanExpr
+factorToLean (IR.ResolvedFactor base [] _) = baseTermToLean base
+factorToLean (IR.ResolvedFactor base suffixes _) =
   case (base, suffixes) of
-    (IR.ResolvedBTAtomic ref, IR.ResolvedSuffixSpecialOp attr : rest)
+    (IR.ResolvedBTAtomic ref, IR.ResolvedSuffixSpecialOp attr : _rest)
       | attr `elem` ["min", "max"] ->
           let baseName = IR.resolvedConstRefName ref
               leanName = case (baseName, attr) of
@@ -426,31 +463,68 @@ renderFactor (IR.ResolvedFactor base suffixes _) =
                 ("𝕌", "max") -> "U_Max"
                 ("𝔻", "min") -> "D_Min"
                 ("𝔻", "max") -> "D_Max"
-                -- User-declared sort S: S#min → S_Min, S#max → S_Max
-                (s, "min") -> s ++ "_Min"
-                (s, "max") -> s ++ "_Max"
-                _          -> baseName ++ "#" ++ attr
-          in leanName ++ concatMap renderSuffix rest
-    _ -> renderBaseTerm base ++ concatMap renderSuffix suffixes
+                (s,   "min") -> s ++ "_Min"
+                (s,   "max") -> s ++ "_Max"
+                _            -> baseName ++ "#" ++ attr
+          in LVar leanName
+    _ -> baseTermToLean base
 
-renderSuffix :: IR.ResolvedTermSuffix -> String
-renderSuffix (IR.ResolvedSuffixDotAttr attr) = "." ++ attr
-renderSuffix (IR.ResolvedSuffixCall args)    =
-  "(" ++ intercalate ", " (map renderTerm args) ++ ")"
-renderSuffix (IR.ResolvedSuffixSpecialOp op) = op
+baseTermToLean :: IR.ResolvedBaseTerm -> LeanExpr
+baseTermToLean (IR.ResolvedBTAtomic ref) =
+  LVar (resolveConstRef ref)
+baseTermToLean (IR.ResolvedBTParen expr) =
+  propExprToLean expr
+baseTermToLean (IR.ResolvedBTSingleton t) =
+  termToLean t
+baseTermToLean (IR.ResolvedBTEvaluationInTheory eit) =
+  propExprToLean (IR.resolvedEITOperand eit)
+baseTermToLean (IR.ResolvedBTProjectionToSort pts) =
+  termToLean (IR.resolvedPTOperand pts)
+baseTermToLean (IR.ResolvedBTProjectionToInterval pti) =
+  termToLean (IR.resolvedPTIOperand pti)
+baseTermToLean (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
+  termToLean (IR.resolvedGSPOperand gsp)
 
-renderBaseTerm :: IR.ResolvedBaseTerm -> String
-renderBaseTerm (IR.ResolvedBTAtomic ref) =
-  renderConstantRef ref
-renderBaseTerm (IR.ResolvedBTParen expr) =
-  "(" ++ renderPropExpr expr ++ ")"
-renderBaseTerm (IR.ResolvedBTSingleton t) =
-  "{" ++ renderTerm t ++ "}"
-renderBaseTerm (IR.ResolvedBTEvaluationInTheory eit) =
-  renderPropExpr (IR.resolvedEITOperand eit)
-renderBaseTerm (IR.ResolvedBTProjectionToSort pts) =
-  renderTerm (IR.resolvedPTOperand pts)
-renderBaseTerm (IR.ResolvedBTProjectionToInterval pti) =
-  renderTerm (IR.resolvedPTIOperand pti)
-renderBaseTerm (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
-  renderTerm (IR.resolvedGSPOperand gsp)
+-- ---------------------------------------------------------------------------
+-- Stage 2 – LeanDoc -> String
+-- ---------------------------------------------------------------------------
+
+-- | Render a 'LeanDoc' to Lean 4 source text.
+renderLeanDoc :: LeanDoc -> String
+renderLeanDoc doc =
+  unlines $
+       [ "-- Generated by Eidos compiler"
+       , "-- Theory: " ++ leanDocTheoryName doc
+       , ""
+       ]
+    ++ map renderDecl (leanDocDecls doc)
+
+renderDecl :: LeanDecl -> String
+renderDecl DeclBlankLine        = ""
+renderDecl (DeclComment c)      = "-- " ++ c
+renderDecl (DeclAxiom ax)       = renderAxiom ax
+
+renderAxiom :: LeanAxiom -> String
+renderAxiom (LeanAxiom name ty) =
+  "axiom " ++ name ++ ": " ++ renderLeanExpr ty
+
+-- | Render a 'LeanExpr' to a Lean 4 string.
+renderLeanExpr :: LeanExpr -> String
+renderLeanExpr LProp          = "Prop"
+renderLeanExpr (LVar n)       = n
+renderLeanExpr (LImpl a b)    = "(" ++ renderLeanExpr a ++ " → " ++ renderLeanExpr b ++ ")"
+renderLeanExpr (LConj a b)    = "(" ++ renderLeanExpr a ++ " ∧ " ++ renderLeanExpr b ++ ")"
+renderLeanExpr (LDisj a b)    = "(" ++ renderLeanExpr a ++ " ∨ " ++ renderLeanExpr b ++ ")"
+renderLeanExpr (LBicond a b)  = "(" ++ renderLeanExpr a ++ " ↔ " ++ renderLeanExpr b ++ ")"
+renderLeanExpr (LForall x ty body) =
+  "∀ " ++ x ++ " : " ++ renderLeanExpr ty ++ ", " ++ renderLeanExpr body
+renderLeanExpr (LExists x ty body) =
+  "∃ " ++ x ++ " : " ++ renderLeanExpr ty ++ ", " ++ renderLeanExpr body
+
+-- ---------------------------------------------------------------------------
+-- Convenience entry point
+-- ---------------------------------------------------------------------------
+
+-- | Convert an Eidos theory directly to Lean 4 source (combines both stages).
+exportToLeanProps :: IR.Theory -> String
+exportToLeanProps = renderLeanDoc . theoryToLeanDoc

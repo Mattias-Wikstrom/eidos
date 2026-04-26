@@ -127,3 +127,15 @@ test-suite ir-tests
                     raw-strings-qq,
                     containers,
                     megaparsec
+
+test-suite leanprops-tests
+  import:           warnings, deps
+  type:             exitcode-stdio-1.0
+  main-is:          LeanPropsSpec.hs
+  hs-source-dirs:   test
+  default-language: GHC2021
+  build-depends:    eidos-parser,
+                    hspec >=2.0,
+                    base,
+                    raw-strings-qq,
+                    megaparsec
