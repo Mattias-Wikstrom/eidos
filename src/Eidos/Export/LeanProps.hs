@@ -39,10 +39,12 @@ exportToLeanProps :: IR.Theory -> String
 exportToLeanProps theory =
   unlines $
        header
+    ++ userSortLimitDecls
     ++ mereoDecls
     ++ propDecls
     ++ mereoBoundsAxioms
     ++ propBoundsAxioms
+    ++ userSortSetBoundsAxioms
     ++ sortOrderAxioms
     ++ userFactAxioms
   where
@@ -108,6 +110,58 @@ exportToLeanProps theory =
          ]
 
     -- -----------------------------------------------------------------------
+    -- User-declared sorts: declare their min/max limit objects and emit
+    -- bounds axioms for every set that lives inside one of those sorts.
+    -- -----------------------------------------------------------------------
+
+    -- User sorts (excluding the three built-ins 𝕌, 𝔻, ℙ)
+    userSorts :: [IR.Sort]
+    userSorts =
+      [ s
+      | IR.EntitySort s <- IR.theoryObjects theory
+      , IR.sortKind s == IR.SortKindFromSignature
+      ]
+
+    -- Lean name for a sort's lower limit (S#min → "S_Min")
+    sortMinName :: IR.Sort -> String
+    sortMinName s = IR.sortName s ++ "_Min"
+
+    -- Lean name for a sort's upper limit (S#max → "S_Max")
+    sortMaxName :: IR.Sort -> String
+    sortMaxName s = IR.sortName s ++ "_Max"
+
+    -- "axiom S_Min : Prop" / "axiom S_Max : Prop" for each user sort
+    userSortLimitDecls :: [String]
+    userSortLimitDecls = concatMap sortLimitDecls userSorts
+      where
+        sortLimitDecls s =
+          [ "axiom " ++ sortMinName s ++ " : Prop"
+          , "axiom " ++ sortMaxName s ++ " : Prop"
+          ]
+
+    -- Sets declared against user sorts (MereologicalEntityKindSet, FromSignature)
+    userSortSets :: [IR.MereologicalObject]
+    userSortSets =
+      [ m
+      | IR.EntityMereological m <- IR.theoryObjects theory
+      , IR.mereoKind m == IR.MereologicalEntityKindSet
+      , IR.mereoOrigin m == IR.FromSignature
+      , IR.sortKind (IR.mereoSort m) == IR.SortKindFromSignature
+      ]
+
+    -- "axiom MySet_top: MySet → S_Min" / "axiom MySet_bot: S_Max → MySet"
+    userSortSetBoundsAxioms :: [String]
+    userSortSetBoundsAxioms = concatMap setBounds userSortSets
+      where
+        setBounds m =
+          let n    = IR.mereoName m
+              sMin = sortMinName (IR.mereoSort m)
+              sMax = sortMaxName (IR.mereoSort m)
+          in [ "axiom " ++ n ++ "_top: " ++ n ++ " → " ++ sMin
+             , "axiom " ++ n ++ "_bot: " ++ sMax ++ " → " ++ n
+             ]
+
+    -- -----------------------------------------------------------------------
     -- Sort-ordering axioms: U_Min ≤ _Top ≤ _Bot ≤ U_Max
     -- -----------------------------------------------------------------------
     sortOrderAxioms =
@@ -116,8 +170,17 @@ exportToLeanProps theory =
       , "axiom sort_order_1: U_Max → _Bot"
       , "axiom sort_order_2: _Bot  → _Top"
       , "axiom sort_order_3: _Top  → U_Min"
-      , ""
       ]
+      ++ userSortOrderAxioms
+      ++ [""]
+
+    -- S_Max → S_Min for each user-declared sort
+    userSortOrderAxioms :: [String]
+    userSortOrderAxioms = map sortOrderAxiom userSorts
+      where
+        sortOrderAxiom s =
+          "axiom " ++ IR.sortName s ++ "_sort_order: "
+          ++ sortMaxName s ++ " → " ++ sortMinName s
 
     -- -----------------------------------------------------------------------
     -- User facts: assertions (ℙ, wrapped with _Top) and
@@ -315,15 +378,18 @@ renderFactor (IR.ResolvedFactor base suffixes _) =
   case (base, suffixes) of
     (IR.ResolvedBTAtomic ref, IR.ResolvedSuffixSpecialOp attr : rest)
       | attr `elem` ["min", "max"] ->
-          let combined = IR.resolvedConstRefName ref ++ "#" ++ attr
-              leanName = case combined of
-                "ℙ#min" -> "_Top"
-                "ℙ#max" -> "_Bot"
-                "𝕌#min" -> "U_Min"
-                "𝕌#max" -> "U_Max"
-                "𝔻#min" -> "U_Min"
-                "𝔻#max" -> "U_Max"
-                other   -> other
+          let baseName = IR.resolvedConstRefName ref
+              leanName = case (baseName, attr) of
+                ("ℙ", "min") -> "_Top"
+                ("ℙ", "max") -> "_Bot"
+                ("𝕌", "min") -> "U_Min"
+                ("𝕌", "max") -> "U_Max"
+                ("𝔻", "min") -> "U_Min"
+                ("𝔻", "max") -> "U_Max"
+                -- User-declared sort S: S#min → S_Min, S#max → S_Max
+                (s, "min") -> s ++ "_Min"
+                (s, "max") -> s ++ "_Max"
+                _          -> baseName ++ "#" ++ attr
           in leanName ++ concatMap renderSuffix rest
     _ -> renderBaseTerm base ++ concatMap renderSuffix suffixes
 
