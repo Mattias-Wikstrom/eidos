@@ -151,8 +151,11 @@ theoryToLeanDoc theory = LeanDoc
       ]
   }
   where
+    usesDomain :: Bool
+    usesDomain = IR.theoryUsesDomain theory
+
     -- -----------------------------------------------------------------------
-    -- Header – the six built-in bound objects
+    -- Header – the four or six built-in bound objects
     -- -----------------------------------------------------------------------
     headerDecls :: [LeanDecl]
     headerDecls =
@@ -160,9 +163,11 @@ theoryToLeanDoc theory = LeanDoc
       , DeclAxiom (LeanAxiom uMaxName LProp)
       , DeclAxiom (LeanAxiom pMinName LProp)
       , DeclAxiom (LeanAxiom pMaxName LProp)
-      , DeclAxiom (LeanAxiom dMinName LProp)
-      , DeclAxiom (LeanAxiom dMaxName LProp)
-      ]
+      ] ++ (if usesDomain
+            then [ DeclAxiom (LeanAxiom dMinName LProp)
+                 , DeclAxiom (LeanAxiom dMaxName LProp)
+                 ]
+            else [])
 
     -- -----------------------------------------------------------------------
     -- User-declared sorts: S_Min / S_Max limit objects
@@ -231,17 +236,19 @@ theoryToLeanDoc theory = LeanDoc
              ]
 
     -- -----------------------------------------------------------------------
-    -- 𝔻-kinded sets
+    -- 𝔻-kinded sets (only if theory uses domain)
     -- -----------------------------------------------------------------------
     setObjects :: [IR.MereologicalObject]
     setObjects =
-      [ m
-      | IR.EntityMereological m <- IR.theoryObjects theory
-      , IR.mereoKind   m == IR.MereologicalEntityKindSet
-      , IR.mereoOrigin m == IR.FromSignature
-      , IR.sortKind  (IR.mereoSort m) == IR.SortKindDomain
-      , IR.sortName  (IR.mereoSort m) == "𝔻"
-      ]
+      if usesDomain
+      then [ m
+           | IR.EntityMereological m <- IR.theoryObjects theory
+           , IR.mereoKind   m == IR.MereologicalEntityKindSet
+           , IR.mereoOrigin m == IR.FromSignature
+           , IR.sortKind  (IR.mereoSort m) == IR.SortKindDomain
+           , IR.sortName  (IR.mereoSort m) == "𝔻"
+           ]
+      else []
 
     setDecls :: [LeanDecl]
     setDecls = map (\m -> DeclAxiom (LeanAxiom (IR.mereoName m) LProp)) setObjects
@@ -279,7 +286,7 @@ theoryToLeanDoc theory = LeanDoc
              ]
 
     -- -----------------------------------------------------------------------
-    -- Sort-ordering axioms
+    -- Sort-ordering axioms (conditionally include D-related axioms)
     -- -----------------------------------------------------------------------
     sortOrderDecls :: [LeanDecl]
     sortOrderDecls =
@@ -291,11 +298,13 @@ theoryToLeanDoc theory = LeanDoc
       , DeclAxiom (LeanAxiom "U_to_P" (LImpl uMax pMax))
       , DeclAxiom (LeanAxiom "P_ordering" (LImpl pMax pMin))
       , DeclAxiom (LeanAxiom "P_to_U" (LImpl pMin uMin))
-      , DeclComment "D and all user sorts sit between U_Max and P_Max"
-      , DeclAxiom (LeanAxiom "D_upper" (LImpl uMax dMax))
-      , DeclAxiom (LeanAxiom "D_ordering" (LImpl dMax dMin))
-      , DeclAxiom (LeanAxiom "D_lower" (LImpl dMin pMax))
-      ]
+      ] ++ (if usesDomain
+            then [ DeclComment "D and all user sorts sit between U_Max and P_Max"
+                 , DeclAxiom (LeanAxiom "D_upper" (LImpl uMax dMax))
+                 , DeclAxiom (LeanAxiom "D_ordering" (LImpl dMax dMin))
+                 , DeclAxiom (LeanAxiom "D_lower" (LImpl dMin pMax))
+                 ]
+            else [])
       ++ concatMap userSortOrderAxioms userSorts
       ++ [DeclBlankLine]
       where
