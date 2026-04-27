@@ -2,6 +2,9 @@
 Things to Be Done
 =================
 
+* Make sure this is rejected as ill-typed:
+    [X : S] (IdS(X) = X);
+
 * There is already information in a theory on whether it uses D and/or P. Only include D/P in the output if it is used.
 
 * The notation [x : S][y: T]some_expr for free variables was chosen to simplify parsing, not for any deep reasons. A better notation might be this: x : S, y: T, some_expr .
