@@ -290,17 +290,13 @@ theoryToLeanDoc theory = LeanDoc
     -- -----------------------------------------------------------------------
     sortOrderDecls :: [LeanDecl]
     sortOrderDecls =
-      [ DeclBlankLine
-      , DeclComment "Sort ordering lattice"
-      , DeclComment "U_Max is the top, U_Min is the bottom"
-      , DeclAxiom (LeanAxiom "U_ordering" (LImpl uMax uMin))
-      , DeclComment "P sits between user sorts and U_Min"
+      [  
+        DeclAxiom (LeanAxiom "U_ordering" (LImpl uMax uMin))
       , DeclAxiom (LeanAxiom "U_to_P" (LImpl uMax pMax))
       , DeclAxiom (LeanAxiom "P_ordering" (LImpl pMax pMin))
       , DeclAxiom (LeanAxiom "P_to_U" (LImpl pMin uMin))
       ] ++ (if usesDomain
-            then [ DeclComment "D and all user sorts sit between U_Max and P_Max"
-                 , DeclAxiom (LeanAxiom "D_upper" (LImpl uMax dMax))
+            then [ DeclAxiom (LeanAxiom "D_upper" (LImpl uMax dMax))
                  , DeclAxiom (LeanAxiom "D_ordering" (LImpl dMax dMin))
                  , DeclAxiom (LeanAxiom "D_lower" (LImpl dMin pMax))
                  ]
