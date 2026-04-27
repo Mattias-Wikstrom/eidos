@@ -427,43 +427,93 @@ main = hspec $ do
         _                           -> False)
         `shouldBe` True
 
-    it "bounded guard for ℙ-quantifier contains P_Max and P_Min" $ do
+    it "bounded guard for ℙ-quantifier uses IsWithinBounds P_Min X P_Max" $ do
       doc <- buildStr [r|{
         axioms { assertions { [X : ℙ] (X → ¬¬X); } }
       }|]
       hasWrappedFactWith doc pMin (\case
         LForall "X" (LVar "Prop")
-          (LImpl (LConj (LImpl pMax (LVar "X"))
-                        (LImpl (LVar "X") pMin))
-                 _) -> True
+          (LImpl (LIsWithinBounds "P_Min" "X" "P_Max") _) -> True
         _ -> False)
         `shouldBe` True
 
-    it "bounded guard for 𝕌-quantifier contains U_Max and U_Min" $ do
+    it "bounded guard for 𝕌-quantifier uses IsWithinBounds U_Min X U_Max" $ do
       doc <- buildStr [r|{
         signature { A : 𝕌; },
         axioms { metafacts { [X : 𝕌] (A - (A - X)) - X; } }
       }|]
       hasWrappedFactWith doc uMin (\case
         LForall "X" (LVar "Prop")
-          (LImpl (LConj (LImpl uMax (LVar "X"))
-                        (LImpl (LVar "X") uMin))
-                 _) -> True
+          (LImpl (LIsWithinBounds "U_Min" "X" "U_Max") _) -> True
         _ -> False)
         `shouldBe` True
         
-    it "bounded guard for user-defined sort quantifier contains S_Max and S_Min" $ do
+    it "bounded guard for user-defined sort quantifier uses IsWithinBounds S_Min X S_Max" $ do
       doc <- buildStr [r|{
         signature { sort S; },
         axioms { assertions { [X : S] (X ↔ X); } }
       }|]
       hasWrappedFactWith doc pMin (\case
         LForall "X" (LVar "Prop")
-          (LImpl (LConj (LImpl (LVar "S_Max") (LVar "X"))
-                        (LImpl (LVar "X") (LVar "S_Min")))
-                _) -> True
+          (LImpl (LIsWithinBounds "S_Min" "X" "S_Max") _) -> True
         _ -> False)
         `shouldBe` True
+
+  -- =========================================================================
+  describe "renderLeanExpr – LIsWithinBounds" $ do
+  -- =========================================================================
+
+    it "renders LIsWithinBounds as IsWithinBounds lo hi var" $
+      renderLeanExpr (LIsWithinBounds "P_Min" "X" "P_Max")
+        `shouldBe` "IsWithinBounds P_Min P_Max X"
+
+    it "renders LIsWithinBounds for a user sort" $
+      renderLeanExpr (LIsWithinBounds "S_Min" "X" "S_Max")
+        `shouldBe` "IsWithinBounds S_Min S_Max X"
+
+  -- =========================================================================
+  describe "theoryToLeanDoc – set union (∪), intersection (∩), subset (⊆) in metafacts" $ do
+  -- =========================================================================
+
+    it "metafact body for A ∪ B (set union) is LConj A B" $ do
+      doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ∪ B; } } }|]
+      hasWrappedFact doc uMin (LConj (LVar "A") (LVar "B")) `shouldBe` True
+
+    it "metafact body for A ∩ B (set intersection) is LDisj A B" $ do
+      doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ∩ B; } } }|]
+      hasWrappedFact doc uMin (LDisj (LVar "A") (LVar "B")) `shouldBe` True
+
+    it "metafact body for A ⊆ B (subset) renders as B → A" $ do
+      doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ⊆ B; } } }|]
+      hasWrappedFact doc uMin (LImpl (LVar "B") (LVar "A")) `shouldBe` True
+
+    it "A ∪ B produces the same Lean body as A + B" $ do
+      docUnion <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ∪ B; } } }|]
+      docPlus  <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A + B; } } }|]
+      wrappedBodies docUnion uMin `shouldBe` wrappedBodies docPlus uMin
+
+    it "A ∩ B produces the same Lean body as A × B" $ do
+      docInter <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ∩ B; } } }|]
+      docProd  <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A × B; } } }|]
+      wrappedBodies docInter uMin `shouldBe` wrappedBodies docProd uMin
+
+    it "A ⊆ B in metafacts produces the same Lean body as A - B" $ do
+      docSubset <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ⊆ B; } } }|]
+      docDiff   <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A - B; } } }|]
+      wrappedBodies docSubset uMin `shouldBe` wrappedBodies docDiff uMin
+
+  -- =========================================================================
+  describe "theoryToLeanDoc – left implication (←) in assertions" $ do
+  -- =========================================================================
+
+    it "assertion body for Q ← P renders as P → Q" $ do
+      doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { Q ← P; } } }|]
+      hasWrappedFact doc pMin (LImpl (LVar "P") (LVar "Q")) `shouldBe` True
+
+    it "Q ← P produces the same Lean body as P → Q" $ do
+      docLeft  <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { Q ← P; } } }|]
+      docRight <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P → Q; } } }|]
+      wrappedBodies docLeft pMin `shouldBe` wrappedBodies docRight pMin
 
   -- =========================================================================
   describe "theoryToLeanDoc – structural invariants" $ do

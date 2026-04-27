@@ -23,6 +23,9 @@
   },
   axioms {
     assertions {
+      MySet1 ∪ MySet2 = MySet1;
+      MySet1 ∩ MySet2 = MySet2;
+      MySet1 ⊆ MySet2;
       P1 ∨ Q;
       P1 ∨ ℙ#min;
       P1 ∨ P2;
