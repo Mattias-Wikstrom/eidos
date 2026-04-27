@@ -296,7 +296,7 @@ theoryToLeanDoc theory = LeanDoc
 
               axName = fName ++ "_fact"
 
-          in [DeclAxiom (LeanAxiom axName quantifiedBody)]
+          in [DeclAxiom (LeanAxiom axName (LImpl uMin quantifiedBody))]
             
     -- -----------------------------------------------------------------------
     -- 𝕌-kinded (mereological) objects
