@@ -75,6 +75,59 @@ data LeanExpr
     -- ^ @ProjectIntoInterval x lo hi@ — interval projection
   deriving (Eq, Show)
 
+
+-- ---------------------------------------------------------------------------
+-- Naming conventions
+-- ---------------------------------------------------------------------------
+-- Base names for built-in sorts
+uName, pName, dName :: String
+uName = "U"
+pName = "P"
+dName = "D"
+
+-- Suffixes for bounds
+minSuffix, maxSuffix :: String
+minSuffix = "_Min"
+maxSuffix = "_Max"
+
+minSuffixForAxiomNames, maxSuffixForAxiomNames :: String
+minSuffixForAxiomNames = "_min"
+maxSuffixForAxiomNames = "_max"
+
+-- Bound object NAMES (as Strings)
+uMinName, uMaxName, pMinName, pMaxName, dMinName, dMaxName :: String
+uMinName = uName ++ minSuffix
+uMaxName = uName ++ maxSuffix
+pMinName = pName ++ minSuffix
+pMaxName = pName ++ maxSuffix
+dMinName = dName ++ minSuffix
+dMaxName = dName ++ maxSuffix
+
+-- Bound object EXPRESSIONS (as LeanExpr)
+uMin, uMax, pMin, pMax, dMin, dMax :: LeanExpr
+uMin = LVar uMinName
+uMax = LVar uMaxName
+pMin = LVar pMinName
+pMax = LVar pMaxName
+dMin = LVar dMinName
+dMax = LVar dMaxName
+
+-- User sort bound names (as Strings)
+sortMinName, sortMaxName :: String -> String
+sortMinName name = name ++ minSuffix
+sortMaxName name = name ++ maxSuffix
+
+-- User sort bound expressions (as LeanExpr)
+sortMin, sortMax :: String -> LeanExpr
+sortMin name = LVar (sortMinName name)
+sortMax name = LVar (sortMaxName name)
+
+-- Prop declaration name
+propDeclName :: String -> String
+propDeclName = id  -- Just the name itself, but centralized for consistency
+
+
+
 -- ---------------------------------------------------------------------------
 -- Stage 1 – Theory → LeanDoc
 -- ---------------------------------------------------------------------------
@@ -104,12 +157,12 @@ theoryToLeanDoc theory = LeanDoc
     headerDecls :: [LeanDecl]
     headerDecls =
       [ DeclComment "Bound objects"
-      , DeclAxiom (LeanAxiom "U_Min" LProp)
-      , DeclAxiom (LeanAxiom "U_Max" LProp)
-      , DeclAxiom (LeanAxiom "P_Min" LProp)
-      , DeclAxiom (LeanAxiom "P_Max" LProp)
-      , DeclAxiom (LeanAxiom "D_Min" LProp)
-      , DeclAxiom (LeanAxiom "D_Max" LProp)
+      , DeclAxiom (LeanAxiom uMinName LProp)
+      , DeclAxiom (LeanAxiom uMaxName LProp)
+      , DeclAxiom (LeanAxiom pMinName LProp)
+      , DeclAxiom (LeanAxiom pMaxName LProp)
+      , DeclAxiom (LeanAxiom dMinName LProp)
+      , DeclAxiom (LeanAxiom dMaxName LProp)
       , DeclBlankLine
       ]
 
@@ -123,18 +176,12 @@ theoryToLeanDoc theory = LeanDoc
       , IR.sortKind s == IR.SortKindFromSignature
       ]
 
-    sortMinName :: IR.Sort -> String
-    sortMinName s = IR.sortName s ++ "_Min"
-
-    sortMaxName :: IR.Sort -> String
-    sortMaxName s = IR.sortName s ++ "_Max"
-
     userSortLimitDecls :: [LeanDecl]
     userSortLimitDecls = concatMap mkSortLimitDecls userSorts
       where
         mkSortLimitDecls s =
-          [ DeclAxiom (LeanAxiom (sortMinName s) LProp)
-          , DeclAxiom (LeanAxiom (sortMaxName s) LProp)
+          [ DeclAxiom (LeanAxiom (sortMinName (IR.sortName s)) LProp)
+          , DeclAxiom (LeanAxiom (sortMaxName (IR.sortName s)) LProp)
           ]
 
     -- -----------------------------------------------------------------------
@@ -146,7 +193,7 @@ theoryToLeanDoc theory = LeanDoc
       | IR.EntityMereological m <- IR.theoryObjects theory
       , IR.mereoKind   m == IR.MereologicalEntityKindMereological
       , IR.mereoOrigin m == IR.FromSignature
-      , IR.mereoName   m `notElem` ["U_Min", "U_Max", "⊤", "⊥"]
+      , IR.mereoName   m `notElem` [uMinName, uMaxName, "⊤", "⊥"]
       ]
 
     mereoDecls :: [LeanDecl]
@@ -157,8 +204,8 @@ theoryToLeanDoc theory = LeanDoc
       where
         mereoBoundsFor m =
           let n = IR.mereoName m
-          in [ DeclAxiom (LeanAxiom (n ++ "_min") (LImpl (LVar n) (LVar "U_Min")))
-             , DeclAxiom (LeanAxiom (n ++ "_max") (LImpl (LVar "U_Max") (LVar n)))
+          in [ DeclAxiom (LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) uMin))
+             , DeclAxiom (LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl uMax (LVar n)))
              ]
 
     -- -----------------------------------------------------------------------
@@ -170,7 +217,7 @@ theoryToLeanDoc theory = LeanDoc
       | IR.EntityMereological m <- IR.theoryObjects theory
       , IR.mereoKind   m == IR.MereologicalEntityKindProposition
       , IR.mereoOrigin m == IR.FromSignature
-      , IR.mereoName   m `notElem` ["P_Min", "P_Max", "⊤", "⊥", "ℙ#min", "ℙ#max"]
+      , IR.mereoName   m `notElem` [pMinName, pMaxName, "⊤", "⊥", "ℙ#min", "ℙ#max"]
       ]
 
     propDecls :: [LeanDecl]
@@ -181,8 +228,8 @@ theoryToLeanDoc theory = LeanDoc
       where
         propBoundsFor m =
           let n = IR.mereoName m
-          in [ DeclAxiom (LeanAxiom (n ++ "_min") (LImpl (LVar n) (LVar "P_Min")))
-             , DeclAxiom (LeanAxiom (n ++ "_max") (LImpl (LVar "P_Max") (LVar n)))
+          in [ DeclAxiom (LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) pMin))
+             , DeclAxiom (LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl pMax (LVar n)))
              ]
 
     -- -----------------------------------------------------------------------
@@ -206,8 +253,8 @@ theoryToLeanDoc theory = LeanDoc
       where
         setBoundsFor m =
           let n = IR.mereoName m
-          in [ DeclAxiom (LeanAxiom (n ++ "_min") (LImpl (LVar n) (LVar "D_Min")))
-             , DeclAxiom (LeanAxiom (n ++ "_max") (LImpl (LVar "D_Max") (LVar n)))
+          in [ DeclAxiom (LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) dMin))
+             , DeclAxiom (LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl dMax (LVar n)))
              ]
 
     -- -----------------------------------------------------------------------
@@ -227,10 +274,10 @@ theoryToLeanDoc theory = LeanDoc
       where
         setBounds m =
           let n    = IR.mereoName m
-              sMin = sortMinName (IR.mereoSort m)
-              sMax = sortMaxName (IR.mereoSort m)
-          in [ DeclAxiom (LeanAxiom (n ++ "_min") (LImpl (LVar n) (LVar sMin)))
-             , DeclAxiom (LeanAxiom (n ++ "_max") (LImpl (LVar sMax) (LVar n)))
+              sMin = sortMinName (IR.sortName (IR.mereoSort m))
+              sMax = sortMaxName (IR.sortName (IR.mereoSort m))
+          in [ DeclAxiom (LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) (LVar sMin)))
+             , DeclAxiom (LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl (LVar sMax) (LVar n)))
              ]
 
     -- -----------------------------------------------------------------------
@@ -241,27 +288,27 @@ theoryToLeanDoc theory = LeanDoc
       [ DeclBlankLine
       , DeclComment "Sort ordering lattice"
       , DeclComment "U_Max is the top, U_Min is the bottom"
-      , DeclAxiom (LeanAxiom "U_ordering" (LImpl (LVar "U_Max") (LVar "U_Min")))
+      , DeclAxiom (LeanAxiom "U_ordering" (LImpl uMax uMin))
       , DeclComment "P sits between user sorts and U_Min"
-      , DeclAxiom (LeanAxiom "U_to_P" (LImpl (LVar "U_Max") (LVar "P_Max")))
-      , DeclAxiom (LeanAxiom "P_ordering" (LImpl (LVar "P_Max") (LVar "P_Min")))
-      , DeclAxiom (LeanAxiom "P_to_U" (LImpl (LVar "P_Min") (LVar "U_Min")))
+      , DeclAxiom (LeanAxiom "U_to_P" (LImpl uMax pMax))
+      , DeclAxiom (LeanAxiom "P_ordering" (LImpl pMax pMin))
+      , DeclAxiom (LeanAxiom "P_to_U" (LImpl pMin uMin))
       , DeclComment "D and all user sorts sit between U_Max and P_Max"
-      , DeclAxiom (LeanAxiom "D_upper" (LImpl (LVar "U_Max") (LVar "D_Max")))
-      , DeclAxiom (LeanAxiom "D_ordering" (LImpl (LVar "D_Max") (LVar "D_Min")))
-      , DeclAxiom (LeanAxiom "D_lower" (LImpl (LVar "D_Min") (LVar "P_Max")))
+      , DeclAxiom (LeanAxiom "D_upper" (LImpl uMax dMax))
+      , DeclAxiom (LeanAxiom "D_ordering" (LImpl dMax dMin))
+      , DeclAxiom (LeanAxiom "D_lower" (LImpl dMin pMax))
       ]
       ++ concatMap userSortOrderAxioms userSorts
       ++ [DeclBlankLine]
       where
         userSortOrderAxioms s =
           let sortName = IR.sortName s
-              sMax = sortMaxName s
-              sMin = sortMinName s
-          in [ DeclAxiom (LeanAxiom (sortName ++ "_upper") (LImpl (LVar "U_Max") (LVar sMax)))
-            , DeclAxiom (LeanAxiom (sortName ++ "_ordering") (LImpl (LVar sMax) (LVar sMin)))
-            , DeclAxiom (LeanAxiom (sortName ++ "_lower") (LImpl (LVar sMin) (LVar "P_Max")))
-            ]
+              sMax = sortMaxName sortName
+              sMin = sortMinName sortName
+          in [ DeclAxiom (LeanAxiom (sortName ++ "_upper") (LImpl uMax (LVar sMax)))
+             , DeclAxiom (LeanAxiom (sortName ++ "_ordering") (LImpl (LVar sMax) (LVar sMin)))
+             , DeclAxiom (LeanAxiom (sortName ++ "_lower") (LImpl (LVar sMin) pMax))
+             ]
             
     -- -----------------------------------------------------------------------
     -- User facts
@@ -299,10 +346,10 @@ theoryToLeanDoc theory = LeanDoc
     factBody fact = wrapFreeVars (IR.factFreeVars fact) (propExprToLean (IR.factPropExpr fact))
 
     assertionDecl :: Int -> IR.Fact -> LeanDecl
-    assertionDecl idx fact = mkFactAxiom (mkLabel idx) (LVar "P_Min") (factBody fact)
+    assertionDecl idx fact = mkFactAxiom (mkLabel idx) pMin (factBody fact)
 
     metafactDecl :: Int -> IR.Fact -> LeanDecl
-    metafactDecl idx fact = mkFactAxiom (mkLabel idx) (LVar "U_Min") (factBody fact)
+    metafactDecl idx fact = mkFactAxiom (mkLabel idx) uMin (factBody fact)
 
     userFactDecls :: [LeanDecl]
     userFactDecls =
@@ -329,10 +376,10 @@ varDeclToForall vd body =
 addBoundedGuard :: String -> String -> LeanExpr -> LeanExpr
 addBoundedGuard sortN varN body =
   case sortN of
-    "ℙ" -> LImpl (LIsWithinBounds "P_Min" varN "P_Max") body
-    "𝕌" -> LImpl (LIsWithinBounds "U_Min" varN "U_Max") body
-    "𝔻" -> LImpl (LIsWithinBounds "D_Min" varN "D_Max") body
-    _   -> LImpl (LIsWithinBounds (sortN ++ "_Min") varN (sortN ++ "_Max")) body
+    "ℙ" -> LImpl (LIsWithinBounds pMinName varN pMaxName) body
+    "𝕌" -> LImpl (LIsWithinBounds uMinName varN uMaxName) body
+    "𝔻" -> LImpl (LIsWithinBounds dMinName varN dMaxName) body
+    _   -> LImpl (LIsWithinBounds (sortN ++ minSuffix) varN (sortN ++ maxSuffix)) body
 
 -- ---------------------------------------------------------------------------
 -- Converting IR prop-expressions to LeanExpr
@@ -375,7 +422,7 @@ conjToLean (IR.ResolvedConj lhs rests) =
 
 negToLean :: IR.ResolvedNeg -> LeanExpr
 negToLean (IR.ResolvedNegNot inner) =
-  LImpl (negToLean inner) (LVar "P_Max")
+  LImpl (negToLean inner) pMax
 negToLean (IR.ResolvedNegChild q) =
   quantifiedToLean q
 
@@ -408,17 +455,17 @@ atomicPropToLean (IR.ResolvedAtomicTermPair tp)  = termPairToLean tp
 -- @S#min@ / @S#max@ are converted to @S_Min@ / @S_Max@.
 resolveName :: String -> String
 resolveName n = case n of
-  "ℙ#min" -> "P_Min"
-  "ℙ#max" -> "P_Max"
-  "𝕌#min" -> "U_Min"
-  "𝕌#max" -> "U_Max"
-  "𝔻#min" -> "D_Min"
-  "𝔻#max" -> "D_Max"
-  "⊤"     -> "P_Min"
-  "⊥"     -> "P_Max"
+  "ℙ#min" -> pMinName
+  "ℙ#max" -> pMaxName
+  "𝕌#min" -> uMinName
+  "𝕌#max" -> uMaxName
+  "𝔻#min" -> dMinName
+  "𝔻#max" -> dMaxName
+  "⊤"     -> pMinName
+  "⊥"     -> pMaxName
   other
-    | Just base <- stripSuffix "#min" other -> base ++ "_Min"
-    | Just base <- stripSuffix "#max" other -> base ++ "_Max"
+    | Just base <- stripSuffix "#min" other -> base ++ minSuffix
+    | Just base <- stripSuffix "#max" other -> base ++ maxSuffix
     | otherwise                             -> other
   where
     stripSuffix :: String -> String -> Maybe String
@@ -483,14 +530,14 @@ factorToLean (IR.ResolvedFactor base suffixes _) =
       | attr `elem` ["min", "max"] ->
           let baseName = IR.resolvedConstRefName ref
               leanName = case (baseName, attr) of
-                ("ℙ", "min") -> "P_Min"
-                ("ℙ", "max") -> "P_Max"
-                ("𝕌", "min") -> "U_Min"
-                ("𝕌", "max") -> "U_Max"
-                ("𝔻", "min") -> "D_Min"
-                ("𝔻", "max") -> "D_Max"
-                (s,   "min") -> s ++ "_Min"
-                (s,   "max") -> s ++ "_Max"
+                ("ℙ", "min") -> pMinName
+                ("ℙ", "max") -> pMaxName
+                ("𝕌", "min") -> uMinName
+                ("𝕌", "max") -> uMaxName
+                ("𝔻", "min") -> dMinName
+                ("𝔻", "max") -> dMaxName
+                (s,   "min") -> s ++ minSuffix
+                (s,   "max") -> s ++ maxSuffix
                 _            -> baseName ++ "#" ++ attr
           in LVar leanName
     _ -> baseTermToLean base
