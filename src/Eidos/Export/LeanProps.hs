@@ -138,12 +138,17 @@ theoryToLeanDoc theory = LeanDoc
       [ headerDecls
       , userSortLimitDecls
       , functionDecls
+      , folInverseDecls
       , functionArgResultDecls
+      , folInverseArgResDecls
       , mereoDecls
       , propDecls
       , setDecls
       , functionArgResultBoundsAxioms
+      , folInverseArgResBoundsAxioms
       , functionFactAxioms
+      , folInverseFactAxioms
+      , folAdjunctionAxioms
       , mereoBoundsAxioms
       , propBoundsAxioms
       , setBoundsAxioms
@@ -204,15 +209,141 @@ theoryToLeanDoc theory = LeanDoc
       in buildImpl arity
 
     functionDecls :: [LeanDecl]
-    functionDecls = map (\f -> DeclAxiom (LeanAxiom (IR.funcName f) (functionType f))) solFunctions
+    functionDecls =
+         map (\f -> DeclAxiom (LeanAxiom (IR.funcName f) (functionType f))) solFunctions
+      ++ map (\f -> DeclAxiom (LeanAxiom (IR.funcName f) (functionType f))) userDeclaredFolFunctions
 
     -- -----------------------------------------------------------------------
-    -- Function argument and result objects from SOL functions
+    -- FOL functions
     -- -----------------------------------------------------------------------
-    -- Collect all argument objects and result objects from SOL functions
+    folFunctions :: [IR.Function]
+    folFunctions = IR.theoryFOLFunctions theory
+
+    -- Only user-declared single-argument FOL functions get an inverse.
+    -- We exclude auto-generated functions (origin /= FromSignature) so that
+    -- _inv functions don't themselves spawn _inv_inv functions.
+    folSingleArgFunctions :: [IR.Function]
+    folSingleArgFunctions =
+      filter (\f -> length (IR.funcArgSorts f) == 1
+                 && IR.funcOrigin f == IR.FromSignature)
+             folFunctions
+
+    -- Inverse name convention: append "_inv"
+    invName :: IR.Function -> String
+    invName f = IR.funcName f ++ "_inv"
+
+    -- FOL inverse declarations (single-arg, user-declared only)
+    folInverseDecls :: [LeanDecl]
+    folInverseDecls =
+      map (\f -> DeclAxiom (LeanAxiom (invName f) (LImpl LProp LProp)))
+          folSingleArgFunctions
+
+    -- Adjunction axioms for user-declared single-arg FOL functions only.
+    -- f_adjunction connects f and f_inv; we do NOT generate inv_adjunction.
+    -- Multi-arg functions (like f : S,S → T) are excluded — they would need
+    -- product sorts which are not yet axiomatised.
+    folAdjunctionAxioms :: [LeanDecl]
+    folAdjunctionAxioms = map mkAdjunction folSingleArgFunctions
+      where
+        mkAdjunction f =
+          let fN      = IR.funcName f
+              argSort = IR.sortName (head (IR.funcArgSorts f))
+              resSort = IR.sortName (IR.funcResSort f)
+              -- forall X : Prop, (IsWithinBounds argSort_Min argSort_Max X) →
+              -- forall Y : Prop, (IsWithinBounds resSort_Min resSort_Max Y) →
+              --   (f(X) ⊆ Y ↔ X ⊆ f_inv(Y))
+              -- A ⊆ B  =>  B → A
+              fX      = LApp (LVar fN) [LVar "X"]
+              fInvY   = LApp (LVar (invName f)) [LVar "Y"]
+              lhs     = LImpl (LVar "Y") fX       -- f(X) ⊆ Y
+              rhs     = LImpl fInvY (LVar "X")     -- X ⊆ f_inv(Y)
+              body    = LBicond lhs rhs
+              innerQ  = LForallKw "Y" LProp
+                          (LImpl (LIsWithinBounds (sortMinName resSort) "Y" (sortMaxName resSort))
+                                 body)
+              outerQ  = LForallKw "X" LProp
+                          (LImpl (LIsWithinBounds (sortMinName argSort) "X" (sortMaxName argSort))
+                                 innerQ)
+          in DeclAxiom (LeanAxiom (fN ++ "_adjunction") outerQ)
+
+    -- Synthetic arg/res object declarations for _inv functions.
+    -- We build these manually from the original function so we can use the
+    -- correct sorts (argSort for inv-result, resSort for inv-argument),
+    -- rather than relying on the IR-generated domain/product sorts.
+    folInverseObjects :: [(String, String, String, String)]
+    -- Each tuple: (inv_1_name, argSortName, inv_res_name, resSortName)
+    -- inv takes resSort → argSort, so:
+    --   inv_1  lives in resSort  (what you feed in)
+    --   inv_res lives in argSort  (what comes out)
+    folInverseObjects =
+      [ ( invName f ++ "_1"
+        , IR.sortName (IR.funcResSort f)
+        , invName f ++ "_res"
+        , IR.sortName (head (IR.funcArgSorts f))
+        )
+      | f <- folSingleArgFunctions
+      ]
+
+    folInverseArgResDecls :: [LeanDecl]
+    folInverseArgResDecls =
+      concatMap (\(n1,_,nr,_) ->
+        [ DeclAxiom (LeanAxiom n1 LProp)
+        , DeclAxiom (LeanAxiom nr LProp)
+        ])
+        folInverseObjects
+
+    folInverseArgResBoundsAxioms :: [LeanDecl]
+    folInverseArgResBoundsAxioms =
+      concatMap mkBounds folInverseObjects
+      where
+        mkBounds (n1, s1, nr, sr) =
+          [ DeclAxiom (LeanAxiom (n1 ++ minSuffixForAxiomNames)
+                       (LImpl pMin (LImpl (LVar n1) (LVar (sortMinName s1)))))
+          , DeclAxiom (LeanAxiom (n1 ++ maxSuffixForAxiomNames)
+                       (LImpl pMin (LImpl (LVar (sortMaxName s1)) (LVar n1))))
+          , DeclAxiom (LeanAxiom (nr ++ minSuffixForAxiomNames)
+                       (LImpl pMin (LImpl (LVar nr) (LVar (sortMinName sr)))))
+          , DeclAxiom (LeanAxiom (nr ++ maxSuffixForAxiomNames)
+                       (LImpl pMin (LImpl (LVar (sortMaxName sr)) (LVar nr))))
+          ]
+
+    folInverseFactAxioms :: [LeanDecl]
+    folInverseFactAxioms = map mkInvFact folSingleArgFunctions
+      where
+        mkInvFact f =
+          let fInv    = invName f
+              argSort = IR.sortName (head (IR.funcArgSorts f))
+              resSort = IR.sortName (IR.funcResSort f)
+              n1      = fInv ++ "_1"   -- lives in resSort
+              nr      = fInv ++ "_res" -- lives in argSort
+              -- forall X1 : Prop, (IsWithinBounds resSort X1) →
+              -- forall X2 : Prop, (IsWithinBounds argSort X2) →
+              --   (X1 = fInv_1 ∧ X2 = fInv_res) ↔ X2 = fInv(X1)
+              lhsConj = LConj (LEq (LVar "X1") (LVar n1))
+                              (LEq (LVar "X2") (LVar nr))
+              rhsEq   = LEq (LVar "X2") (LApp (LVar fInv) [LVar "X1"])
+              body    = LBicond lhsConj rhsEq
+              q2      = LForallKw "X2" LProp
+                          (LImpl (LIsWithinBounds (sortMinName argSort) "X2" (sortMaxName argSort))
+                                 body)
+              q1      = LForallKw "X1" LProp
+                          (LImpl (LIsWithinBounds (sortMinName resSort) "X1" (sortMaxName resSort))
+                                 q2)
+          in DeclAxiom (LeanAxiom (fInv ++ "_fact") q1)
+
+    -- -----------------------------------------------------------------------
+    -- Function argument and result objects
+    -- -----------------------------------------------------------------------
+    -- Only user-declared FOL functions — _inv arg/res objects are handled
+    -- separately via folInverseArgResDecls / folInverseArgResBoundsAxioms.
+    userDeclaredFolFunctions :: [IR.Function]
+    userDeclaredFolFunctions =
+      filter (\f -> IR.funcOrigin f == IR.FromSignature) folFunctions
+
     functionObjects :: [IR.MereologicalObject]
-    functionObjects = 
-      concatMap (\f -> IR.funcArgObjects f ++ [IR.funcResObject f]) solFunctions
+    functionObjects =
+      concatMap (\f -> IR.funcArgObjects f ++ [IR.funcResObject f]) solFunctions ++
+      concatMap (\f -> IR.funcArgObjects f ++ [IR.funcResObject f]) userDeclaredFolFunctions
 
     -- Sanitize names for Lean (replace # with _)
     functionArgResultDecls :: [LeanDecl]
@@ -240,7 +371,7 @@ theoryToLeanDoc theory = LeanDoc
     -- Function fact axioms: connect function with its argument/result objects
     -- -----------------------------------------------------------------------
     functionFactAxioms :: [LeanDecl]
-    functionFactAxioms = concatMap mkFunctionFact solFunctions
+    functionFactAxioms = concatMap mkFunctionFact (solFunctions ++ userDeclaredFolFunctions)
       where
         -- Build: forall X : Prop, (IsWithinBounds lo hi X) → <rest>
         mkBoundedForall :: String -> String -> LeanExpr -> LeanExpr
@@ -296,7 +427,7 @@ theoryToLeanDoc theory = LeanDoc
 
               axName = fName ++ "_fact"
 
-          in [DeclAxiom (LeanAxiom axName (LImpl uMin quantifiedBody))]
+          in [DeclAxiom (LeanAxiom axName quantifiedBody)]
             
     -- -----------------------------------------------------------------------
     -- 𝕌-kinded (mereological) objects
