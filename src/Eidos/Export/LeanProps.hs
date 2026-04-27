@@ -134,6 +134,7 @@ theoryToLeanDoc theory = LeanDoc
   , leanDocDecls      = concat
       [ headerDecls
       , userSortLimitDecls
+      , functionDecls
       , functionArgResultDecls
       , mereoDecls
       , propDecls
@@ -185,11 +186,27 @@ theoryToLeanDoc theory = LeanDoc
           ]
 
     -- -----------------------------------------------------------------------
-    -- Function argument and result objects from SOL functions
+    -- SOL function declarations (F, G, H, IdS, etc.)
     -- -----------------------------------------------------------------------
     solFunctions :: [IR.Function]
     solFunctions = IR.theorySOLFunctions theory
 
+    -- Build function type: Prop → Prop → ... → Prop
+    functionType :: IR.Function -> LeanExpr
+    functionType f = 
+      let arity = length (IR.funcArgObjects f)
+          -- Build chain of implications: Arg1 → Arg2 → ... → Result
+          buildImpl 0 = LProp  -- This shouldn't happen since functions have at least 1 arg
+          buildImpl 1 = LImpl LProp LProp
+          buildImpl n = foldr (\_ acc -> LImpl LProp acc) LProp [1..arity]
+      in buildImpl arity
+
+    functionDecls :: [LeanDecl]
+    functionDecls = map (\f -> DeclAxiom (LeanAxiom (IR.funcName f) (functionType f))) solFunctions
+
+    -- -----------------------------------------------------------------------
+    -- Function argument and result objects from SOL functions
+    -- -----------------------------------------------------------------------
     -- Collect all argument objects and result objects from SOL functions
     functionObjects :: [IR.MereologicalObject]
     functionObjects = 
