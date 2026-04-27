@@ -156,14 +156,12 @@ theoryToLeanDoc theory = LeanDoc
     -- -----------------------------------------------------------------------
     headerDecls :: [LeanDecl]
     headerDecls =
-      [ DeclComment "Bound objects"
-      , DeclAxiom (LeanAxiom uMinName LProp)
+      [ DeclAxiom (LeanAxiom uMinName LProp)
       , DeclAxiom (LeanAxiom uMaxName LProp)
       , DeclAxiom (LeanAxiom pMinName LProp)
       , DeclAxiom (LeanAxiom pMaxName LProp)
       , DeclAxiom (LeanAxiom dMinName LProp)
       , DeclAxiom (LeanAxiom dMaxName LProp)
-      , DeclBlankLine
       ]
 
     -- -----------------------------------------------------------------------
