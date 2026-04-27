@@ -117,15 +117,6 @@ sortMinName, sortMaxName :: String -> String
 sortMinName name = name ++ minSuffix
 sortMaxName name = name ++ maxSuffix
 
--- User sort bound expressions (as LeanExpr)
-sortMin, sortMax :: String -> LeanExpr
-sortMin name = LVar (sortMinName name)
-sortMax name = LVar (sortMaxName name)
-
--- Prop declaration name
-propDeclName :: String -> String
-propDeclName = id  -- Just the name itself, but centralized for consistency
-
 
 
 -- ---------------------------------------------------------------------------
@@ -139,9 +130,11 @@ theoryToLeanDoc theory = LeanDoc
   , leanDocDecls      = concat
       [ headerDecls
       , userSortLimitDecls
+      , functionArgResultDecls
       , mereoDecls
       , propDecls
       , setDecls
+      , functionArgResultBoundsAxioms
       , mereoBoundsAxioms
       , propBoundsAxioms
       , setBoundsAxioms
@@ -186,6 +179,32 @@ theoryToLeanDoc theory = LeanDoc
           [ DeclAxiom (LeanAxiom (sortMinName (IR.sortName s)) LProp)
           , DeclAxiom (LeanAxiom (sortMaxName (IR.sortName s)) LProp)
           ]
+
+    -- -----------------------------------------------------------------------
+    -- Function argument and result objects from SOL functions
+    -- -----------------------------------------------------------------------
+    solFunctions :: [IR.Function]
+    solFunctions = IR.theorySOLFunctions theory
+
+    -- Collect all argument objects and result objects from SOL functions
+    functionObjects :: [IR.MereologicalObject]
+    functionObjects = 
+      concatMap (\f -> IR.funcArgObjects f ++ [IR.funcResObject f]) solFunctions
+
+    functionArgResultDecls :: [LeanDecl]
+    functionArgResultDecls = 
+      map (\m -> DeclAxiom (LeanAxiom (IR.mereoName m) LProp)) functionObjects
+
+    functionArgResultBoundsAxioms :: [LeanDecl]
+    functionArgResultBoundsAxioms = concatMap functionArgResultBoundsFor functionObjects
+      where
+        functionArgResultBoundsFor m =
+          let n = IR.mereoName m
+              -- Get the sort of this function object
+              sortName = IR.sortName (IR.mereoSort m)
+          in [ DeclAxiom (LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) (LVar (sortMinName sortName))))
+             , DeclAxiom (LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl (LVar (sortMaxName sortName)) (LVar n)))
+             ]
 
     -- -----------------------------------------------------------------------
     -- 𝕌-kinded (mereological) objects
