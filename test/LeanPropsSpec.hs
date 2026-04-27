@@ -465,11 +465,11 @@ main = hspec $ do
 
     it "renders LIsWithinBounds as IsWithinBounds lo hi var" $
       renderLeanExpr (LIsWithinBounds "P_Min" "X" "P_Max")
-        `shouldBe` "IsWithinBounds P_Min P_Max X"
+        `shouldBe` "(IsWithinBounds P_Min P_Max X)"
 
     it "renders LIsWithinBounds for a user sort" $
       renderLeanExpr (LIsWithinBounds "S_Min" "X" "S_Max")
-        `shouldBe` "IsWithinBounds S_Min S_Max X"
+        `shouldBe` "(IsWithinBounds S_Min S_Max X)"
 
   -- =========================================================================
   describe "theoryToLeanDoc – set union (∪), intersection (∩), subset (⊆) in metafacts" $ do
@@ -514,6 +514,62 @@ main = hspec $ do
       docLeft  <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { Q ← P; } } }|]
       docRight <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P → Q; } } }|]
       wrappedBodies docLeft pMin `shouldBe` wrappedBodies docRight pMin
+
+  -- =========================================================================
+  describe "renderLeanExpr – LProjectIntoInterval" $ do
+  -- =========================================================================
+
+    it "renders LProjectIntoInterval as ProjectIntoInterval x lo hi" $
+      renderLeanExpr (LProjectIntoInterval (LVar "X") (LVar "P_Min") (LVar "P_Max"))
+        `shouldBe` "(ProjectIntoInterval X P_Min P_Max)"
+
+    it "renders LProjectIntoInterval with nested expressions" $
+      renderLeanExpr (LProjectIntoInterval (LConj (LVar "A") (LVar "B")) (LVar "lo") (LVar "hi"))
+        `shouldBe` "(ProjectIntoInterval (A ∧ B) lo hi)"
+
+  -- =========================================================================
+  describe "theoryToLeanDoc – projection-to-interval <lo,hi>(x)" $ do
+  -- =========================================================================
+
+    it "metafact body for <A,B>(C) is LProjectIntoInterval C A B" $ do
+      doc <- buildStr [r|{
+        signature { A : 𝕌; B : 𝕌; C : 𝕌; },
+        axioms { metafacts { <A,B>(C); } }
+      }|]
+      hasWrappedFact doc uMin
+        (LProjectIntoInterval (LVar "C") (LVar "A") (LVar "B"))
+        `shouldBe` True
+
+    it "assertion body for <P1,P2>(Q) is LProjectIntoInterval Q P1 P2" $ do
+      doc <- buildStr [r|{
+        signature { P1 : ℙ; P2 : ℙ; Q : ℙ; },
+        axioms { assertions { <P1,P2>(Q); } }
+      }|]
+      hasWrappedFact doc pMin
+        (LProjectIntoInterval (LVar "Q") (LVar "P1") (LVar "P2"))
+        `shouldBe` True
+
+  -- =========================================================================
+  describe "theoryToLeanDoc – projection-to-sort <S>(x)" $ do
+  -- =========================================================================
+
+    it "metafact body for <𝕌>(A) uses U_Min and U_Max as bounds" $ do
+      doc <- buildStr [r|{
+        signature { A : 𝕌; },
+        axioms { metafacts { <𝕌>(A); } }
+      }|]
+      hasWrappedFact doc uMin
+        (LProjectIntoInterval (LVar "A") (LVar "U_Min") (LVar "U_Max"))
+        `shouldBe` True
+
+    it "metafact body for <S>(A) uses S_Min and S_Max as bounds" $ do
+      doc <- buildStr [r|{
+        signature { sort S; A : 𝕌; },
+        axioms { metafacts { <S>(A); } }
+      }|]
+      hasWrappedFact doc uMin
+        (LProjectIntoInterval (LVar "A") (LVar "S_Min") (LVar "S_Max"))
+        `shouldBe` True
 
   -- =========================================================================
   describe "theoryToLeanDoc – structural invariants" $ do

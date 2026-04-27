@@ -71,6 +71,8 @@ data LeanExpr
   | LExists String LeanExpr LeanExpr   -- ^ @∃ x : T, body@
   | LIsWithinBounds String String String
     -- ^ @IsWithinBounds lo var hi@ — bounded-membership guard
+  | LProjectIntoInterval LeanExpr LeanExpr LeanExpr
+    -- ^ @ProjectIntoInterval x lo hi@ — interval projection
   deriving (Eq, Show)
 
 -- ---------------------------------------------------------------------------
@@ -401,18 +403,31 @@ atomicPropToLean (IR.ResolvedAtomicTermPair tp)  = termPairToLean tp
 -- Constant-reference resolution
 -- ---------------------------------------------------------------------------
 
+-- | Map a raw constant name to its Lean 4 identifier.
+-- Built-in sorts get explicit mappings; user-sort names of the form
+-- @S#min@ / @S#max@ are converted to @S_Min@ / @S_Max@.
+resolveName :: String -> String
+resolveName n = case n of
+  "ℙ#min" -> "P_Min"
+  "ℙ#max" -> "P_Max"
+  "𝕌#min" -> "U_Min"
+  "𝕌#max" -> "U_Max"
+  "𝔻#min" -> "D_Min"
+  "𝔻#max" -> "D_Max"
+  "⊤"     -> "P_Min"
+  "⊥"     -> "P_Max"
+  other
+    | Just base <- stripSuffix "#min" other -> base ++ "_Min"
+    | Just base <- stripSuffix "#max" other -> base ++ "_Max"
+    | otherwise                             -> other
+  where
+    stripSuffix :: String -> String -> Maybe String
+    stripSuffix suffix str =
+      let (front, back) = splitAt (length str - length suffix) str
+      in if back == suffix then Just front else Nothing
+
 resolveConstRef :: IR.ResolvedConstantRef -> String
-resolveConstRef ref =
-  case IR.resolvedConstRefName ref of
-    "ℙ#min" -> "P_Min"
-    "ℙ#max" -> "P_Max"
-    "𝕌#min" -> "U_Min"
-    "𝕌#max" -> "U_Max"
-    "𝔻#min" -> "D_Min"
-    "𝔻#max" -> "D_Max"
-    "⊤"     -> "P_Min"
-    "⊥"     -> "P_Max"
-    other   -> other
+resolveConstRef = resolveName . IR.resolvedConstRefName
 
 -- ---------------------------------------------------------------------------
 -- Term-pair → LeanExpr  (relation-level operations, left-fold)
@@ -490,9 +505,16 @@ baseTermToLean (IR.ResolvedBTSingleton t) =
 baseTermToLean (IR.ResolvedBTEvaluationInTheory eit) =
   propExprToLean (IR.resolvedEITOperand eit)
 baseTermToLean (IR.ResolvedBTProjectionToSort pts) =
-  termToLean (IR.resolvedPTOperand pts)
+  let s    = IR.resolvedPTSort pts
+      lo   = resolveName (IR.mereoName (IR.sortMin s))
+      hi   = resolveName (IR.mereoName (IR.sortMax s))
+      x    = termToLean (IR.resolvedPTOperand pts)
+  in LProjectIntoInterval x (LVar lo) (LVar hi)
 baseTermToLean (IR.ResolvedBTProjectionToInterval pti) =
-  termToLean (IR.resolvedPTIOperand pti)
+  let lo = termToLean (IR.resolvedPTILo      pti)
+      hi = termToLean (IR.resolvedPTIHi      pti)
+      x  = termToLean (IR.resolvedPTIOperand pti)
+  in LProjectIntoInterval x lo hi
 baseTermToLean (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
   termToLean (IR.resolvedGSPOperand gsp)
 
@@ -508,6 +530,7 @@ renderLeanDoc doc =
        , "-- Theory: " ++ leanDocTheoryName doc
        , ""
        , "def IsWithinBounds (lo hi x : Prop) : Prop := (hi → x) ∧ (x → lo)"
+       , "def ProjectIntoInterval (x lo hi : Prop) : Prop := (x ∧ lo) ∨ hi"
        , ""
        ]
     ++ map renderDecl (leanDocDecls doc)
@@ -534,7 +557,9 @@ renderLeanExpr (LForall x ty body) =
 renderLeanExpr (LExists x ty body) =
   "∃ " ++ x ++ " : " ++ renderLeanExpr ty ++ ", " ++ renderLeanExpr body
 renderLeanExpr (LIsWithinBounds lo v hi) =
-  "IsWithinBounds " ++ lo ++ " " ++ hi ++ " " ++ v
+  "(IsWithinBounds " ++ lo ++ " " ++ hi ++ " " ++ v ++ ")"
+renderLeanExpr (LProjectIntoInterval x lo hi) =
+  "(ProjectIntoInterval " ++ renderLeanExpr x ++ " " ++ renderLeanExpr lo ++ " " ++ renderLeanExpr hi ++ ")"
 
 -- ---------------------------------------------------------------------------
 -- Convenience entry point
