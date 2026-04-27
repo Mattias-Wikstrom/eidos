@@ -69,7 +69,9 @@ data LeanExpr
   | LDisj  LeanExpr LeanExpr           -- ^ @A ∨ B@
   | LBicond LeanExpr LeanExpr          -- ^ @A ↔ B@
   | LForall String LeanExpr LeanExpr   -- ^ @∀ x : T, body@
+  | LForallKw String LeanExpr LeanExpr -- ^ @forall x : T, body@ (keyword style)
   | LExists String LeanExpr LeanExpr   -- ^ @∃ x : T, body@
+  | LEq LeanExpr LeanExpr              -- ^ @A = B@
   | LIsWithinBounds String String String
     -- ^ @IsWithinBounds lo var hi@ — bounded-membership guard
   | LProjectIntoInterval LeanExpr LeanExpr LeanExpr
@@ -141,6 +143,7 @@ theoryToLeanDoc theory = LeanDoc
       , propDecls
       , setDecls
       , functionArgResultBoundsAxioms
+      , functionFactAxioms
       , mereoBoundsAxioms
       , propBoundsAxioms
       , setBoundsAxioms
@@ -230,6 +233,71 @@ theoryToLeanDoc theory = LeanDoc
                          (LImpl pMin (LImpl (LVar (sortMaxName sortName)) (LVar nSanitized))))
              ]
 
+    -- -----------------------------------------------------------------------
+    -- Function fact axioms: connect function with its argument/result objects
+    -- -----------------------------------------------------------------------
+    -- -----------------------------------------------------------------------
+    -- Function fact axioms: connect function with its argument/result objects
+    -- -----------------------------------------------------------------------
+    functionFactAxioms :: [LeanDecl]
+    functionFactAxioms = concatMap mkFunctionFact solFunctions
+      where
+        -- Build: forall X : Prop, (IsWithinBounds lo hi X) → <rest>
+        mkBoundedForall :: String -> String -> LeanExpr -> LeanExpr
+        mkBoundedForall varN sortN rest =
+          let lo = sortMinName sortN
+              hi = sortMaxName sortN
+          in LForallKw varN LProp
+               (LImpl (LIsWithinBounds lo varN hi) rest)
+
+        mkFunctionFact f =
+          let fName    = IR.funcName f
+              argObjs  = IR.funcArgObjects f
+              resObj   = IR.funcResObject f
+              argCount = length argObjs
+
+              -- arg vars X1..Xn, result var X(n+1)
+              argVarNames = [ "X" ++ show i | i <- [1..argCount] ]
+              resVarName  = "X" ++ show (argCount + 1)
+
+              -- (X1 = F_1 ∧ X2 = F_2 ∧ ... ∧ Xres = F_res)
+              argEqs =
+                [ LEq (LVar varN) (LVar (sanitizeName (IR.mereoName obj)))
+                | (varN, obj) <- zip argVarNames argObjs
+                ]
+              resEq = LEq (LVar resVarName)
+                          (LVar (sanitizeName (IR.mereoName resObj)))
+              -- left side: X1=F_1 ∧ X2=F_2 ∧ ... ∧ Xres=F_res
+              -- build left-fold: ((X1=F_1 ∧ X2=F_2) ∧ X3=F_res)
+              lhsConj = case argEqs of
+                []     -> resEq
+                (e:es) -> foldl LConj e (es ++ [resEq])
+
+              -- right side: Xres = (F X1 X2 ...)
+              funcApp = LApp (LVar fName) (map LVar argVarNames)
+              rhsEq   = LEq (LVar resVarName) funcApp
+
+              -- body: lhsConj ↔ rhsEq
+              body = LBicond lhsConj rhsEq
+
+              -- wrap in forall quantifiers: args first, then result
+              sortOf obj = IR.sortName (IR.mereoSort obj)
+
+              -- build the chain of foralls from inside out (foldr)
+              -- order: X1, X2, ..., Xn, X(n+1)
+              allVarsAndSorts =
+                   zip argVarNames (map sortOf argObjs)
+                ++ [(resVarName, sortOf resObj)]
+
+              quantifiedBody =
+                foldr (\(varN, sN) acc -> mkBoundedForall varN sN acc)
+                      body
+                      allVarsAndSorts
+
+              axName = fName ++ "_fact"
+
+          in [DeclAxiom (LeanAxiom axName quantifiedBody)]
+            
     -- -----------------------------------------------------------------------
     -- 𝕌-kinded (mereological) objects
     -- -----------------------------------------------------------------------
@@ -577,7 +645,7 @@ factorToLean (IR.ResolvedFactor base suffixes _) =
   where
     applySuffix :: LeanExpr -> IR.ResolvedTermSuffix -> LeanExpr
     applySuffix expr (IR.ResolvedSuffixDotAttr attr) =
-      LVar (sanitizeName (renderLeanExpr expr ++ "_" ++ attr))  -- This is a simplification
+      LVar (sanitizeName (renderLeanExpr expr ++ "_" ++ attr))
     applySuffix expr (IR.ResolvedSuffixCall args) =
       let argExprs = map termToLean args
       in LApp expr argExprs
@@ -609,7 +677,7 @@ baseTermToLean (IR.ResolvedBTProjectionToInterval pti) =
   in LProjectIntoInterval x lo hi
 baseTermToLean (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
   termToLean (IR.resolvedGSPOperand gsp)
-  
+
 -- ---------------------------------------------------------------------------
 -- Stage 2 – LeanDoc -> String
 -- ---------------------------------------------------------------------------
@@ -647,8 +715,12 @@ renderLeanExpr (LDisj a b)    = "(" ++ renderLeanExpr a ++ " ∨ " ++ renderLean
 renderLeanExpr (LBicond a b)  = "(" ++ renderLeanExpr a ++ " ↔ " ++ renderLeanExpr b ++ ")"
 renderLeanExpr (LForall x ty body) =
   "∀ " ++ x ++ " : " ++ renderLeanExpr ty ++ ", " ++ renderLeanExpr body
+renderLeanExpr (LForallKw x ty body) =
+  "forall " ++ x ++ " : " ++ renderLeanExpr ty ++ ", " ++ renderLeanExpr body
 renderLeanExpr (LExists x ty body) =
   "∃ " ++ x ++ " : " ++ renderLeanExpr ty ++ ", " ++ renderLeanExpr body
+renderLeanExpr (LEq a b) =
+  renderLeanExpr a ++ " = " ++ renderLeanExpr b
 renderLeanExpr (LIsWithinBounds lo v hi) =
   "(IsWithinBounds " ++ lo ++ " " ++ hi ++ " " ++ v ++ ")"
 renderLeanExpr (LProjectIntoInterval x lo hi) =
