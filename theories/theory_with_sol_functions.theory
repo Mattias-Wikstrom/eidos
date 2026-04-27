@@ -1,0 +1,28 @@
+{
+  signature {
+    sort S;
+    sort T;
+
+    S1 ⊆ S;
+    S2 ⊆ S;
+
+    T1 ⊆ T;
+    T2 ⊆ T;
+
+    F : S, S → T;
+    G : S → S;
+    H : T → S;
+
+    IdS : S → S;
+  },
+  axioms {
+    assertions {
+      [X ⊆ S] (IdS(X) = X);
+      [X ⊆ S] [Y ⊆ S] (F(X, Y) = T1);
+      [X ⊆ S] [Y ⊆ S] (F(X, Y) = F(Y, X));
+      [X ⊆ S] (G(X) = G(G(X)));
+      [X ⊆ S] (H(F(X, X)) = G(G(G(X))));
+
+    }
+  }
+}
