@@ -63,6 +63,7 @@ data LeanAxiom = LeanAxiom
 data LeanExpr
   = LProp                              -- ^ @Prop@
   | LVar   String                      -- ^ atomic name
+  | LApp   LeanExpr [LeanExpr]         -- ^ function application
   | LImpl  LeanExpr LeanExpr           -- ^ @A → B@
   | LConj  LeanExpr LeanExpr           -- ^ @A ∧ B@
   | LDisj  LeanExpr LeanExpr           -- ^ @A ∨ B@
@@ -195,10 +196,8 @@ theoryToLeanDoc theory = LeanDoc
     functionType :: IR.Function -> LeanExpr
     functionType f = 
       let arity = length (IR.funcArgObjects f)
-          -- Build chain of implications: Arg1 → Arg2 → ... → Result
-          buildImpl 0 = LProp  -- This shouldn't happen since functions have at least 1 arg
-          buildImpl 1 = LImpl LProp LProp
-          buildImpl n = foldr (\_ acc -> LImpl LProp acc) LProp [1..arity]
+          buildImpl 0 = LProp
+          buildImpl n = foldr (\_ acc -> LImpl LProp acc) LProp [1..n]
       in buildImpl arity
 
     functionDecls :: [LeanDecl]
@@ -490,7 +489,8 @@ quantifierToLean (IR.ResolvedQExists vd) body =
   in LExists varN (LVar "Prop") (addBoundedGuard sn varN body)
 
 atomicPropToLean :: IR.ResolvedAtomicProp -> LeanExpr
-atomicPropToLean (IR.ResolvedAtomicConstant ref) = LVar (resolveConstRef ref)
+atomicPropToLean (IR.ResolvedAtomicConstant ref) = 
+  LVar (resolveConstRef ref)
 atomicPropToLean (IR.ResolvedAtomicTermPair tp)  = termPairToLean tp
 
 -- ---------------------------------------------------------------------------
@@ -572,22 +572,20 @@ applyArithOp leftExpr off =
 factorToLean :: IR.ResolvedFactor -> LeanExpr
 factorToLean (IR.ResolvedFactor base [] _) = baseTermToLean base
 factorToLean (IR.ResolvedFactor base suffixes _) =
-  case (base, suffixes) of
-    (IR.ResolvedBTAtomic ref, IR.ResolvedSuffixSpecialOp attr : _rest)
-      | attr `elem` ["min", "max"] ->
-          let baseName = IR.resolvedConstRefName ref
-              leanName = case (baseName, attr) of
-                ("ℙ", "min") -> pMinName
-                ("ℙ", "max") -> pMaxName
-                ("𝕌", "min") -> uMinName
-                ("𝕌", "max") -> uMaxName
-                ("𝔻", "min") -> dMinName
-                ("𝔻", "max") -> dMaxName
-                (s,   "min") -> s ++ minSuffix
-                (s,   "max") -> s ++ maxSuffix
-                _            -> baseName ++ "#" ++ attr
-          in LVar leanName
-    _ -> baseTermToLean base
+  let baseExpr = baseTermToLean base
+  in foldl applySuffix baseExpr suffixes
+  where
+    applySuffix :: LeanExpr -> IR.ResolvedTermSuffix -> LeanExpr
+    applySuffix expr (IR.ResolvedSuffixDotAttr attr) =
+      LVar (sanitizeName (renderLeanExpr expr ++ "_" ++ attr))  -- This is a simplification
+    applySuffix expr (IR.ResolvedSuffixCall args) =
+      let argExprs = map termToLean args
+      in LApp expr argExprs
+    applySuffix expr (IR.ResolvedSuffixSpecialOp attr) =
+      case attr of
+        "min" -> LVar (sanitizeName (renderLeanExpr expr ++ minSuffix))
+        "max" -> LVar (sanitizeName (renderLeanExpr expr ++ maxSuffix))
+        _ -> LVar (sanitizeName (renderLeanExpr expr ++ "_" ++ attr))
 
 baseTermToLean :: IR.ResolvedBaseTerm -> LeanExpr
 baseTermToLean (IR.ResolvedBTAtomic ref) =
@@ -611,7 +609,7 @@ baseTermToLean (IR.ResolvedBTProjectionToInterval pti) =
   in LProjectIntoInterval x lo hi
 baseTermToLean (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
   termToLean (IR.resolvedGSPOperand gsp)
-
+  
 -- ---------------------------------------------------------------------------
 -- Stage 2 – LeanDoc -> String
 -- ---------------------------------------------------------------------------
@@ -642,6 +640,7 @@ renderAxiom (LeanAxiom name ty) =
 renderLeanExpr :: LeanExpr -> String
 renderLeanExpr LProp          = "Prop"
 renderLeanExpr (LVar n)       = n
+renderLeanExpr (LApp f args)  = "(" ++ renderLeanExpr f ++ " " ++ unwords (map renderLeanExpr args) ++ ")"
 renderLeanExpr (LImpl a b)    = "(" ++ renderLeanExpr a ++ " → " ++ renderLeanExpr b ++ ")"
 renderLeanExpr (LConj a b)    = "(" ++ renderLeanExpr a ++ " ∧ " ++ renderLeanExpr b ++ ")"
 renderLeanExpr (LDisj a b)    = "(" ++ renderLeanExpr a ++ " ∨ " ++ renderLeanExpr b ++ ")"
