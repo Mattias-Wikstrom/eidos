@@ -117,6 +117,10 @@ sortMinName, sortMaxName :: String -> String
 sortMinName name = name ++ minSuffix
 sortMaxName name = name ++ maxSuffix
 
+-- Helper to convert names with # to _
+sanitizeName :: String -> String
+sanitizeName = map (\c -> if c == '#' then '_' else c)
+
 
 
 -- ---------------------------------------------------------------------------
@@ -191,19 +195,23 @@ theoryToLeanDoc theory = LeanDoc
     functionObjects = 
       concatMap (\f -> IR.funcArgObjects f ++ [IR.funcResObject f]) solFunctions
 
+    -- Sanitize names for Lean (replace # with _)
     functionArgResultDecls :: [LeanDecl]
     functionArgResultDecls = 
-      map (\m -> DeclAxiom (LeanAxiom (IR.mereoName m) LProp)) functionObjects
+      map (\m -> DeclAxiom (LeanAxiom (sanitizeName (IR.mereoName m)) LProp)) functionObjects
 
     functionArgResultBoundsAxioms :: [LeanDecl]
     functionArgResultBoundsAxioms = concatMap functionArgResultBoundsFor functionObjects
       where
         functionArgResultBoundsFor m =
           let n = IR.mereoName m
+              nSanitized = sanitizeName n
               -- Get the sort of this function object
               sortName = IR.sortName (IR.mereoSort m)
-          in [ DeclAxiom (LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) (LVar (sortMinName sortName))))
-             , DeclAxiom (LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl (LVar (sortMaxName sortName)) (LVar n)))
+          in [ DeclAxiom (LeanAxiom (nSanitized ++ minSuffixForAxiomNames) 
+                         (LImpl pMin (LImpl (LVar nSanitized) (LVar (sortMinName sortName)))))
+             , DeclAxiom (LeanAxiom (nSanitized ++ maxSuffixForAxiomNames) 
+                         (LImpl pMin (LImpl (LVar (sortMaxName sortName)) (LVar nSanitized))))
              ]
 
     -- -----------------------------------------------------------------------
