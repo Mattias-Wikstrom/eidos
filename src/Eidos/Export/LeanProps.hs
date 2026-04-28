@@ -159,6 +159,8 @@ theoryToLeanDoc theory = LeanDoc
       , folAdjunctionAxioms
       , imageAdjunctionAxioms
       , decompositionAxioms
+      , tupleFact
+      , projectionFacts
       , mereoBoundsAxioms
       , propBoundsAxioms
       , setBoundsAxioms
@@ -574,7 +576,80 @@ theoryToLeanDoc theory = LeanDoc
                       body
                       (zip varNs argSNs)
           in DeclAxiom (LeanAxiom (fN ++ "_decomposition") quantified)
-    -- Only user-declared FOL functions — _inv arg/res objects are handled
+
+    -- (11) f_tuple_fact: canonical-element fact for tuple formation.
+    --      f_tuple maps (S1, S2, ...) → f_dom, with witnesses f_1, f_2, ..., f_arg.
+    --      forall X1, (IsWithinBounds s1 X1) → ... → forall Xn, (IsWithinBounds sn Xn) →
+    --      forall Xr, (IsWithinBounds dom Xr) →
+    --        (X1 = f_1 ∧ ... ∧ Xn = f_n ∧ Xr = f_arg) ↔ Xr = f_tuple(X1, ..., Xn)
+    tupleFact :: [LeanDecl]
+    tupleFact = concatMap mkTupleFact multiArgFolFunctions
+      where
+        mkTupleFact f =
+          case IR.funcArgument f of
+            Nothing  -> []
+            Just arg ->
+              let argObjs  = IR.funcArgObjects f
+                  argSorts = IR.funcArgSorts f
+                  arity    = length argObjs
+                  argVars  = [ "X" ++ show i | i <- [1..arity] ]
+                  resVar   = "X" ++ show (arity + 1)
+                  dMn      = domMinName f
+                  dMx      = domMaxName f
+                  argN     = sanitizeName (IR.mereoName arg)
+                  argEqs   =
+                    [ LEq (LVar xi) (LVar (sanitizeName (IR.mereoName obj)))
+                    | (xi, obj) <- zip argVars argObjs
+                    ]
+                  resEq    = LEq (LVar resVar) (LVar argN)
+                  lhsConj  = case argEqs of
+                    []     -> resEq
+                    (e:es) -> foldl LConj e (es ++ [resEq])
+                  tupleApp = LApp (LVar (tupleName f)) (map LVar argVars)
+                  rhsEq    = LEq (LVar resVar) tupleApp
+                  body     = LBicond lhsConj rhsEq
+                  mkArgQ (varN, sN) acc =
+                    LForallKw varN LProp
+                      (LImpl (LIsWithinBounds (sortMinName sN) varN (sortMaxName sN)) acc)
+                  resQ acc =
+                    LForallKw resVar LProp
+                      (LImpl (LIsWithinBounds dMn resVar dMx) acc)
+                  quantified =
+                    foldr mkArgQ (resQ body) (zip argVars (map IR.sortName argSorts))
+              in [DeclAxiom (LeanAxiom (tupleName f ++ "_fact") quantified)]
+
+    -- (12) f_pi_k_fact: canonical-element fact for each projection function.
+    --      f_pi_k maps f_dom → S_k, with input witness f_arg and output witness f_k.
+    --      forall X1, (IsWithinBounds dom X1) →
+    --      forall X2, (IsWithinBounds s_k X2) →
+    --        (X1 = f_arg ∧ X2 = f_k) ↔ X2 = f_pi_k(X1)
+    projectionFacts :: [LeanDecl]
+    projectionFacts = concatMap mkProjFacts multiArgFolFunctions
+      where
+        mkProjFacts f =
+          case IR.funcArgument f of
+            Nothing  -> []
+            Just arg ->
+              let dMn  = domMinName f
+                  dMx  = domMaxName f
+                  argN = sanitizeName (IR.mereoName arg)
+              in [ mkOneProjFact argN dMn dMx k obj srt
+                 | (k, obj, srt) <- zip3 [1..] (IR.funcArgObjects f) (IR.funcArgSorts f)
+                 ]
+          where
+            mkOneProjFact argN dMn dMx k obj srt =
+              let objN  = sanitizeName (IR.mereoName obj)
+                  sN    = IR.sortName srt
+                  lhs   = LConj (LEq (LVar "X1") (LVar argN))
+                                (LEq (LVar "X2") (LVar objN))
+                  rhs   = LEq (LVar "X2") (LApp (LVar (piName f k)) [LVar "X1"])
+                  body  = LBicond lhs rhs
+                  qX2   = LForallKw "X2" LProp
+                            (LImpl (LIsWithinBounds (sortMinName sN) "X2" (sortMaxName sN))
+                                   body)
+                  qX1   = LForallKw "X1" LProp
+                            (LImpl (LIsWithinBounds dMn "X1" dMx) qX2)
+              in DeclAxiom (LeanAxiom (piName f k ++ "_fact") qX1)
     -- separately via folInverseArgResDecls / folInverseArgResBoundsAxioms.
     userDeclaredFolFunctions :: [IR.Function]
     userDeclaredFolFunctions =
