@@ -137,10 +137,16 @@ theoryToLeanDoc theory = LeanDoc
   , leanDocDecls      = concat
       [ headerDecls
       , userSortLimitDecls
+      , productSortLimitDecls
       , functionDecls
+      , imageFunctionDecls
+      , projectionFunctionDecls
+      , tupleFunctionDecls
       , folInverseDecls
       , functionArgResultDecls
       , folInverseArgResDecls
+      , productArgDecls
+      , invImgWitnessDecls
       , mereoDecls
       , propDecls
       , setDecls
@@ -148,12 +154,17 @@ theoryToLeanDoc theory = LeanDoc
       , folInverseArgResBoundsAxioms
       , functionFactAxioms
       , folInverseFactAxioms
+      , dirImgFactAxioms
+      , invImgFactAxioms
       , folAdjunctionAxioms
+      , imageAdjunctionAxioms
+      , decompositionAxioms
       , mereoBoundsAxioms
       , propBoundsAxioms
       , setBoundsAxioms
       , userSortSetBoundsAxioms
       , sortOrderDecls
+      , productSortOrderAxioms
       , userFactDecls
       ]
   }
@@ -332,8 +343,237 @@ theoryToLeanDoc theory = LeanDoc
           in DeclAxiom (LeanAxiom (fInv ++ "_fact") q1)
 
     -- -----------------------------------------------------------------------
-    -- Function argument and result objects
+    -- Product sorts for multi-argument FOL functions
     -- -----------------------------------------------------------------------
+    -- Multi-arg FOL functions (arity > 1) get a product sort f#dom with its
+    -- own Min/Max, ordering axioms, projection functions f_pi_k, tuple
+    -- formation function f_tuple, direct/inverse image functions, and a
+    -- decomposition axiom connecting f with f_tuple and f_dir_img.
+    multiArgFolFunctions :: [IR.Function]
+    multiArgFolFunctions =
+      filter (\f -> length (IR.funcArgSorts f) > 1
+                 && IR.funcOrigin f == IR.FromSignature)
+             folFunctions
+
+    -- Sanitized names derived from a function's product sort
+    domMinName, domMaxName :: IR.Function -> String
+    domMinName f = sanitizeName (IR.sortName dom) ++ minSuffix
+      where dom = maybe (error "no domain sort") id (IR.funcDomain f)
+    domMaxName f = sanitizeName (IR.sortName dom) ++ maxSuffix
+      where dom = maybe (error "no domain sort") id (IR.funcDomain f)
+
+    -- Helper: projection function name for the k-th argument (1-based)
+    piName :: IR.Function -> Int -> String
+    piName f k = IR.funcName f ++ "_pi_" ++ show k
+
+    -- Helper: tuple formation function name
+    tupleName :: IR.Function -> String
+    tupleName f = IR.funcName f ++ "_tuple"
+
+    -- Helper: direct/inverse image function names
+    dirImgName, invImgName :: IR.Function -> String
+    dirImgName f = IR.funcName f ++ "_dir_img"
+    invImgName f = IR.funcName f ++ "_inv_img"
+
+    -- (1) Min/Max limit objects for the product sort
+    productSortLimitDecls :: [LeanDecl]
+    productSortLimitDecls = concatMap mkLimits multiArgFolFunctions
+      where
+        mkLimits f =
+          [ DeclAxiom (LeanAxiom (domMinName f) LProp)
+          , DeclAxiom (LeanAxiom (domMaxName f) LProp)
+          ]
+
+    -- (2) Sort ordering: U_Max → dom_Max, dom_Max → dom_Min, dom_Min → P_Max
+    productSortOrderAxioms :: [LeanDecl]
+    productSortOrderAxioms = concatMap mkOrder multiArgFolFunctions
+      where
+        mkOrder f =
+          let fN  = IR.funcName f
+              dMx = domMaxName f
+              dMn = domMinName f
+          in [ DeclAxiom (LeanAxiom (fN ++ "_dom_upper")
+                         (LImpl uMax (LVar dMx)))
+             , DeclAxiom (LeanAxiom (fN ++ "_dom_ordering")
+                         (LImpl (LVar dMx) (LVar dMn)))
+             , DeclAxiom (LeanAxiom (fN ++ "_dom_lower")
+                         (LImpl (LVar dMn) pMax))
+             ]
+
+    -- (3) Projection functions f_pi_1, f_pi_2, ... : Prop → Prop
+    projectionFunctionDecls :: [LeanDecl]
+    projectionFunctionDecls = concatMap mkProjDecls multiArgFolFunctions
+      where
+        mkProjDecls f =
+          [ DeclAxiom (LeanAxiom (piName f k) (LImpl LProp LProp))
+          | k <- [1 .. length (IR.funcArgSorts f)]
+          ]
+
+    -- (4) Tuple formation function f_tuple : Prop → Prop → ... → Prop
+    --     (same arity as f)
+    tupleFunctionDecls :: [LeanDecl]
+    tupleFunctionDecls = map mkTupleDecl multiArgFolFunctions
+      where
+        mkTupleDecl f =
+          let arity = length (IR.funcArgSorts f)
+              ty    = foldr (\_ acc -> LImpl LProp acc) LProp [1..arity]
+          in DeclAxiom (LeanAxiom (tupleName f) ty)
+
+    -- (5) Direct image function f_dir_img : Prop → Prop  (f#dom → resSort)
+    --     Inverse image function f_inv_img : Prop → Prop (resSort → f#dom)
+    imageFunctionDecls :: [LeanDecl]
+    imageFunctionDecls = concatMap mkImgDecls multiArgFolFunctions
+      where
+        mkImgDecls f =
+          [ DeclAxiom (LeanAxiom (dirImgName f) (LImpl LProp LProp))
+          , DeclAxiom (LeanAxiom (invImgName f) (LImpl LProp LProp))
+          ]
+
+    -- (6) f_arg : canonical element of f#dom (read from IR's funcArgument)
+    --     Bounds: P_Min → f_arg → dom_Min  and  P_Min → dom_Max → f_arg
+    productArgDecls :: [LeanDecl]
+    productArgDecls = concatMap mkArgDecl multiArgFolFunctions
+      where
+        mkArgDecl f =
+          case IR.funcArgument f of
+            Nothing  -> []
+            Just arg ->
+              let n   = sanitizeName (IR.mereoName arg)
+                  dMn = domMinName f
+                  dMx = domMaxName f
+              in [ DeclAxiom (LeanAxiom n LProp)
+                 , DeclAxiom (LeanAxiom (n ++ minSuffixForAxiomNames)
+                               (LImpl pMin (LImpl (LVar n) (LVar dMn))))
+                 , DeclAxiom (LeanAxiom (n ++ maxSuffixForAxiomNames)
+                               (LImpl pMin (LImpl (LVar dMx) (LVar n))))
+                 ]
+
+    -- (7) f_dir_img_fact: canonical-element fact for the direct image function
+    --     forall A : Prop, (IsWithinBounds dom_Min dom_Max A) →
+    --     forall B : Prop, (IsWithinBounds res_Min res_Max B) →
+    --       (A = f_arg ∧ B = f_res) ↔ B = f_dir_img(A)
+    dirImgFactAxioms :: [LeanDecl]
+    dirImgFactAxioms = concatMap mkDirImgFact multiArgFolFunctions
+      where
+        mkDirImgFact f =
+          case IR.funcArgument f of
+            Nothing  -> []
+            Just arg ->
+              let dMn    = domMinName f
+                  dMx    = domMaxName f
+                  rSN    = IR.sortName (IR.funcResSort f)
+                  argN   = sanitizeName (IR.mereoName arg)
+                  resN   = sanitizeName (IR.mereoName (IR.funcResObject f))
+                  lhs    = LConj (LEq (LVar "A") (LVar argN))
+                                 (LEq (LVar "B") (LVar resN))
+                  rhs    = LEq (LVar "B") (LApp (LVar (dirImgName f)) [LVar "A"])
+                  body   = LBicond lhs rhs
+                  qB     = LForallKw "B" LProp
+                             (LImpl (LIsWithinBounds (sortMinName rSN) "B" (sortMaxName rSN))
+                                    body)
+                  qA     = LForallKw "A" LProp
+                             (LImpl (LIsWithinBounds dMn "A" dMx)
+                                    qB)
+              in [DeclAxiom (LeanAxiom (dirImgName f ++ "_fact") qA)]
+
+    -- (8) f_inv_img_fact: similar fact for the inverse image function
+    --     We use fresh names f_inv_img_arg, f_inv_img_res for its witnesses.
+    --     forall A : Prop, (IsWithinBounds res_Min res_Max A) →
+    --     forall B : Prop, (IsWithinBounds dom_Min dom_Max B) →
+    --       (A = f_inv_img_arg ∧ B = f_inv_img_res) ↔ B = f_inv_img(A)
+    invImgWitnessDecls :: [LeanDecl]
+    invImgWitnessDecls = concatMap mkWitnesses multiArgFolFunctions
+      where
+        mkWitnesses f =
+          let fN    = invImgName f
+              argN  = fN ++ "_arg"
+              resN  = fN ++ "_res"
+              rSN   = IR.sortName (IR.funcResSort f)
+              dMn   = domMinName f
+              dMx   = domMaxName f
+          in [ DeclAxiom (LeanAxiom argN LProp)
+             , DeclAxiom (LeanAxiom (argN ++ minSuffixForAxiomNames)
+                           (LImpl pMin (LImpl (LVar argN) (LVar (sortMinName rSN)))))
+             , DeclAxiom (LeanAxiom (argN ++ maxSuffixForAxiomNames)
+                           (LImpl pMin (LImpl (LVar (sortMaxName rSN)) (LVar argN))))
+             , DeclAxiom (LeanAxiom resN LProp)
+             , DeclAxiom (LeanAxiom (resN ++ minSuffixForAxiomNames)
+                           (LImpl pMin (LImpl (LVar resN) (LVar dMn))))
+             , DeclAxiom (LeanAxiom (resN ++ maxSuffixForAxiomNames)
+                           (LImpl pMin (LImpl (LVar dMx) (LVar resN))))
+             ]
+
+    invImgFactAxioms :: [LeanDecl]
+    invImgFactAxioms = map mkInvImgFact multiArgFolFunctions
+      where
+        mkInvImgFact f =
+          let fN   = invImgName f
+              argN = fN ++ "_arg"
+              resN = fN ++ "_res"
+              rSN  = IR.sortName (IR.funcResSort f)
+              dMn  = domMinName f
+              dMx  = domMaxName f
+              lhs  = LConj (LEq (LVar "A") (LVar argN))
+                           (LEq (LVar "B") (LVar resN))
+              rhs  = LEq (LVar "B") (LApp (LVar fN) [LVar "A"])
+              body = LBicond lhs rhs
+              qB   = LForallKw "B" LProp
+                       (LImpl (LIsWithinBounds dMn "B" dMx) body)
+              qA   = LForallKw "A" LProp
+                       (LImpl (LIsWithinBounds (sortMinName rSN) "A" (sortMaxName rSN))
+                              qB)
+          in DeclAxiom (LeanAxiom (fN ++ "_fact") qA)
+
+    -- (9) Adjunction between f_dir_img and f_inv_img:
+    --     forall X : Prop, (IsWithinBounds dom_Min dom_Max X) →
+    --     forall Y : Prop, (IsWithinBounds res_Min res_Max Y) →
+    --       f_dir_img(X) ⊆ Y ↔ X ⊆ f_inv_img(Y)
+    --     where A ⊆ B  =  B → A
+    imageAdjunctionAxioms :: [LeanDecl]
+    imageAdjunctionAxioms = map mkAdj multiArgFolFunctions
+      where
+        mkAdj f =
+          let dMn   = domMinName f
+              dMx   = domMaxName f
+              rSN   = IR.sortName (IR.funcResSort f)
+              dirN  = dirImgName f
+              invN  = invImgName f
+              dirX  = LApp (LVar dirN) [LVar "X"]
+              invY  = LApp (LVar invN) [LVar "Y"]
+              lhs   = LImpl (LVar "Y") dirX   -- dir_img(X) ⊆ Y
+              rhs   = LImpl invY (LVar "X")   -- X ⊆ inv_img(Y)
+              body  = LBicond lhs rhs
+              qY    = LForallKw "Y" LProp
+                        (LImpl (LIsWithinBounds (sortMinName rSN) "Y" (sortMaxName rSN))
+                               body)
+              qX    = LForallKw "X" LProp
+                        (LImpl (LIsWithinBounds dMn "X" dMx) qY)
+          in DeclAxiom (LeanAxiom (IR.funcName f ++ "_image_adjunction") qX)
+
+    -- (10) Decomposition axiom:
+    --      forall X1 : Prop, (IsWithinBounds s1_Min s1_Max X1) →
+    --      forall X2 : Prop, (IsWithinBounds s2_Min s2_Max X2) →
+    --        f(X1, X2) = f_dir_img(f_tuple(X1, X2))
+    decompositionAxioms :: [LeanDecl]
+    decompositionAxioms = map mkDecomp multiArgFolFunctions
+      where
+        mkDecomp f =
+          let fN      = IR.funcName f
+              argSNs  = map IR.sortName (IR.funcArgSorts f)
+              arity   = length argSNs
+              varNs   = [ "X" ++ show i | i <- [1..arity] ]
+              tupleApp = LApp (LVar (tupleName f)) (map LVar varNs)
+              dirApp   = LApp (LVar (dirImgName f)) [tupleApp]
+              fApp     = LApp (LVar fN) (map LVar varNs)
+              body     = LEq fApp dirApp
+              quantified =
+                foldr (\(varN, sN) acc ->
+                          LForallKw varN LProp
+                            (LImpl (LIsWithinBounds (sortMinName sN) varN (sortMaxName sN))
+                                   acc))
+                      body
+                      (zip varNs argSNs)
+          in DeclAxiom (LeanAxiom (fN ++ "_decomposition") quantified)
     -- Only user-declared FOL functions — _inv arg/res objects are handled
     -- separately via folInverseArgResDecls / folInverseArgResBoundsAxioms.
     userDeclaredFolFunctions :: [IR.Function]
