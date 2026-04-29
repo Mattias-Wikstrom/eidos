@@ -141,6 +141,7 @@ theoryToLeanDoc theory = LeanDoc
       , functionDecls
       , imageFunctionDecls
       , projectionFunctionDecls
+      , projectionInverseFunctionDecls
       , tupleFunctionDecls
       , folInverseDecls
       , functionArgResultDecls
@@ -161,6 +162,8 @@ theoryToLeanDoc theory = LeanDoc
       , decompositionAxioms
       , tupleFact
       , projectionFacts
+      , projectionAdjunctionAxioms
+      , tupleInverseDecompositionFacts
       , mereoBoundsAxioms
       , propBoundsAxioms
       , setBoundsAxioms
@@ -620,9 +623,11 @@ theoryToLeanDoc theory = LeanDoc
 
     -- (12) f_pi_k_fact: canonical-element fact for each projection function.
     --      f_pi_k maps f_dom → S_k, with input witness f_arg and output witness f_k.
+    --      Weakened to implication only (→ not ↔), because the biconditional is
+    --      too strong: knowing X2 = f_pi_k(X1) does not force X1 = f_arg.
     --      forall X1, (IsWithinBounds dom X1) →
     --      forall X2, (IsWithinBounds s_k X2) →
-    --        (X1 = f_arg ∧ X2 = f_k) ↔ X2 = f_pi_k(X1)
+    --        (X1 = f_arg ∧ X2 = f_k) → X2 = f_pi_k(X1)
     projectionFacts :: [LeanDecl]
     projectionFacts = concatMap mkProjFacts multiArgFolFunctions
       where
@@ -643,13 +648,90 @@ theoryToLeanDoc theory = LeanDoc
                   lhs   = LConj (LEq (LVar "X1") (LVar argN))
                                 (LEq (LVar "X2") (LVar objN))
                   rhs   = LEq (LVar "X2") (LApp (LVar (piName f k)) [LVar "X1"])
-                  body  = LBicond lhs rhs
+                  -- Weakened: → instead of ↔
+                  body  = LImpl lhs rhs
                   qX2   = LForallKw "X2" LProp
                             (LImpl (LIsWithinBounds (sortMinName sN) "X2" (sortMaxName sN))
                                    body)
                   qX1   = LForallKw "X1" LProp
                             (LImpl (LIsWithinBounds dMn "X1" dMx) qX2)
               in DeclAxiom (LeanAxiom (piName f k ++ "_fact") qX1)
+
+    -- Helper: inverse projection function name for the k-th argument (1-based)
+    piInvName :: IR.Function -> Int -> String
+    piInvName f k = IR.funcName f ++ "_pi_" ++ show k ++ "_inv"
+
+    -- (13) Inverse projection function declarations: f_pi_k_inv : Prop → Prop
+    --      These are the right adjoints to the projection functions f_pi_k.
+    --      f_pi_k : f_dom → S_k,   f_pi_k_inv : S_k → f_dom
+    projectionInverseFunctionDecls :: [LeanDecl]
+    projectionInverseFunctionDecls = concatMap mkProjInvDecls multiArgFolFunctions
+      where
+        mkProjInvDecls f =
+          [ DeclAxiom (LeanAxiom (piInvName f k) (LImpl LProp LProp))
+          | k <- [1 .. length (IR.funcArgSorts f)]
+          ]
+
+    -- (14) Adjunction axioms: f_pi_k ⊣ f_pi_k_inv
+    --      forall X : Prop, (IsWithinBounds dom_Min dom_Max X) →
+    --      forall Y : Prop, (IsWithinBounds s_k_Min s_k_Max Y) →
+    --        (f_pi_k(X) ⊆ Y) ↔ (X ⊆ f_pi_k_inv(Y))
+    --      i.e. (Y → f_pi_k(X)) ↔ (f_pi_k_inv(Y) → X)
+    projectionAdjunctionAxioms :: [LeanDecl]
+    projectionAdjunctionAxioms = concatMap mkProjAdj multiArgFolFunctions
+      where
+        mkProjAdj f =
+          [ mkOneAdj f k srt
+          | (k, srt) <- zip [1..] (IR.funcArgSorts f)
+          ]
+          where
+            mkOneAdj f k srt =
+              let dMn   = domMinName f
+                  dMx   = domMaxName f
+                  sN    = IR.sortName srt
+                  piN   = piName f k
+                  piInvN = piInvName f k
+                  piX   = LApp (LVar piN) [LVar "X"]
+                  piInvY = LApp (LVar piInvN) [LVar "Y"]
+                  lhs   = LImpl (LVar "Y") piX       -- f_pi_k(X) ⊆ Y
+                  rhs   = LImpl piInvY (LVar "X")    -- X ⊆ f_pi_k_inv(Y)
+                  body  = LBicond lhs rhs
+                  qY    = LForallKw "Y" LProp
+                            (LImpl (LIsWithinBounds (sortMinName sN) "Y" (sortMaxName sN))
+                                   body)
+                  qX    = LForallKw "X" LProp
+                            (LImpl (LIsWithinBounds dMn "X" dMx) qY)
+              in DeclAxiom (LeanAxiom (piN ++ "_adjunction") qX)
+
+    -- (15) f_tuple_inv_decomposition: connects f_tuple to the inverse projections.
+    --      forall X1 : Prop, (IsWithinBounds s1_Min s1_Max X1) →
+    --      ...
+    --      forall Xn : Prop, (IsWithinBounds sn_Min sn_Max Xn) →
+    --        f_tuple(X1, ..., Xn) = f_pi_1_inv(X1) ∩ ... ∩ f_pi_n_inv(Xn)
+    --      where ∩ is meet, encoded as ∧ in the Prop lattice.
+    tupleInverseDecompositionFacts :: [LeanDecl]
+    tupleInverseDecompositionFacts = map mkTupleInvDecomp multiArgFolFunctions
+      where
+        mkTupleInvDecomp f =
+          let argSNs  = map IR.sortName (IR.funcArgSorts f)
+              arity   = length argSNs
+              varNs   = [ "X" ++ show i | i <- [1..arity] ]
+              -- f_tuple(X1, ..., Xn)
+              tupleApp = LApp (LVar (tupleName f)) (map LVar varNs)
+              -- f_pi_k_inv(Xk) for each k
+              invApps  = [ LApp (LVar (piInvName f k)) [LVar xk]
+                         | (k, xk) <- zip [1..] varNs ]
+              -- fold them together with ∧ (meet / intersection)
+              meetExpr = foldl1 LConj invApps
+              body     = LEq tupleApp meetExpr
+              quantified =
+                foldr (\(varN, sN) acc ->
+                          LForallKw varN LProp
+                            (LImpl (LIsWithinBounds (sortMinName sN) varN (sortMaxName sN))
+                                   acc))
+                      body
+                      (zip varNs argSNs)
+          in DeclAxiom (LeanAxiom (tupleName f ++ "_inv_decomposition") quantified)
     -- separately via folInverseArgResDecls / folInverseArgResBoundsAxioms.
     userDeclaredFolFunctions :: [IR.Function]
     userDeclaredFolFunctions =
