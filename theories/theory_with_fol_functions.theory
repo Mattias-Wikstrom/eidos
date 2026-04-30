@@ -12,6 +12,7 @@
     f : S, S → T;
     g : S → S;
     h : T → S;
+    k : S, T, T → S;
 
     idS : S → S;
   },
