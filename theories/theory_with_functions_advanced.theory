@@ -1,0 +1,25 @@
+{
+  signature {
+    sort S;
+    sort T;
+
+    S1 ⊆ S;
+    S2 ⊆ S;
+
+    T1 ⊆ T;
+    T2 ⊆ T;
+
+    f : S, S → T;
+    g : S → S;
+    h : T → S;
+    k : S, T, T → S;
+
+    idS : S → S;
+  },
+  axioms {
+    assertions {
+      [X ⊆ f#dom] X = X;
+      
+    }
+  }
+}

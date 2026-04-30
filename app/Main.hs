@@ -13,6 +13,7 @@ import           Eidos.IR as IR
 
 import           Eidos.Export.JSON      (exportTheoryToJSONString)
 import           Eidos.Export.LeanProps (exportToLeanProps)
+import           Eidos.Export.Lean (exportToLean)
 
 main :: IO ()
 main = do
@@ -135,6 +136,22 @@ main = do
             Right theory -> do
               putStr $ exportToLeanProps theory
               exitSuccess
+    
+    ["--lean", filePath] -> do
+      result <- parseFile filePath
+      case result of
+        Left err -> do
+          IO.hPutStrLn IO.stderr ("Parse error: " ++ show err)
+          exitFailure
+        Right ast -> do
+          irResult <- buildTheoryFromFile filePath ast
+          case irResult of
+            Left buildErr -> do
+              IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
+              exitFailure
+            Right theory -> do
+              putStr $ Eidos.Export.Lean.exportToLean theory
+              exitSuccess
 
     _ -> do
       IO.hPutStrLn IO.stderr "Usage:"
@@ -146,4 +163,5 @@ main = do
       IO.hPutStrLn IO.stderr "  eidos-parser --lean_using_props <file.theory>  # Export to Lean 4 (handles ℙ, 𝕌, and mixed theories)"
       IO.hPutStrLn IO.stderr "  eidos-parser --json <file.theory>             # Export IR as JSON"
       IO.hPutStrLn IO.stderr "  eidos-parser --json --compact <file.theory>   # Export IR as compact JSON"
+      IO.hPutStrLn IO.stderr "  eidos-parser --lean <file.theory>                   # Export to Lean 4 using structure-based encoding (sorts → Types)"
       exitFailure
