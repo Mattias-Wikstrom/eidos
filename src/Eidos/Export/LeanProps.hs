@@ -134,7 +134,7 @@ sanitizeName = map (\c -> if c == '#' then '_' else c)
 theoryToLeanDoc :: IR.Theory -> LeanDoc
 theoryToLeanDoc theory = LeanDoc
   { leanDocTheoryName = IR.theoryFullyQualifiedName theory
-  , leanDocDecls      = concat
+  , leanDocDecls      = interleaveBlankLines
       [ headerDecls
       , userSortLimitDecls
       , productSortLimitDecls
@@ -180,6 +180,15 @@ theoryToLeanDoc theory = LeanDoc
       ]
   }
   where
+    -- | Interleave non-empty lists with blank lines
+    interleaveBlankLines :: [[LeanDecl]] -> [LeanDecl]
+    interleaveBlankLines [] = []
+    interleaveBlankLines [xs] = xs
+    interleaveBlankLines (xs:ys:rest)
+      | null xs   = interleaveBlankLines (ys:rest)
+      | null ys   = interleaveBlankLines (xs:rest)
+      | otherwise = xs ++ [DeclBlankLine] ++ interleaveBlankLines (ys:rest)
+
     usesDomain :: Bool
     usesDomain = IR.theoryUsesDomain theory
 
@@ -1066,7 +1075,6 @@ theoryToLeanDoc theory = LeanDoc
                  ]
             else [])
       ++ concatMap userSortOrderAxioms userSorts
-      ++ [DeclBlankLine]
       where
         userSortOrderAxioms s =
           let sortName = IR.sortName s
