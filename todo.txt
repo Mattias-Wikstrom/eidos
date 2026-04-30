@@ -2,6 +2,24 @@
 Things to Be Done
 =================
 
+* Support for non-propositional Lean 4 output.
+
+* Check if the output can be written in a more abstract way on the Lean 4 side.
+
+* All objects in the output for a theory have to fall within the limits of the universe of the theory.
+
+* Check for language constructs that are ignored at the moment.
+
+* Check that the function code works with implicit and named subtheories.
+
+* #dom is not supported at the moment. Check that #1, #2, and #arg work.
+
+* The current Lean 4 output does not work correctly for quotient sorts or subsorts.
+
+* The intermediate representations are not very satisfactory at this point. Design needed. The entire code that renders Lean 4 output should be redesigned.
+
+* The Lean 4 output should be better organized. Maybe use macros/elaborations.
+
 * Make sure this is rejected as ill-typed:
     [X : S] (IdS(X) = X);
 
