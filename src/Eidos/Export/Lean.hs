@@ -69,13 +69,32 @@ theoryToLeanTypeDoc theory =
     fields = concat
       [ [LTDField "U" LTType]
       , [LTDField "P" LTType]
+      , [LTDField "emb_P" (LTArrow (LTVar "P") (LTVar "U"))]
       , [LTDField "D" LTType | theoryUsesD]
+      , [LTDField "emb_D" (LTArrow (LTVar "D") (LTVar "U")) | theoryUsesD]
+      -- Built-in operations on U
+      , [LTDField "plus"  uBinOp]
+      , [LTDField "times" uBinOp]
+      , [LTDField "minus" uBinOp]
+      -- Embeddings from each user sort into U
+      , [LTDField ("emb_" ++ sortName) (LTArrow (LTVar sortName) (LTVar "U"))
+        | sortName <- allUserSorts]
       , map sortToField userSorts
       , map subsetToField userSubsets
       , map folFuncToField userFOLFunctions
       , map solFuncToField userSOLFunctions
       , map factToField (zip [1..] userFacts)
       ]
+        where
+        uBinOp = LTArrow (LTVar "U") (LTArrow (LTVar "U") (LTVar "U"))
+        
+    -- All user-declared sorts
+    allUserSorts = [ IR.sortName s 
+                   | IR.EntitySort s <- IR.theoryObjects theory
+                   , IR.sortKind s == IR.SortKindFromSignature ]
+    
+    -- Also embed P into U
+    pEmbedding = LTDField "emb_P" (LTArrow (LTVar "P") (LTVar "U"))
     
     theoryUsesD = IR.theoryUsesDomain theory
     
