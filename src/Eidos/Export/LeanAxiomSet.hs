@@ -82,7 +82,16 @@ data Tag
     -- ^ Concerns a set declared with @S1 ⊆ S@.
   | TagFunction
     -- ^ Concerns a function (FOL or SOL, user-declared or generated).
-    --   Always present when any of the sub-entity tags below are present.
+    --   Always present when 'TagFOLFunction' or 'TagSOLFunction' is present,
+    --   and when any of the sub-entity tags are present.
+  | TagFOLFunction
+    -- ^ The function originates from a user-declared FOL function
+    --   (including all generated machinery: product sort, projections,
+    --   tuples, image functions, IR predicate).
+    --   Always co-occurs with 'TagFunction'.
+  | TagSOLFunction
+    -- ^ The function originates from a user-declared SOL function.
+    --   Always co-occurs with 'TagFunction'.
   | TagImage
     -- ^ Concerns the direct/inverse-image sub-entity of a function.
     --   Always co-occurs with 'TagFunction'.
@@ -98,6 +107,10 @@ data Tag
   | TagIR
     -- ^ Concerns the invertible-rectangular predicate of a multi-arg function.
     --   Always co-occurs with 'TagFunction'.
+    --   Present on /all/ IR-related axiom sets, so that filtering by 'TagIR'
+    --   collects everything IR-related across all functions.  The more
+    --   specific role tags ('TagIRTupleProj', 'TagIRProjFromTuple',
+    --   'TagIRSeparates') narrow within that group.
 
   -- -----------------------------------------------------------------------
   -- Role tags  (what logical role does this axiom set play?)
@@ -151,12 +164,21 @@ type TagSet = Set Tag
 tags :: [Tag] -> TagSet
 tags ts =
   let s = Set.fromList ts
-      subEntityTags = [TagImage, TagProjection, TagTuple, TagInverse, TagIR]
-      hasSubEntity  = any (`Set.member` s) subEntityTags
-  in if hasSubEntity && not (TagFunction `Set.member` s)
-       then error $ "LeanAxiomSet.tags: sub-entity tag present without TagFunction: "
+      subEntityTags  = [TagImage, TagProjection, TagTuple, TagInverse, TagIR]
+      originTags     = [TagFOLFunction, TagSOLFunction]
+      hasSubEntity   = any (`Set.member` s) subEntityTags
+      hasOriginTag   = any (`Set.member` s) originTags
+      hasTagFunction = TagFunction `Set.member` s
+      irRoleTags     = [TagIRTupleProj, TagIRProjFromTuple, TagIRSeparates]
+      hasIRRoleTag   = any (`Set.member` s) irRoleTags
+      hasTagIR       = TagIR `Set.member` s
+  in if (hasSubEntity || hasOriginTag) && not hasTagFunction
+       then error $ "LeanAxiomSet.tags: sub-entity or origin tag present without TagFunction: "
                  ++ show ts
-       else s
+     else if hasIRRoleTag && not hasTagIR
+       then error $ "LeanAxiomSet.tags: IR role tag present without TagIR: "
+                 ++ show ts
+     else s
 
 -- ---------------------------------------------------------------------------
 -- Subject paths
