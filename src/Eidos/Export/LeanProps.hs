@@ -144,15 +144,18 @@ theoryToLeanDoc theory = LeanDoc
       , projectionInverseFunctionDecls
       , tupleFunctionDecls
       , folInverseDecls
+      , irPredicateDecls
       , functionArgResultDecls
       , folInverseArgResDecls
       , productArgDecls
+      , projectionWitnessDecls
       , invImgWitnessDecls
       , mereoDecls
       , propDecls
       , setDecls
       , functionArgResultBoundsAxioms
       , folInverseArgResBoundsAxioms
+      , projectionWitnessBoundsAxioms
       , functionFactAxioms
       , folInverseFactAxioms
       , dirImgFactAxioms
@@ -164,6 +167,9 @@ theoryToLeanDoc theory = LeanDoc
       , projectionFacts
       , projectionAdjunctionAxioms
       , tupleInverseDecompositionFacts
+      , irTupleWithProjectionsAxioms
+      , irProjectionsFromTupleAxioms
+      , irSeparationAxioms
       , mereoBoundsAxioms
       , propBoundsAxioms
       , setBoundsAxioms
@@ -621,40 +627,71 @@ theoryToLeanDoc theory = LeanDoc
                     foldr mkArgQ (resQ body) (zip argVars (map IR.sortName argSorts))
               in [DeclAxiom (LeanAxiom (tupleName f ++ "_fact") quantified)]
 
-    -- (12) f_pi_k_fact: canonical-element fact for each projection function.
-    --      f_pi_k maps f_dom → S_k, with input witness f_arg and output witness f_k.
-    --      Weakened to implication only (→ not ↔), because the biconditional is
-    --      too strong: knowing X2 = f_pi_k(X1) does not force X1 = f_arg.
+    -- (12) Projection witness objects: f_pi_k_1 (input, lives in f_dom) and
+    --      f_pi_k_res (output, lives in S_k).  Treated exactly like the arg/res
+    --      witnesses of ordinary FOL functions (g_1, g_res, etc.).
+    projectionWitnessDecls :: [LeanDecl]
+    projectionWitnessDecls = concatMap mkProjWitnesses multiArgFolFunctions
+      where
+        mkProjWitnesses f =
+          concatMap mkOne [1 .. length (IR.funcArgSorts f)]
+          where
+            mkOne k =
+              [ DeclAxiom (LeanAxiom (piName f k ++ "_1") LProp)
+              , DeclAxiom (LeanAxiom (piName f k ++ "_res") LProp)
+              ]
+
+    projectionWitnessBoundsAxioms :: [LeanDecl]
+    projectionWitnessBoundsAxioms = concatMap mkProjWitnessBounds multiArgFolFunctions
+      where
+        mkProjWitnessBounds f =
+          let dMn = domMinName f
+              dMx = domMaxName f
+          in concatMap (mkBoundsForK dMn dMx)
+               (zip [1..] (IR.funcArgSorts f))
+          where
+            mkBoundsForK dMn dMx (k, srt) =
+              let n1  = piName f k ++ "_1"    -- lives in f_dom
+                  nr  = piName f k ++ "_res"  -- lives in S_k
+                  sN  = IR.sortName srt
+              in [ DeclAxiom (LeanAxiom (n1 ++ minSuffixForAxiomNames)
+                               (LImpl pMin (LImpl (LVar n1) (LVar dMn))))
+                 , DeclAxiom (LeanAxiom (n1 ++ maxSuffixForAxiomNames)
+                               (LImpl pMin (LImpl (LVar dMx) (LVar n1))))
+                 , DeclAxiom (LeanAxiom (nr ++ minSuffixForAxiomNames)
+                               (LImpl pMin (LImpl (LVar nr) (LVar (sortMinName sN)))))
+                 , DeclAxiom (LeanAxiom (nr ++ maxSuffixForAxiomNames)
+                               (LImpl pMin (LImpl (LVar (sortMaxName sN)) (LVar nr))))
+                 ]
+
+    -- (12b) f_pi_k_fact: full ↔ biconditional, exactly like g_fact / h_fact.
+    --      f_pi_k : f_dom → S_k, with witnesses f_pi_k_1 (input) and f_pi_k_res (output).
     --      forall X1, (IsWithinBounds dom X1) →
     --      forall X2, (IsWithinBounds s_k X2) →
-    --        (X1 = f_arg ∧ X2 = f_k) → X2 = f_pi_k(X1)
+    --        (X1 = f_pi_k_1 ∧ X2 = f_pi_k_res) ↔ X2 = f_pi_k(X1)
     projectionFacts :: [LeanDecl]
     projectionFacts = concatMap mkProjFacts multiArgFolFunctions
       where
         mkProjFacts f =
-          case IR.funcArgument f of
-            Nothing  -> []
-            Just arg ->
-              let dMn  = domMinName f
-                  dMx  = domMaxName f
-                  argN = sanitizeName (IR.mereoName arg)
-              in [ mkOneProjFact argN dMn dMx k obj srt
-                 | (k, obj, srt) <- zip3 [1..] (IR.funcArgObjects f) (IR.funcArgSorts f)
-                 ]
+          let dMn = domMinName f
+              dMx = domMaxName f
+          in [ mkOneProjFact dMn dMx k srt
+             | (k, srt) <- zip [1..] (IR.funcArgSorts f)
+             ]
           where
-            mkOneProjFact argN dMn dMx k obj srt =
-              let objN  = sanitizeName (IR.mereoName obj)
-                  sN    = IR.sortName srt
-                  lhs   = LConj (LEq (LVar "X1") (LVar argN))
-                                (LEq (LVar "X2") (LVar objN))
-                  rhs   = LEq (LVar "X2") (LApp (LVar (piName f k)) [LVar "X1"])
-                  -- Weakened: → instead of ↔
-                  body  = LImpl lhs rhs
-                  qX2   = LForallKw "X2" LProp
-                            (LImpl (LIsWithinBounds (sortMinName sN) "X2" (sortMaxName sN))
-                                   body)
-                  qX1   = LForallKw "X1" LProp
-                            (LImpl (LIsWithinBounds dMn "X1" dMx) qX2)
+            mkOneProjFact dMn dMx k srt =
+              let n1   = piName f k ++ "_1"
+                  nr   = piName f k ++ "_res"
+                  sN   = IR.sortName srt
+                  lhs  = LConj (LEq (LVar "X1") (LVar n1))
+                               (LEq (LVar "X2") (LVar nr))
+                  rhs  = LEq (LVar "X2") (LApp (LVar (piName f k)) [LVar "X1"])
+                  body = LBicond lhs rhs
+                  qX2  = LForallKw "X2" LProp
+                           (LImpl (LIsWithinBounds (sortMinName sN) "X2" (sortMaxName sN))
+                                  body)
+                  qX1  = LForallKw "X1" LProp
+                           (LImpl (LIsWithinBounds dMn "X1" dMx) qX2)
               in DeclAxiom (LeanAxiom (piName f k ++ "_fact") qX1)
 
     -- Helper: inverse projection function name for the k-th argument (1-based)
@@ -732,6 +769,94 @@ theoryToLeanDoc theory = LeanDoc
                       body
                       (zip varNs argSNs)
           in DeclAxiom (LeanAxiom (tupleName f ++ "_inv_decomposition") quantified)
+
+    -- (16) IR_f predicate: a Prop → Prop predicate saying that an element of
+    --      f_dom is an "invertible rectangle."
+    --      IR_f_tuple_with_projections:
+    --        forall Z, (IsWithinBounds dom Z) →
+    --          IR_f(Z) ↔ Z = f_tuple(f_pi_1(Z), f_pi_2(Z))
+    --      IR_f_projections_from_tuple:
+    --        forall X, (IsWithinBounds S_1 X) →
+    --        forall Y, (IsWithinBounds S_2 Y) →
+    --          IR_f(f_tuple(X,Y)) ↔ (f_pi_1(f_tuple(X,Y)) = X ∧ f_pi_2(f_tuple(X,Y)) = Y)
+    --      IR_f_separates:
+    --        forall X, (IsWithinBounds S_1 X) →
+    --        forall Y, (IsWithinBounds S_1 Y) →
+    --          X = Y ↔ forall Z, (IsWithinBounds dom Z) →
+    --                    IR_f(Z) → ((X → Z) ↔ (Y → Z))
+    irPredicateName :: IR.Function -> String
+    irPredicateName f = "IR_" ++ IR.funcName f
+
+    irPredicateDecls :: [LeanDecl]
+    irPredicateDecls = map mkIRDecl multiArgFolFunctions
+      where
+        mkIRDecl f = DeclAxiom (LeanAxiom (irPredicateName f) (LImpl LProp LProp))
+
+    irTupleWithProjectionsAxioms :: [LeanDecl]
+    irTupleWithProjectionsAxioms = map mkIRTuple multiArgFolFunctions
+      where
+        mkIRTuple f =
+          let dMn    = domMinName f
+              dMx    = domMaxName f
+              irN    = irPredicateName f
+              tupN   = tupleName f
+              -- build f_tuple(f_pi_1(Z), ..., f_pi_n(Z))
+              arity  = length (IR.funcArgSorts f)
+              piApps = [ LApp (LVar (piName f k)) [LVar "Z"] | k <- [1..arity] ]
+              tupleApp = LApp (LVar tupN) piApps
+              irZ    = LApp (LVar irN) [LVar "Z"]
+              body   = LBicond irZ (LEq (LVar "Z") tupleApp)
+              qZ     = LForallKw "Z" LProp
+                         (LImpl (LIsWithinBounds dMn "Z" dMx) body)
+          in DeclAxiom (LeanAxiom (irN ++ "_tuple_with_projections") qZ)
+
+    irProjectionsFromTupleAxioms :: [LeanDecl]
+    irProjectionsFromTupleAxioms = map mkIRProj multiArgFolFunctions
+      where
+        mkIRProj f =
+          let argSNs  = map IR.sortName (IR.funcArgSorts f)
+              arity   = length argSNs
+              varNs   = [ "X" ++ show i | i <- [1..arity] ]
+              irN     = irPredicateName f
+              tupN    = tupleName f
+              tupleApp = LApp (LVar tupN) (map LVar varNs)
+              irTuple  = LApp (LVar irN) [tupleApp]
+              -- f_pi_k(f_tuple(X1,...,Xn)) = Xk  for each k
+              projEqs  = [ LEq (LApp (LVar (piName f k)) [tupleApp]) (LVar xk)
+                         | (k, xk) <- zip [1..] varNs ]
+              rhsConj  = foldl1 LConj projEqs
+              body     = LBicond irTuple rhsConj
+              quantified =
+                foldr (\(varN, sN) acc ->
+                          LForallKw varN LProp
+                            (LImpl (LIsWithinBounds (sortMinName sN) varN (sortMaxName sN))
+                                   acc))
+                      body
+                      (zip varNs argSNs)
+          in DeclAxiom (LeanAxiom (irPredicateName f ++ "_projections_from_tuple") quantified)
+
+    irSeparationAxioms :: [LeanDecl]
+    irSeparationAxioms = map mkIRSep multiArgFolFunctions
+      where
+        mkIRSep f =
+          -- We separate over the first argument sort (S_1).
+          -- X = Y ↔ ∀ Z : Prop, (IsWithinBounds dom Z) →
+          --           IR_f(Z) → ((X → Z) ↔ (Y → Z))
+          let dMn   = domMinName f
+              dMx   = domMaxName f
+              irN   = irPredicateName f
+              irZ   = LApp (LVar irN) [LVar "Z"]
+              body  = LBicond (LImpl (LVar "X") (LVar "Z"))
+                              (LImpl (LVar "Y") (LVar "Z"))
+              inner = LImpl irZ body
+              qZ    = LForallKw "Z" LProp
+                        (LImpl (LIsWithinBounds dMn "Z" dMx) inner)
+              sep   = LBicond (LEq (LVar "X") (LVar "Y")) qZ
+              qY    = LForallKw "Y" LProp
+                        (LImpl (LIsWithinBounds dMn "Y" dMx) sep)
+              qX    = LForallKw "X" LProp
+                        (LImpl (LIsWithinBounds dMn "X" dMx) qY)
+          in DeclAxiom (LeanAxiom (irPredicateName f ++ "_separates") qX)
     -- separately via folInverseArgResDecls / folInverseArgResBoundsAxioms.
     userDeclaredFolFunctions :: [IR.Function]
     userDeclaredFolFunctions =
