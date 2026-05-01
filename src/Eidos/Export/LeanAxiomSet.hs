@@ -58,7 +58,7 @@ module Eidos.Export.LeanAxiomSet
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Eidos.Export.LeanProps (LeanAxiom)
+import Eidos.Export.LeanExpr (LeanAxiom)
 
 -- ---------------------------------------------------------------------------
 -- Tags

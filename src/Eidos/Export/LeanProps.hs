@@ -31,11 +31,17 @@ module Eidos.Export.LeanProps
   , renderLeanDoc
   , renderLeanExpr
     -- * Convenience entry point
+  , LeanPropsOptions (..)
+  , defaultLeanPropsOptions
+  , exportToLeanPropsWithOptions
   , exportToLeanProps
   ) where
 
 import qualified Eidos.IR as IR
 import Eidos.Export.LeanExpr
+import Data.List (sortOn)
+import Eidos.Export.MkAxiomSets (mkAxiomSets)
+import Eidos.Export.LeanAxiomSet
 
 -- ---------------------------------------------------------------------------
 -- Naming conventions
@@ -1266,5 +1272,94 @@ baseTermToLean (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
 -- ---------------------------------------------------------------------------
 
 -- | Convert an Eidos theory directly to Lean 4 source (combines both stages).
+exportToLeanPropsWithOptions :: LeanPropsOptions -> IR.Theory -> String
+exportToLeanPropsWithOptions opts theory =
+  let axiomSets0 = mkAxiomSets theory
+      axiomSets1 = map collapseSortingSet axiomSets0
+      axiomSets2 = if optGroupByEntity opts then sortOn asPath axiomSets1 else axiomSets1
+      doc = LeanDoc
+        { leanDocTheoryName = IR.theoryFullyQualifiedName theory
+        , leanDocDecls = renderAxiomSetsToDecls opts axiomSets2
+        }
+      header =
+        if optUseBoundedForallSyntax opts
+        then unlines
+          [ "macro \"bforall \" x:ident \" in \" lo:term \"..\" hi:term \", \" body:term : term =>"
+          , "  `(forall $x : Prop, (IsWithinBounds $lo $hi $x) → $body)"
+          , ""
+          ]
+        else ""
+  in header ++ renderLeanDoc doc
+
 exportToLeanProps :: IR.Theory -> String
-exportToLeanProps = renderLeanDoc . theoryToLeanDoc
+exportToLeanProps = exportToLeanPropsWithOptions defaultLeanPropsOptions
+
+renderAxiomSetsToDecls :: LeanPropsOptions -> [AxiomSet] -> [LeanDecl]
+renderAxiomSetsToDecls opts = concatMap renderOne
+  where
+    renderOne as_ =
+      let commentDecls = if optAddGroupComments opts
+                         then [DeclComment (subjectPathComment (asPath as_))]
+                         else []
+          axDecls = map (DeclAxiom . mapAxiom) (asAxioms as_)
+      in DeclBlankLine : commentDecls ++ axDecls
+
+    mapAxiom ax = ax { axiomType = rewriteBounded (axiomType ax) }
+
+    rewriteBounded (LBoundedForall var lo hi body)
+      | optUseBoundedForallSyntax opts =
+          LApp (LVar "bforall")
+            [ LVar var, LVar lo, LVar hi, rewriteBounded body ]
+      | otherwise = LBoundedForall var lo hi (rewriteBounded body)
+    rewriteBounded (LImpl a b) = LImpl (rewriteBounded a) (rewriteBounded b)
+    rewriteBounded (LConj a b) = LConj (rewriteBounded a) (rewriteBounded b)
+    rewriteBounded (LDisj a b) = LDisj (rewriteBounded a) (rewriteBounded b)
+    rewriteBounded (LBicond a b) = LBicond (rewriteBounded a) (rewriteBounded b)
+    rewriteBounded (LForall x ty b) = LForall x (rewriteBounded ty) (rewriteBounded b)
+    rewriteBounded (LForallKw x ty b) = LForallKw x (rewriteBounded ty) (rewriteBounded b)
+    rewriteBounded (LExists x ty b) = LExists x (rewriteBounded ty) (rewriteBounded b)
+    rewriteBounded (LEq a b) = LEq (rewriteBounded a) (rewriteBounded b)
+    rewriteBounded (LApp f args) = LApp (rewriteBounded f) (map rewriteBounded args)
+    rewriteBounded (LProjectIntoInterval x lo hi) =
+      LProjectIntoInterval (rewriteBounded x) (rewriteBounded lo) (rewriteBounded hi)
+    rewriteBounded x = x
+
+subjectPathComment :: SubjectPath -> String
+subjectPathComment = unwords . map show
+
+collapseSortingSet :: AxiomSet -> AxiomSet
+collapseSortingSet as_
+  | not (hasTag TagSorting as_) = as_
+  | otherwise =
+      case asAxioms as_ of
+        [LeanAxiom nMin (LImpl _ (LImpl (LVar obj1) (LVar lo))),
+         LeanAxiom nMax (LImpl _ (LImpl (LVar hi) (LVar obj2)))]
+          | obj1 == obj2
+          , stripSuffix "_min" nMin == Just obj1
+          , stripSuffix "_max" nMax == Just obj1
+          -> as_ { asAxioms = [LeanAxiom (obj1 ++ "_sorting") (LIsWithinBounds lo obj1 hi)] }
+        [LeanAxiom nMin (LImpl (LVar obj1) (LVar lo)),
+         LeanAxiom nMax (LImpl (LVar hi) (LVar obj2))]
+          | obj1 == obj2
+          , stripSuffix "_min" nMin == Just obj1
+          , stripSuffix "_max" nMax == Just obj1
+          -> as_ { asAxioms = [LeanAxiom (obj1 ++ "_sorting") (LIsWithinBounds lo obj1 hi)] }
+        _ -> as_
+  where
+    stripSuffix suffix str =
+      let n = length str - length suffix
+      in if n >= 0 && drop n str == suffix then Just (take n str) else Nothing
+data LeanPropsOptions = LeanPropsOptions
+  { optGroupByEntity      :: Bool
+  , optUseSortingAxioms   :: Bool
+  , optAddGroupComments   :: Bool
+  , optUseBoundedForallSyntax :: Bool
+  } deriving (Eq, Show)
+
+defaultLeanPropsOptions :: LeanPropsOptions
+defaultLeanPropsOptions = LeanPropsOptions
+  { optGroupByEntity = False
+  , optUseSortingAxioms = False
+  , optAddGroupComments = False
+  , optUseBoundedForallSyntax = False
+  }
