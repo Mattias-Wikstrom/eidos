@@ -1204,6 +1204,8 @@ applyRelOp leftExpr rfbt =
        "∪"  -> LConj   leftExpr right   -- set union  => conjunction
        "∩"  -> LDisj   leftExpr right   -- set intersection => disjunction
        "⊆"  -> LImpl   right leftExpr   -- A ⊆ B  =>  B -> A
+       "∈"  -> LImpl   right leftExpr   -- x ∈ A  =>  A -> x
+       "⇒"  -> LImpl   leftExpr right   -- A ⇒ B  =>  A -> B
        _    -> LVar ("(" ++ op ++ ")")  -- fallback
 
 -- ---------------------------------------------------------------------------
@@ -1226,6 +1228,7 @@ applyArithOp leftExpr off =
        "∸"  -> LBicond leftExpr right
        "∪"  -> LConj   leftExpr right   -- set union  => conjunction
        "∩"  -> LDisj   leftExpr right   -- set intersection => disjunction
+       "⇒"  -> LImpl   leftExpr right   -- A ⇒ B  =>  A -> B
        _    -> LVar ("(" ++ op ++ ")")  -- fallback
 
 factorToLean :: IR.ResolvedFactor -> LeanExpr
