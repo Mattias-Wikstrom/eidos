@@ -1127,7 +1127,7 @@ atomicPropToLean :: IR.ResolvedAtomicProp -> LeanExpr
 atomicPropToLean (IR.ResolvedAtomicConstant ref) = LVar (resolveConstRef ref)
 atomicPropToLean (IR.ResolvedAtomicTermPair tp)  = termPairToLean tp
 
-resolveConstRef :: IR.ResolvedConstRef -> String
+resolveConstRef :: IR.ResolvedConstantRef -> String
 resolveConstRef ref =
   let raw = IR.resolvedConstRefName ref
   in case raw of
@@ -1174,15 +1174,34 @@ factorToLean (IR.ResolvedFactor base suffixes _) =
   foldl applySuffix (baseTermToLean base) suffixes
   where
     applySuffix expr (IR.ResolvedSuffixDotAttr attr) =
-      LApp expr [LVar attr]
-    applySuffix expr (IR.ResolvedSuffixFuncApp args) =
+      LVar (sanitizeName (renderLeanExpr expr ++ "_" ++ attr))
+    applySuffix expr (IR.ResolvedSuffixCall args) =
       LApp expr (map termToLean args)
-    applySuffix expr (IR.ResolvedSuffixProjectIntoInterval lo hi) =
-      LProjectIntoInterval expr (termToLean lo) (termToLean hi)
-    applySuffix expr (IR.ResolvedSuffixProjectToSort sn varN) =
-      let (loN, hiN) = sortBounds sn
-      in LProjectIntoInterval expr (LVar loN) (LVar hiN)
+    applySuffix expr (IR.ResolvedSuffixSpecialOp attr) =
+      case attr of
+        "min" -> LVar (sanitizeName (renderLeanExpr expr ++ minSuffix))
+        "max" -> LVar (sanitizeName (renderLeanExpr expr ++ maxSuffix))
+        _ -> LVar (sanitizeName (renderLeanExpr expr ++ "_" ++ attr))
 
 baseTermToLean :: IR.ResolvedBaseTerm -> LeanExpr
-baseTermToLean (IR.ResolvedBaseTermConst ref)  = LVar (resolveConstRef ref)
-baseTermToLean (IR.ResolvedBaseTermParen inner) = propExprToLean inner
+baseTermToLean (IR.ResolvedBTAtomic ref) =
+  LVar (resolveConstRef ref)
+baseTermToLean (IR.ResolvedBTParen expr) =
+  propExprToLean expr
+baseTermToLean (IR.ResolvedBTSingleton t) =
+  termToLean t
+baseTermToLean (IR.ResolvedBTEvaluationInTheory eit) =
+  propExprToLean (IR.resolvedEITOperand eit)
+baseTermToLean (IR.ResolvedBTProjectionToSort pts) =
+  let s    = IR.resolvedPTSort pts
+      lo   = resolveName (IR.mereoName (IR.sortMin s))
+      hi   = resolveName (IR.mereoName (IR.sortMax s))
+      x    = termToLean (IR.resolvedPTOperand pts)
+  in LProjectIntoInterval x (LVar lo) (LVar hi)
+baseTermToLean (IR.ResolvedBTProjectionToInterval pti) =
+  let lo = termToLean (IR.resolvedPTILo      pti)
+      hi = termToLean (IR.resolvedPTIHi      pti)
+      x  = termToLean (IR.resolvedPTIOperand pti)
+  in LProjectIntoInterval x lo hi
+baseTermToLean (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
+  termToLean (IR.resolvedGSPOperand gsp)
