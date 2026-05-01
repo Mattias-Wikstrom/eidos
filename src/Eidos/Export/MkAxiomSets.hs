@@ -78,7 +78,10 @@ sortBounds :: String -> (String, String)
 sortBounds sortN = case sortN of
   "ℙ" -> (pMinName, pMaxName)
   "𝕌" -> (uMinName, uMaxName)
-  _   -> (sortN ++ minSuffix, sortN ++ maxSuffix)
+  "𝔻" -> (dMinName, dMaxName)
+  _   ->
+    let n = sanitizeName sortN
+    in (n ++ minSuffix, n ++ maxSuffix)
 
 bForall :: String -> String -> String -> LeanExpr -> LeanExpr
 bForall = LBoundedForall
