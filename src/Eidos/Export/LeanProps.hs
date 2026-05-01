@@ -1275,7 +1275,9 @@ baseTermToLean (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
 exportToLeanPropsWithOptions :: LeanPropsOptions -> IR.Theory -> String
 exportToLeanPropsWithOptions opts theory =
   let axiomSets0 = mkAxiomSets theory
-      axiomSets1 = map collapseSortingSet axiomSets0
+      axiomSets1 = if optUseSortingAxioms opts
+                   then map collapseSortingSet axiomSets0
+                   else axiomSets0
       axiomSets2 = if optGroupByEntity opts then sortOn asPath axiomSets1 else axiomSets1
       doc = LeanDoc
         { leanDocTheoryName = IR.theoryFullyQualifiedName theory
