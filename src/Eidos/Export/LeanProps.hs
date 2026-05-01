@@ -1081,7 +1081,9 @@ sortBounds sortN = case sortN of
   "ℙ" -> (pMinName, pMaxName)
   "𝕌" -> (uMinName, uMaxName)
   "𝔻" -> (dMinName, dMaxName)
-  _   -> (sortN ++ minSuffix, sortN ++ maxSuffix)
+  _   ->
+    let n = sanitizeName sortN
+    in (n ++ minSuffix, n ++ maxSuffix)
 
 -- ---------------------------------------------------------------------------
 -- Converting IR prop-expressions to LeanExpr
@@ -1168,9 +1170,9 @@ resolveName n = case n of
   "⊤"     -> pMinName
   "⊥"     -> pMaxName
   other
-    | Just base <- stripSuffix "#min" other -> base ++ minSuffix
-    | Just base <- stripSuffix "#max" other -> base ++ maxSuffix
-    | otherwise                             -> other
+    | Just base <- stripSuffix "#min" other -> sanitizeName base ++ minSuffix
+    | Just base <- stripSuffix "#max" other -> sanitizeName base ++ maxSuffix
+    | otherwise                             -> sanitizeName other
   where
     stripSuffix :: String -> String -> Maybe String
     stripSuffix suffix str =
