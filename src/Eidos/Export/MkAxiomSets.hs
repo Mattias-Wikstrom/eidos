@@ -1166,6 +1166,8 @@ applyRelOp leftExpr rfbt =
        "∪"  -> LConj   leftExpr right
        "∩"  -> LDisj   leftExpr right
        "⊆"  -> LImpl   right leftExpr
+       "∈"  -> LImpl   right leftExpr
+       "⇒"  -> LImpl   leftExpr right
        _    -> LVar ("(" ++ op ++ ")")
 
 termToLean :: IR.ResolvedTerm -> LeanExpr
@@ -1184,6 +1186,7 @@ applyArithOp leftExpr off =
        "∸"  -> LBicond leftExpr right
        "∪"  -> LConj  leftExpr right
        "∩"  -> LDisj  leftExpr right
+       "⇒"  -> LImpl  leftExpr right
        _    -> LVar ("(" ++ op ++ ")")
 
 factorToLean :: IR.ResolvedFactor -> LeanExpr
