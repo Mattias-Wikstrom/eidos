@@ -78,7 +78,7 @@ sortBounds :: String -> (String, String)
 sortBounds sortN = case sortN of
   "ℙ" -> (pMinName, pMaxName)
   "𝕌" -> (uMinName, uMaxName)
-  "𝔻" -> (dMinName, dMaxName)
+  "𝔻" -> ("D_Min", "D_Max")
   _   ->
     let n = sanitizeName sortN
     in (n ++ minSuffix, n ++ maxSuffix)
