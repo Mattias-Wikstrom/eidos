@@ -26,6 +26,7 @@ library
                     , Eidos.Export.Lean
                     , Eidos.Export.LeanProps
                     , Eidos.Export.LeanAxiomSet
+                    , Eidos.Export.MkAxiomSets
                     , Eidos.BuildMonad 
     hs-source-dirs:   src
     default-language: GHC2021
