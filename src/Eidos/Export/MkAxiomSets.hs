@@ -213,7 +213,7 @@ mkAxiomSets theory = concat
 
   userAssertions =
     [ f | f <- IR.theoryFacts theory
-        , IR.factKind f == IR.FactKindAssertion
+        , IR.factKind f `elem` [IR.FactKindAssertion, IR.FactKindFact]
         , not (IR.factIsInherited f)
         , not (IR.factIsMereologicalTranslation f)
         ]
@@ -1076,10 +1076,9 @@ mkAxiomSets theory = concat
 
 propExprToLean :: IR.ResolvedPropExpr -> LeanExpr
 propExprToLean (IR.ResolvedPropBicond lhs rests) =
-  case rests of
-    []    -> rightImplToLean lhs
-    (r:_) -> LBicond (rightImplToLean lhs)
-                     (rightImplToLean (IR.resolvedPropRestRight r))
+  foldl (\acc r -> LBicond acc (rightImplToLean (IR.resolvedPropRestRight r)))
+        (rightImplToLean lhs)
+        rests
 
 rightImplToLean :: IR.ResolvedRightImpl -> LeanExpr
 rightImplToLean (IR.ResolvedRightImpl lhs Nothing) = leftImplToLean lhs
@@ -1157,12 +1156,19 @@ applyRelOp :: LeanExpr -> IR.ResolvedRelationFollowedByTerm -> LeanExpr
 applyRelOp leftExpr rfbt =
   let op    = IR.resolvedRFTOp rfbt
       right = termToLean (IR.resolvedRFTRight rfbt)
+      qual  = IR.resolvedRFTSortQual rfbt
   in case op of
        "+"  -> LConj   leftExpr right
        "×"  -> LDisj   leftExpr right
        "-"  -> LImpl   right leftExpr
        "∸"  -> LBicond leftExpr right
-       "="  -> LBicond leftExpr right
+       "="  -> case qual of
+                 Just (IR.ResolvedOptionalSortExpr "^" s) ->
+                   let lo  = LVar (resolveName (IR.mereoName (IR.sortMin s)))
+                       hi  = LVar (resolveName (IR.mereoName (IR.sortMax s)))
+                   in LBicond (LProjectIntoInterval leftExpr lo hi)
+                              (LProjectIntoInterval right     lo hi)
+                 _ -> LBicond leftExpr right
        "≤"  -> LImpl   leftExpr right
        "∪"  -> LConj   leftExpr right
        "∩"  -> LDisj   leftExpr right
@@ -1226,4 +1232,19 @@ baseTermToLean (IR.ResolvedBTProjectionToInterval pti) =
       x  = termToLean (IR.resolvedPTIOperand pti)
   in LProjectIntoInterval x lo hi
 baseTermToLean (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
-  termToLean (IR.resolvedGSPOperand gsp)
+  let sym     = IR.resolvedGSPSymbol gsp
+      operand = termToLean (IR.resolvedGSPOperand gsp)
+  in case IR.resolvedGSPVar gsp of
+       Left vd ->
+         let varN     = IR.resolvedVarName vd
+             sn       = IR.sortName (IR.resolvedVarSort vd)
+             (lo, hi) = sortBounds sn
+         in case sym of
+              "Σ" -> LBoundedForall varN lo hi operand
+              "Π" -> LExists varN (LVar "Prop")
+                       (LImpl (LIsWithinBounds lo varN hi) operand)
+              _   -> operand   -- unknown symbol: fall back to operand
+       Right _bareVar ->
+         -- Bare (untyped) binder: no sort information available,
+         -- emit the operand unchanged (same as the pre-fix behaviour).
+         operand
