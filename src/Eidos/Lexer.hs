@@ -204,8 +204,11 @@ kwPropositions = symbol "ℙ"
 -- | Plain identifier: [a-zA-Z_][a-zA-Z0-9_]*
 --   Rejects structural keywords so that e.g. "sort = x" cannot parse
 --   "sort" as a term-level constant.
+--   Also rejects Σ and Π, which are reserved as generalized sum/product
+--   operators and must be followed by a typed binder.
 ident :: Parser String
 ident = lexeme $ try $ do
+  notFollowedBy (char 'Σ' <|> char 'Π')
   h <- letterChar <|> char '_'
   t <- many (alphaNumChar <|> char '_')
   let w = h : t

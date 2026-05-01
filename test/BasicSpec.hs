@@ -141,7 +141,7 @@ main = hspec $ do
                     [x : Q][y ⊆ Q](y ⊆ y)↔(y = y);
                     [x : S][y : S] f(y, x) =_S f(x, y);
                     ⊥ ∨ ¬sub.⊤;
-                    [y : S] (f(f(y, y), y) ⊆ f(f(y, y), Σy(y)));
+                    [y : S] (f(f(y, y), y) ⊆ f(f(y, y), Σy : S(y)));
                     [x : S] f(x, x)=sub.h(x);
                     ¬⊥;
                     [x : S] ⊥ ∨ ¬x⊆x ∨ x≤x ∧ ¬sub.h(x)=sub.h(x) ∧ ¬sub.h(x)=sub.h(x);
@@ -238,6 +238,12 @@ main = hspec $ do
       
       it "parses generalized product" $
         parseString "{ axioms { assertions { Πx:S(x); } } }" `shouldSatisfy` isRight
+
+      it "rejects Σ with a bare (untyped) binder — sort annotation is required" $
+        parseString "{ axioms { assertions { Σx(x); } } }" `shouldSatisfy` isLeft
+
+      it "rejects Π with a bare (untyped) binder — sort annotation is required" $
+        parseString "{ axioms { assertions { Πx(x); } } }" `shouldSatisfy` isLeft
 
     describe "Error handling" $ do
       it "fails on malformed function declaration" $

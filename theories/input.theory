@@ -24,7 +24,7 @@
             [x : Q][Y ⊆ Q](Y ⊆ Y)↔(Y ⊆ Y);
             [x : S][y : S] f(y, x) =_S f(x, y);
             ⊥ ∨ ¬sub.⊤;
-            [y : S] (f(f(y, y), y) ⊆ f(f(y, y), Σy(y)));
+            [y : S] (f(f(y, y), y) ⊆ f(f(y, y), Σy:𝔻(y)));
             [x : S] x = x;
             ¬⊥;
             //[x : S] ⊥ ∨ ¬x⊆x ∨ x≤x ∧ ¬sub.h(x)=sub.h(x) ∧ ¬sub.h(x)=sub.h(x);

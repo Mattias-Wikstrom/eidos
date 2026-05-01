@@ -502,22 +502,20 @@ pProjectionToInterval = do
   op <- between lparen rparen pTerm
   return $ ProjectionToInterval lo hi op
 
--- | Σ or Π followed by a bound variable, then a parenthesised body.
+-- | Σ or Π followed by a typed bound variable, then a parenthesised body.
 --
--- Valid forms:
---   Sy(body)       -- bare identifier (must not be immediately followed by '(')
---   Sz : D (body)  -- typed VarDecl
+-- Valid form:
+--   Σz : S (body)  -- typed VarDecl, sort annotation required
+--   Πz : S (body)
 --
--- S(body) with no bound variable is rejected: bareId requires the next
--- char not be '(' so that S(x) fails cleanly.
+-- A bare identifier without a sort annotation (e.g. Σy(body)) is not
+-- syntactically well-formed and is rejected.
 pGeneralizedSumOrProduct :: Parser GeneralizedSumOrProduct
 pGeneralizedSumOrProduct = do
   sym <- try generSumSym <|> generProdSym
-  v   <- (Left <$> try pTypedVarDecl) <|> (Right <$> bareId)
+  v   <- Left <$> pTypedVarDecl
   op  <- between lparen rparen pTerm
   return $ GeneralizedSumOrProduct sym v op
-  where
-    bareId = ident
 
 -- | VarDecl without the surrounding brackets — used inside Σ/Π.
 pTypedVarDecl :: Parser VarDecl

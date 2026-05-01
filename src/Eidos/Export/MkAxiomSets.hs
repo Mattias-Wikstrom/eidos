@@ -1244,7 +1244,10 @@ baseTermToLean (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
               "Π" -> LExists varN (LVar "Prop")
                        (LImpl (LIsWithinBounds lo varN hi) operand)
               _   -> operand   -- unknown symbol: fall back to operand
-       Right _bareVar ->
-         -- Bare (untyped) binder: no sort information available,
-         -- emit the operand unchanged (same as the pre-fix behaviour).
-         operand
+       Right bareVar ->
+         -- A bare (untyped) binder for Σ/Π is not syntactically well-formed:
+         -- a sort must always be specified.  If this branch is reached it
+         -- indicates a bug in the parser or IR construction.
+         error ("baseTermToLean: GeneralizedSumOrProduct with bare binder '"
+                ++ bareVar ++ "' for symbol '" ++ sym
+                ++ "' — sort annotation is required")
