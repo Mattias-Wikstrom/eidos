@@ -1029,7 +1029,7 @@ mkAxiomSets theory = concat
         let fN  = IR.funcName f
             dMx = domMaxName f
             dMn = domMinName f
-        in axiomSet [SFunction fN, STuple] (tags [TagSort, TagFOLFunction, TagTuple, TagOrdering])
+        in axiomSet [SFunction fN, STuple] (tags [TagSort, TagFunction, TagFOLFunction, TagTuple, TagOrdering])
              [ LeanAxiom (fN ++ "_dom_upper")   (LImpl uMax (LVar dMx))
              , LeanAxiom (fN ++ "_dom_ordering") (LImpl (LVar dMx) (LVar dMn))
              , LeanAxiom (fN ++ "_dom_lower")   (LImpl (LVar dMn) pMax)
