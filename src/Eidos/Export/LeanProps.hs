@@ -21,7 +21,7 @@
 -- * @+, ×, ∸@ map to @∧, ∨, ↔@.
 -- * Assertions are wrapped with @P_Min@; metafacts with @U_Min@.
 module Eidos.Export.LeanProps
-  ( -- * Internal representation
+  ( -- * Internal representation (re-exported from Eidos.Export.LeanExpr)
     LeanDoc (..)
   , LeanDecl (..)
   , LeanAxiom (..)
@@ -35,49 +35,7 @@ module Eidos.Export.LeanProps
   ) where
 
 import qualified Eidos.IR as IR
-
--- ---------------------------------------------------------------------------
--- Internal representation
--- ---------------------------------------------------------------------------
-
--- | A complete Lean 4 document ready to be printed.
-data LeanDoc = LeanDoc
-  { leanDocTheoryName :: String
-  , leanDocDecls      :: [LeanDecl]
-  } deriving (Eq, Show)
-
--- | A single top-level item in a Lean 4 file.
-data LeanDecl
-  = DeclComment  String       -- ^ @-- comment@
-  | DeclBlankLine              -- ^ empty line
-  | DeclAxiom    LeanAxiom    -- ^ @axiom name : body@
-  deriving (Eq, Show)
-
--- | An @axiom@ statement with a name and a type expression.
-data LeanAxiom = LeanAxiom
-  { axiomName :: String
-  , axiomType :: LeanExpr
-  } deriving (Eq, Show)
-
--- | A Lean 4 proposition (the expression language we need).
-data LeanExpr
-  = LProp                              -- ^ @Prop@
-  | LVar   String                      -- ^ atomic name
-  | LApp   LeanExpr [LeanExpr]         -- ^ function application
-  | LImpl  LeanExpr LeanExpr           -- ^ @A → B@
-  | LConj  LeanExpr LeanExpr           -- ^ @A ∧ B@
-  | LDisj  LeanExpr LeanExpr           -- ^ @A ∨ B@
-  | LBicond LeanExpr LeanExpr          -- ^ @A ↔ B@
-  | LForall String LeanExpr LeanExpr   -- ^ @∀ x : T, body@
-  | LForallKw String LeanExpr LeanExpr -- ^ @forall x : T, body@ (keyword style)
-  | LExists String LeanExpr LeanExpr   -- ^ @∃ x : T, body@
-  | LEq LeanExpr LeanExpr              -- ^ @A = B@
-  | LIsWithinBounds String String String
-    -- ^ @IsWithinBounds lo var hi@ — bounded-membership guard
-  | LProjectIntoInterval LeanExpr LeanExpr LeanExpr
-    -- ^ @ProjectIntoInterval x lo hi@ — interval projection
-  deriving (Eq, Show)
-
+import Eidos.Export.LeanExpr
 
 -- ---------------------------------------------------------------------------
 -- Naming conventions
@@ -130,11 +88,17 @@ sanitizeName = map (\c -> if c == '#' then '_' else c)
 -- Stage 1 – Theory → LeanDoc
 -- ---------------------------------------------------------------------------
 
+-- | Prepend a blank line to a non-empty list of decls, producing a visually
+--   separated section.  Empty lists are left empty (no spurious blank lines).
+section :: [LeanDecl] -> [LeanDecl]
+section [] = []
+section ds = DeclBlankLine : ds
+
 -- | Convert an Eidos 'IR.Theory' into a structured 'LeanDoc'.
 theoryToLeanDoc :: IR.Theory -> LeanDoc
 theoryToLeanDoc theory = LeanDoc
   { leanDocTheoryName = IR.theoryFullyQualifiedName theory
-  , leanDocDecls      = interleaveBlankLines
+  , leanDocDecls      = concatMap section
       [ headerDecls
       , userSortLimitDecls
       , productSortLimitDecls
@@ -180,14 +144,12 @@ theoryToLeanDoc theory = LeanDoc
       ]
   }
   where
-    -- | Interleave non-empty lists with blank lines
-    interleaveBlankLines :: [[LeanDecl]] -> [LeanDecl]
-    interleaveBlankLines [] = []
-    interleaveBlankLines [xs] = xs
-    interleaveBlankLines (xs:ys:rest)
-      | null xs   = interleaveBlankLines (ys:rest)
-      | null ys   = interleaveBlankLines (xs:rest)
-      | otherwise = xs ++ [DeclBlankLine] ++ interleaveBlankLines (ys:rest)
+    -- | Smart constructor for bounded universal quantification.
+    -- Replaces the verbose pattern:
+    --   LForallKw var LProp (LImpl (LIsWithinBounds lo var hi) body)
+    -- with a single, introspectable node.
+    bForall :: String -> String -> String -> LeanExpr -> LeanExpr
+    bForall = LBoundedForall
 
     usesDomain :: Bool
     usesDomain = IR.theoryUsesDomain theory
@@ -289,12 +251,8 @@ theoryToLeanDoc theory = LeanDoc
               lhs     = LImpl (LVar "Y") fX       -- f(X) ⊆ Y
               rhs     = LImpl fInvY (LVar "X")     -- X ⊆ f_inv(Y)
               body    = LBicond lhs rhs
-              innerQ  = LForallKw "Y" LProp
-                          (LImpl (LIsWithinBounds (sortMinName resSort) "Y" (sortMaxName resSort))
-                                 body)
-              outerQ  = LForallKw "X" LProp
-                          (LImpl (LIsWithinBounds (sortMinName argSort) "X" (sortMaxName argSort))
-                                 innerQ)
+              innerQ  = bForall "Y" (sortMinName resSort) (sortMaxName resSort) body
+              outerQ  = bForall "X" (sortMinName argSort) (sortMaxName argSort) innerQ
           in DeclAxiom (LeanAxiom (fN ++ "_adjunction") outerQ)
 
     -- Synthetic arg/res object declarations for _inv functions.
@@ -354,12 +312,8 @@ theoryToLeanDoc theory = LeanDoc
                               (LEq (LVar "X2") (LVar nr))
               rhsEq   = LEq (LVar "X2") (LApp (LVar fInv) [LVar "X1"])
               body    = LBicond lhsConj rhsEq
-              q2      = LForallKw "X2" LProp
-                          (LImpl (LIsWithinBounds (sortMinName argSort) "X2" (sortMaxName argSort))
-                                 body)
-              q1      = LForallKw "X1" LProp
-                          (LImpl (LIsWithinBounds (sortMinName resSort) "X1" (sortMaxName resSort))
-                                 q2)
+              q2      = bForall "X2" (sortMinName argSort) (sortMaxName argSort) body
+              q1      = bForall "X1" (sortMinName resSort) (sortMaxName resSort) q2
           in DeclAxiom (LeanAxiom (fInv ++ "_fact") q1)
 
     -- -----------------------------------------------------------------------
@@ -488,12 +442,8 @@ theoryToLeanDoc theory = LeanDoc
                                  (LEq (LVar "B") (LVar resN))
                   rhs    = LEq (LVar "B") (LApp (LVar (dirImgName f)) [LVar "A"])
                   body   = LBicond lhs rhs
-                  qB     = LForallKw "B" LProp
-                             (LImpl (LIsWithinBounds (sortMinName rSN) "B" (sortMaxName rSN))
-                                    body)
-                  qA     = LForallKw "A" LProp
-                             (LImpl (LIsWithinBounds dMn "A" dMx)
-                                    qB)
+                  qB     = bForall "B" (sortMinName rSN) (sortMaxName rSN) body
+                  qA     = bForall "A" dMn dMx qB
               in [DeclAxiom (LeanAxiom (dirImgName f ++ "_fact") qA)]
 
     -- (8) f_inv_img_fact: similar fact for the inverse image function
@@ -537,11 +487,8 @@ theoryToLeanDoc theory = LeanDoc
                            (LEq (LVar "B") (LVar resN))
               rhs  = LEq (LVar "B") (LApp (LVar fN) [LVar "A"])
               body = LBicond lhs rhs
-              qB   = LForallKw "B" LProp
-                       (LImpl (LIsWithinBounds dMn "B" dMx) body)
-              qA   = LForallKw "A" LProp
-                       (LImpl (LIsWithinBounds (sortMinName rSN) "A" (sortMaxName rSN))
-                              qB)
+              qB   = bForall "B" dMn dMx body
+              qA   = bForall "A" (sortMinName rSN) (sortMaxName rSN) qB
           in DeclAxiom (LeanAxiom (fN ++ "_fact") qA)
 
     -- (9) Adjunction between f_dir_img and f_inv_img:
@@ -563,11 +510,8 @@ theoryToLeanDoc theory = LeanDoc
               lhs   = LImpl (LVar "Y") dirX   -- dir_img(X) ⊆ Y
               rhs   = LImpl invY (LVar "X")   -- X ⊆ inv_img(Y)
               body  = LBicond lhs rhs
-              qY    = LForallKw "Y" LProp
-                        (LImpl (LIsWithinBounds (sortMinName rSN) "Y" (sortMaxName rSN))
-                               body)
-              qX    = LForallKw "X" LProp
-                        (LImpl (LIsWithinBounds dMn "X" dMx) qY)
+              qY    = bForall "Y" (sortMinName rSN) (sortMaxName rSN) body
+              qX    = bForall "X" dMn dMx qY
           in DeclAxiom (LeanAxiom (IR.funcName f ++ "_image_adjunction") qX)
 
     -- (10) Decomposition axiom:
@@ -588,9 +532,7 @@ theoryToLeanDoc theory = LeanDoc
               body     = LEq fApp dirApp
               quantified =
                 foldr (\(varN, sN) acc ->
-                          LForallKw varN LProp
-                            (LImpl (LIsWithinBounds (sortMinName sN) varN (sortMaxName sN))
-                                   acc))
+                          bForall varN (sortMinName sN) (sortMaxName sN) acc)
                       body
                       (zip varNs argSNs)
           in DeclAxiom (LeanAxiom (fN ++ "_decomposition") quantified)
@@ -627,11 +569,9 @@ theoryToLeanDoc theory = LeanDoc
                   rhsEq    = LEq (LVar resVar) tupleApp
                   body     = LBicond lhsConj rhsEq
                   mkArgQ (varN, sN) acc =
-                    LForallKw varN LProp
-                      (LImpl (LIsWithinBounds (sortMinName sN) varN (sortMaxName sN)) acc)
+                    bForall varN (sortMinName sN) (sortMaxName sN) acc
                   resQ acc =
-                    LForallKw resVar LProp
-                      (LImpl (LIsWithinBounds dMn resVar dMx) acc)
+                    bForall resVar dMn dMx acc
                   quantified =
                     foldr mkArgQ (resQ body) (zip argVars (map IR.sortName argSorts))
               in [DeclAxiom (LeanAxiom (tupleName f ++ "_fact") quantified)]
@@ -696,11 +636,8 @@ theoryToLeanDoc theory = LeanDoc
                                (LEq (LVar "X2") (LVar nr))
                   rhs  = LEq (LVar "X2") (LApp (LVar (piName f k)) [LVar "X1"])
                   body = LBicond lhs rhs
-                  qX2  = LForallKw "X2" LProp
-                           (LImpl (LIsWithinBounds (sortMinName sN) "X2" (sortMaxName sN))
-                                  body)
-                  qX1  = LForallKw "X1" LProp
-                           (LImpl (LIsWithinBounds dMn "X1" dMx) qX2)
+                  qX2  = bForall "X2" (sortMinName sN) (sortMaxName sN) body
+                  qX1  = bForall "X1" dMn dMx qX2
               in DeclAxiom (LeanAxiom (piName f k ++ "_fact") qX1)
 
     -- Helper: inverse projection function name for the k-th argument (1-based)
@@ -742,11 +679,8 @@ theoryToLeanDoc theory = LeanDoc
                   lhs   = LImpl (LVar "Y") piX       -- f_pi_k(X) ⊆ Y
                   rhs   = LImpl piInvY (LVar "X")    -- X ⊆ f_pi_k_inv(Y)
                   body  = LBicond lhs rhs
-                  qY    = LForallKw "Y" LProp
-                            (LImpl (LIsWithinBounds (sortMinName sN) "Y" (sortMaxName sN))
-                                   body)
-                  qX    = LForallKw "X" LProp
-                            (LImpl (LIsWithinBounds dMn "X" dMx) qY)
+                  qY    = bForall "Y" (sortMinName sN) (sortMaxName sN) body
+                  qX    = bForall "X" dMn dMx qY
               in DeclAxiom (LeanAxiom (piN ++ "_adjunction") qX)
 
     -- (15) f_tuple_inv_decomposition: connects f_tuple to the inverse projections.
@@ -772,9 +706,7 @@ theoryToLeanDoc theory = LeanDoc
               body     = LEq tupleApp meetExpr
               quantified =
                 foldr (\(varN, sN) acc ->
-                          LForallKw varN LProp
-                            (LImpl (LIsWithinBounds (sortMinName sN) varN (sortMaxName sN))
-                                   acc))
+                          bForall varN (sortMinName sN) (sortMaxName sN) acc)
                       body
                       (zip varNs argSNs)
           in DeclAxiom (LeanAxiom (tupleName f ++ "_inv_decomposition") quantified)
@@ -815,8 +747,7 @@ theoryToLeanDoc theory = LeanDoc
               tupleApp = LApp (LVar tupN) piApps
               irZ    = LApp (LVar irN) [LVar "Z"]
               body   = LBicond irZ (LEq (LVar "Z") tupleApp)
-              qZ     = LForallKw "Z" LProp
-                         (LImpl (LIsWithinBounds dMn "Z" dMx) body)
+              qZ     = bForall "Z" dMn dMx body
           in DeclAxiom (LeanAxiom (irN ++ "_tuple_with_projections") qZ)
 
     irProjectionsFromTupleAxioms :: [LeanDecl]
@@ -837,9 +768,7 @@ theoryToLeanDoc theory = LeanDoc
               body     = LBicond irTuple rhsConj
               quantified =
                 foldr (\(varN, sN) acc ->
-                          LForallKw varN LProp
-                            (LImpl (LIsWithinBounds (sortMinName sN) varN (sortMaxName sN))
-                                   acc))
+                          bForall varN (sortMinName sN) (sortMaxName sN) acc)
                       body
                       (zip varNs argSNs)
           in DeclAxiom (LeanAxiom (irPredicateName f ++ "_projections_from_tuple") quantified)
@@ -858,13 +787,10 @@ theoryToLeanDoc theory = LeanDoc
               body  = LBicond (LImpl (LVar "X") (LVar "Z"))
                               (LImpl (LVar "Y") (LVar "Z"))
               inner = LImpl irZ body
-              qZ    = LForallKw "Z" LProp
-                        (LImpl (LIsWithinBounds dMn "Z" dMx) inner)
+              qZ    = bForall "Z" dMn dMx inner
               sep   = LBicond (LEq (LVar "X") (LVar "Y")) qZ
-              qY    = LForallKw "Y" LProp
-                        (LImpl (LIsWithinBounds dMn "Y" dMx) sep)
-              qX    = LForallKw "X" LProp
-                        (LImpl (LIsWithinBounds dMn "X" dMx) qY)
+              qY    = bForall "Y" dMn dMx sep
+              qX    = bForall "X" dMn dMx qY
           in DeclAxiom (LeanAxiom (irPredicateName f ++ "_separates") qX)
     -- separately via folInverseArgResDecls / folInverseArgResBoundsAxioms.
     userDeclaredFolFunctions :: [IR.Function]
@@ -904,13 +830,8 @@ theoryToLeanDoc theory = LeanDoc
     functionFactAxioms :: [LeanDecl]
     functionFactAxioms = concatMap mkFunctionFact (solFunctions ++ userDeclaredFolFunctions)
       where
-        -- Build: forall X : Prop, (IsWithinBounds lo hi X) → <rest>
         mkBoundedForall :: String -> String -> LeanExpr -> LeanExpr
-        mkBoundedForall varN sortN rest =
-          let lo = sortMinName sortN
-              hi = sortMaxName sortN
-          in LForallKw varN LProp
-               (LImpl (LIsWithinBounds lo varN hi) rest)
+        mkBoundedForall varN sortN = bForall varN (sortMinName sortN) (sortMaxName sortN)
 
         mkFunctionFact f =
           let fName    = IR.funcName f
@@ -1075,6 +996,7 @@ theoryToLeanDoc theory = LeanDoc
                  ]
             else [])
       ++ concatMap userSortOrderAxioms userSorts
+      ++ [DeclBlankLine]
       where
         userSortOrderAxioms s =
           let sortName = IR.sortName s
@@ -1144,17 +1066,16 @@ varDeclToForall :: IR.ResolvedVarDecl -> LeanExpr -> LeanExpr
 varDeclToForall vd body =
   let varN = IR.resolvedVarName vd
       sn   = IR.sortName (IR.resolvedVarSort vd)
-  in LForall varN (LVar "Prop") (addBoundedGuard sn varN body)
+      (lo, hi) = sortBounds sn
+  in LBoundedForall varN lo hi body
 
--- | For built-in sorts, add the membership-guard @IsWithinBounds lo var hi → body@.
--- For user-defined sorts, adds the same using the sort's Min/Max limits.
-addBoundedGuard :: String -> String -> LeanExpr -> LeanExpr
-addBoundedGuard sortN varN body =
-  case sortN of
-    "ℙ" -> LImpl (LIsWithinBounds pMinName varN pMaxName) body
-    "𝕌" -> LImpl (LIsWithinBounds uMinName varN uMaxName) body
-    "𝔻" -> LImpl (LIsWithinBounds dMinName varN dMaxName) body
-    _   -> LImpl (LIsWithinBounds (sortN ++ minSuffix) varN (sortN ++ maxSuffix)) body
+-- | Resolve a sort name to its (lo, hi) bound names.
+sortBounds :: String -> (String, String)
+sortBounds sortN = case sortN of
+  "ℙ" -> (pMinName, pMaxName)
+  "𝕌" -> (uMinName, uMaxName)
+  "𝔻" -> (dMinName, dMaxName)
+  _   -> (sortN ++ minSuffix, sortN ++ maxSuffix)
 
 -- ---------------------------------------------------------------------------
 -- Converting IR prop-expressions to LeanExpr
@@ -1209,13 +1130,14 @@ quantifiedToLean (IR.ResolvedQuantified qs atom) =
 
 quantifierToLean :: IR.ResolvedQuantifier -> LeanExpr -> LeanExpr
 quantifierToLean (IR.ResolvedQForall vd) body =
-  let varN = IR.resolvedVarName vd
-      sn   = IR.sortName (IR.resolvedVarSort vd)
-  in LForall varN (LVar "Prop") (addBoundedGuard sn varN body)
+  let varN    = IR.resolvedVarName vd
+      sn      = IR.sortName (IR.resolvedVarSort vd)
+      (lo, hi) = sortBounds sn
+  in LBoundedForall varN lo hi body
 quantifierToLean (IR.ResolvedQExists vd) body =
   let varN = IR.resolvedVarName vd
       sn   = IR.sortName (IR.resolvedVarSort vd)
-  in LExists varN (LVar "Prop") (addBoundedGuard sn varN body)
+  in LExists varN (LVar "Prop") (LImpl (LIsWithinBounds (fst (sortBounds sn)) varN (snd (sortBounds sn))) body)
 
 atomicPropToLean :: IR.ResolvedAtomicProp -> LeanExpr
 atomicPropToLean (IR.ResolvedAtomicConstant ref) = 
@@ -1338,54 +1260,6 @@ baseTermToLean (IR.ResolvedBTProjectionToInterval pti) =
   in LProjectIntoInterval x lo hi
 baseTermToLean (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
   termToLean (IR.resolvedGSPOperand gsp)
-
--- ---------------------------------------------------------------------------
--- Stage 2 – LeanDoc -> String
--- ---------------------------------------------------------------------------
-
--- | Render a 'LeanDoc' to Lean 4 source text.
-renderLeanDoc :: LeanDoc -> String
-renderLeanDoc doc =
-  unlines $
-       [ "-- Generated by Eidos compiler"
-       , "-- Theory: " ++ leanDocTheoryName doc
-       , ""
-       , "def IsWithinBounds (lo hi x : Prop) : Prop := (hi → x) ∧ (x → lo)"
-       , "def ProjectIntoInterval (x lo hi : Prop) : Prop := (x ∧ lo) ∨ hi"
-       , ""
-       ]
-    ++ map renderDecl (leanDocDecls doc)
-
-renderDecl :: LeanDecl -> String
-renderDecl DeclBlankLine        = ""
-renderDecl (DeclComment c)      = "-- " ++ c
-renderDecl (DeclAxiom ax)       = renderAxiom ax
-
-renderAxiom :: LeanAxiom -> String
-renderAxiom (LeanAxiom name ty) =
-  "axiom " ++ name ++ ": " ++ renderLeanExpr ty
-
--- | Render a 'LeanExpr' to a Lean 4 string.
-renderLeanExpr :: LeanExpr -> String
-renderLeanExpr LProp          = "Prop"
-renderLeanExpr (LVar n)       = n
-renderLeanExpr (LApp f args)  = "(" ++ renderLeanExpr f ++ " " ++ unwords (map renderLeanExpr args) ++ ")"
-renderLeanExpr (LImpl a b)    = "(" ++ renderLeanExpr a ++ " → " ++ renderLeanExpr b ++ ")"
-renderLeanExpr (LConj a b)    = "(" ++ renderLeanExpr a ++ " ∧ " ++ renderLeanExpr b ++ ")"
-renderLeanExpr (LDisj a b)    = "(" ++ renderLeanExpr a ++ " ∨ " ++ renderLeanExpr b ++ ")"
-renderLeanExpr (LBicond a b)  = "(" ++ renderLeanExpr a ++ " ↔ " ++ renderLeanExpr b ++ ")"
-renderLeanExpr (LForall x ty body) =
-  "∀ " ++ x ++ " : " ++ renderLeanExpr ty ++ ", " ++ renderLeanExpr body
-renderLeanExpr (LForallKw x ty body) =
-  "forall " ++ x ++ " : " ++ renderLeanExpr ty ++ ", " ++ renderLeanExpr body
-renderLeanExpr (LExists x ty body) =
-  "∃ " ++ x ++ " : " ++ renderLeanExpr ty ++ ", " ++ renderLeanExpr body
-renderLeanExpr (LEq a b) =
-  renderLeanExpr a ++ " = " ++ renderLeanExpr b
-renderLeanExpr (LIsWithinBounds lo v hi) =
-  "(IsWithinBounds " ++ lo ++ " " ++ hi ++ " " ++ v ++ ")"
-renderLeanExpr (LProjectIntoInterval x lo hi) =
-  "(ProjectIntoInterval " ++ renderLeanExpr x ++ " " ++ renderLeanExpr lo ++ " " ++ renderLeanExpr hi ++ ")"
 
 -- ---------------------------------------------------------------------------
 -- Convenience entry point

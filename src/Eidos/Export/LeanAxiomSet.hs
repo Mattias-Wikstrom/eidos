@@ -71,12 +71,11 @@ import Eidos.Export.LeanProps (LeanAxiom)
 -- tags.  The smart constructor 'tags' will reject combinations that violate
 -- the constraint that sub-entity tags (@TagImage@, @TagProjection@, etc.)
 -- must co-occur with @TagFunction@.
-data Tag
+data Tag = TagSort
   -- -----------------------------------------------------------------------
   -- Entity-kind tags  (what kind of theory entity is involved?)
   -- -----------------------------------------------------------------------
-
-  | TagSort
+  
     -- ^ Concerns a sort (including product-domain sorts like @f_dom@).
   | TagSet
     -- ^ Concerns a set declared with @S1 ⊆ S@.

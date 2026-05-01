@@ -408,23 +408,23 @@ main = hspec $ do
   describe "theoryToLeanDoc – universal quantifier in facts" $ do
   -- =========================================================================
 
-    it "renders [X : ℙ] body as LForall X Prop ..." $ do
+    it "renders [X : ℙ] body as LBoundedForall X P_Min P_Max ..." $ do
       doc <- buildStr [r|{
         axioms { assertions { [X : ℙ] (X → ¬¬X); } }
       }|]
       hasWrappedFactWith doc pMin (\case
-        LForall "X" (LVar "Prop") _ -> True
-        _                           -> False)
+        LBoundedForall "X" "P_Min" "P_Max" _ -> True
+        _                                    -> False)
         `shouldBe` True
 
-    it "renders [X : 𝕌] body as LForall X Prop ..." $ do
+    it "renders [X : 𝕌] body as LBoundedForall X U_Min U_Max ..." $ do
       doc <- buildStr [r|{
         signature { A : 𝕌; },
         axioms { metafacts { [X : 𝕌] (A - (A - X)) - X; } }
       }|]
       hasWrappedFactWith doc uMin (\case
-        LForall "X" (LVar "Prop") _ -> True
-        _                           -> False)
+        LBoundedForall "X" "U_Min" "U_Max" _ -> True
+        _                                    -> False)
         `shouldBe` True
 
     it "bounded guard for ℙ-quantifier uses IsWithinBounds P_Min X P_Max" $ do
@@ -432,8 +432,7 @@ main = hspec $ do
         axioms { assertions { [X : ℙ] (X → ¬¬X); } }
       }|]
       hasWrappedFactWith doc pMin (\case
-        LForall "X" (LVar "Prop")
-          (LImpl (LIsWithinBounds "P_Min" "X" "P_Max") _) -> True
+        LBoundedForall "X" "P_Min" "P_Max" _ -> True
         _ -> False)
         `shouldBe` True
 
@@ -443,8 +442,7 @@ main = hspec $ do
         axioms { metafacts { [X : 𝕌] (A - (A - X)) - X; } }
       }|]
       hasWrappedFactWith doc uMin (\case
-        LForall "X" (LVar "Prop")
-          (LImpl (LIsWithinBounds "U_Min" "X" "U_Max") _) -> True
+        LBoundedForall "X" "U_Min" "U_Max" _ -> True
         _ -> False)
         `shouldBe` True
         
@@ -454,8 +452,7 @@ main = hspec $ do
         axioms { assertions { [X : S] (X ↔ X); } }
       }|]
       hasWrappedFactWith doc pMin (\case
-        LForall "X" (LVar "Prop")
-          (LImpl (LIsWithinBounds "S_Min" "X" "S_Max") _) -> True
+        LBoundedForall "X" "S_Min" "S_Max" _ -> True
         _ -> False)
         `shouldBe` True
 

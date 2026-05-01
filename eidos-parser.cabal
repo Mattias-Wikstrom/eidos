@@ -17,6 +17,7 @@ library
                     , Eidos.Parser
                     , Eidos.FromSyntax
                     , Eidos.IR
+                    , Eidos.Export.LeanExpr
                     , Eidos.Pretty
                     , Eidos.DebugIR
                     , Eidos.TypeCheck
