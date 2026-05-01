@@ -2,17 +2,13 @@
 Things to Be Done
 =================
 
-* Support for non-propositional Lean 4 output.
+* Check for language constructs that are ignored at the moment.
 
 * Check if the output can be written in a more abstract way on the Lean 4 side.
 
 * All objects in the output for a theory have to fall within the limits of the universe of the theory.
 
-* Check for language constructs that are ignored at the moment.
-
 * Check that the function code works with implicit and named subtheories.
-
-* #dom is not supported at the moment. Check that #1, #2, and #arg work.
 
 * The current Lean 4 output does not work correctly for quotient sorts or subsorts.
 
@@ -23,15 +19,11 @@ Things to Be Done
 * Make sure this is rejected as ill-typed:
     [X : S] (IdS(X) = X);
 
-* There is already information in a theory on whether it uses D and/or P. Only include D/P in the output if it is used.
-
 * The notation [x : S][y: T]some_expr for free variables was chosen to simplify parsing, not for any deep reasons. A better notation might be this: x : S, y: T, some_expr .
 
 * Support for reflection is not done by any means. What exists now is likely to be full of errors and there are not many unit tests that reflection works as it is supposed to. A separate document should be created with documentation on how reflection is supposed to work.
 
 * Documentation is also needed of all the mereological facts that get generated for a theory.
-
-* The generation of mereological facts needs to be checked. There should be unit tests which verify that the right things are generated.
 
 * The support for FOL functions has not been properly checked. There should be documentation and unit tests. Product sorts, SOL functions, and mereological facts should be generated as expected.
 
@@ -61,11 +53,18 @@ Things to Be Done
   (Note that these restrictions need to be enforced for subtheories as well as the theory itself.) 
 
 PARTLY IMPLEMENTED:
+* The generation of mereological facts needs to be checked. There should be unit tests which verify that the right things are generated.
+
+* Support for non-propositional Lean 4 output.
+
 * A theory should only have 𝔻 ('the domain') if it either uses it or gets it through an implicit import. Same thing for ℙ ('propositions').
+* There is already information in a theory on whether it uses D and/or P. Only include D/P in the output if it is used.
 
 POSSIBLY DONE:
 
 DONE:
+* #dom is not supported at the moment. Check that #1, #2, and #arg work.
+
 * Support for implicit and named subtheories may be done (although it is likely that there are errors or problems with the immediate representation), but documentation is needed on how this is supposed to work.
 
 * Enforce commas/semicolons. There are places in the language where commas/semicolons appear optional at this point and where they should arguably be mandatory. In any case, a decision needs to be taken on this and there needs to be unit tests which ensure that the right things are allowed/disallowed.

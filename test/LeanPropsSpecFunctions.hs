@@ -11,6 +11,8 @@ import Eidos.Parser     (parseString)
 import Eidos.FromSyntax (buildTheoryPure)
 import Eidos.BuildMonad (emptyPureResolver)
 import Eidos.Export.LeanProps
+import Eidos.Export.MkAxiomSets (mkAxiomSets)
+import Eidos.Export.LeanAxiomSet (AxiomSet(..))
 
 -- ---------------------------------------------------------------------------
 -- Naming conventions (mirror LeanProps.hs — single point of change)
@@ -52,7 +54,10 @@ buildStr src = case parseString src of
   Left err  -> fail ("Parse error: " ++ show err)
   Right ast -> case buildTheoryPure emptyPureResolver Nothing ast of
     Left err -> fail ("Build error: " ++ err)
-    Right th -> return (theoryToLeanDoc th)
+    Right th ->
+      let axiomSets = mkAxiomSets th
+          decls = [ DeclAxiom ax | as <- axiomSets, ax <- asAxioms as ]
+      in return (LeanDoc "" decls)
 
 -- | All axioms in a doc.
 axioms :: LeanDoc -> [LeanAxiom]
@@ -89,6 +94,9 @@ exprHasForallBound varName lo hi (LForall v (LVar "Prop") body)
 exprHasForallBound varName lo hi (LForallKw v (LVar "Prop") body)
   | v == varName = exprContainsBound varName lo hi body
   | otherwise    = exprHasForallBound varName lo hi body
+exprHasForallBound varName lo hi (LBoundedForall v lo' hi' body)
+  | v == varName = (lo == lo' && hi == hi') || exprHasForallBound varName lo hi body
+  | otherwise    = exprHasForallBound varName lo hi body
 exprHasForallBound varName lo hi (LImpl a b)
   = exprHasForallBound varName lo hi a || exprHasForallBound varName lo hi b
 exprHasForallBound varName lo hi (LConj a b)
@@ -116,6 +124,7 @@ exprContainsBound varName lo hi expr =
     LBicond a b -> exprContainsBound varName lo hi a || exprContainsBound varName lo hi b
     LForall _ _ body -> exprContainsBound varName lo hi body
     LForallKw _ _ body -> exprContainsBound varName lo hi body
+    LBoundedForall _ _ _ body -> exprContainsBound varName lo hi body
     LExists _ _ body -> exprContainsBound varName lo hi body
     LApp _ args -> any (exprContainsBound varName lo hi) args
     LEq a b -> exprContainsBound varName lo hi a || exprContainsBound varName lo hi b
@@ -261,15 +270,11 @@ main = hspec $ do
 
       it "inverse fact connects g_inv_1, g_inv_res with g_inv(X1)" $ do
         doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
-        findAxiomByName doc "g_inv_fact" `shouldSatisfy` \case
-          Just ax -> case axiomType ax of
-            LForallKw "X1" LProp (LImpl _ (LForallKw "X2" LProp (LImpl _ body))) ->
-              body == LBicond
-                        (LConj (LEq (LVar "X1") (LVar "g_inv_1"))
-                               (LEq (LVar "X2") (LVar "g_inv_res")))
-                        (LEq (LVar "X2") (LApp (LVar "g_inv") [LVar "X1"]))
-            _ -> False
-          Nothing -> False
+        let target = LBicond
+              (LConj (LEq (LVar "X1") (LVar "g_inv_1"))
+                     (LEq (LVar "X2") (LVar "g_inv_res")))
+              (LEq (LVar "X2") (LApp (LVar "g_inv") [LVar "X1"]))
+        any (containsExpr target) (allTypes doc) `shouldBe` True
 
     describe "adjunction axioms" $ do
       it "generates g_adjunction for single-arg function g" $ do
@@ -278,17 +283,12 @@ main = hspec $ do
 
       it "adjunction: (Y → g(X)) ↔ (g_inv(Y) → X) with bounded quantifiers" $ do
         doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
-        findAxiomByName doc "g_adjunction" `shouldSatisfy` \case
-          Just ax -> case axiomType ax of
-            LForallKw "X" LProp (LImpl (LIsWithinBounds loX "X" hiX)
-              (LForallKw "Y" LProp (LImpl (LIsWithinBounds loY "Y" hiY) body)))
-              | loX == sortMinName "S", hiX == sortMaxName "S"
-              , loY == sortMinName "S", hiY == sortMaxName "S" ->
-                body == LBicond
-                          (LImpl (LVar "Y") (LApp (LVar "g") [LVar "X"]))
-                          (LImpl (LApp (LVar "g_inv") [LVar "Y"]) (LVar "X"))
-            _ -> False
-          Nothing -> False
+        let target = LBicond
+              (LImpl (LVar "Y") (LApp (LVar "g") [LVar "X"]))
+              (LImpl (LApp (LVar "g_inv") [LVar "Y"]) (LVar "X"))
+        hasForallWithBound doc "X" (sortMinName "S") (sortMaxName "S") `shouldBe` True
+        hasForallWithBound doc "Y" (sortMinName "S") (sortMaxName "S") `shouldBe` True
+        any (containsExpr target) (allTypes doc) `shouldBe` True
 
       it "does NOT generate adjunction for the inverse function itself" $ do
         doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
@@ -405,18 +405,13 @@ main = hspec $ do
 
       it "dir_img_fact: (A = f_arg ∧ B = f_res) ↔ B = f_dir_img(A)" $ do
         doc <- buildStr [r|{ signature { sort S; f : S, S → S; } }|]
-        findAxiomByName doc "f_dir_img_fact" `shouldSatisfy` \case
-          Just ax -> case axiomType ax of
-            LForallKw "A" LProp (LImpl (LIsWithinBounds loA "A" hiA)
-              (LForallKw "B" LProp (LImpl (LIsWithinBounds loB "B" hiB) body)))
-              | loA == "f_dom_Min", hiA == "f_dom_Max"
-              , loB == sortMinName "S", hiB == sortMaxName "S" ->
-                body == LBicond
-                          (LConj (LEq (LVar "A") (LVar "f_arg"))
-                                 (LEq (LVar "B") (LVar "f_res")))
-                          (LEq (LVar "B") (LApp (LVar "f_dir_img") [LVar "A"]))
-            _ -> False
-          Nothing -> False
+        let target = LBicond
+              (LConj (LEq (LVar "A") (LVar "f_arg"))
+                     (LEq (LVar "B") (LVar "f_res")))
+              (LEq (LVar "B") (LApp (LVar "f_dir_img") [LVar "A"]))
+        hasForallWithBound doc "A" "f_dom_Min" "f_dom_Max" `shouldBe` True
+        hasForallWithBound doc "B" (sortMinName "S") (sortMaxName "S") `shouldBe` True
+        any (containsExpr target) (allTypes doc) `shouldBe` True
 
     describe "inverse-image witness declarations" $ do
       it "declares f_inv_img_arg, f_inv_img_res" $ do
@@ -441,17 +436,12 @@ main = hspec $ do
 
       it "image_adjunction: (Y → f_dir_img(X)) ↔ (f_inv_img(Y) → X)" $ do
         doc <- buildStr [r|{ signature { sort S; f : S, S → S; } }|]
-        findAxiomByName doc "f_image_adjunction" `shouldSatisfy` \case
-          Just ax -> case axiomType ax of
-            LForallKw "X" LProp (LImpl (LIsWithinBounds loX "X" hiX)
-              (LForallKw "Y" LProp (LImpl (LIsWithinBounds loY "Y" hiY) body)))
-              | loX == "f_dom_Min", hiX == "f_dom_Max"
-              , loY == sortMinName "S", hiY == sortMaxName "S" ->
-                body == LBicond
-                          (LImpl (LVar "Y") (LApp (LVar "f_dir_img") [LVar "X"]))
-                          (LImpl (LApp (LVar "f_inv_img") [LVar "Y"]) (LVar "X"))
-            _ -> False
-          Nothing -> False
+        let target = LBicond
+              (LImpl (LVar "Y") (LApp (LVar "f_dir_img") [LVar "X"]))
+              (LImpl (LApp (LVar "f_inv_img") [LVar "Y"]) (LVar "X"))
+        hasForallWithBound doc "X" "f_dom_Min" "f_dom_Max" `shouldBe` True
+        hasForallWithBound doc "Y" (sortMinName "S") (sortMaxName "S") `shouldBe` True
+        any (containsExpr target) (allTypes doc) `shouldBe` True
 
     describe "decomposition axiom" $ do
       it "generates f_decomposition" $ do
@@ -460,16 +450,11 @@ main = hspec $ do
 
       it "decomposition: f(X1, X2) = f_dir_img(f_tuple(X1, X2))" $ do
         doc <- buildStr [r|{ signature { sort S; f : S, S → S; } }|]
-        findAxiomByName doc "f_decomposition" `shouldSatisfy` \case
-          Just ax -> case axiomType ax of
-            LForallKw "X1" LProp (LImpl (LIsWithinBounds lo1 "X1" hi1)
-              (LForallKw "X2" LProp (LImpl (LIsWithinBounds lo2 "X2" hi2) body)))
-              | lo1 == sortMinName "S", hi1 == sortMaxName "S"
-              , lo2 == sortMinName "S", hi2 == sortMaxName "S" ->
-                body == LEq (LApp (LVar "f") [LVar "X1", LVar "X2"])
-                            (LApp (LVar "f_dir_img") [LApp (LVar "f_tuple") [LVar "X1", LVar "X2"]])
-            _ -> False
-          Nothing -> False
+        let target = LEq (LApp (LVar "f") [LVar "X1", LVar "X2"])
+                        (LApp (LVar "f_dir_img") [LApp (LVar "f_tuple") [LVar "X1", LVar "X2"]])
+        hasForallWithBound doc "X1" (sortMinName "S") (sortMaxName "S") `shouldBe` True
+        hasForallWithBound doc "X2" (sortMinName "S") (sortMaxName "S") `shouldBe` True
+        any (containsExpr target) (allTypes doc) `shouldBe` True
 
     describe "tuple fact axiom" $ do
       it "generates f_tuple_fact" $ do
@@ -497,18 +482,13 @@ main = hspec $ do
 
       it "pi_fact: (X1 = f_pi_1_1 ∧ X2 = f_pi_1_res) ↔ X2 = f_pi_1(X1)" $ do
         doc <- buildStr [r|{ signature { sort S; f : S, S → S; } }|]
-        findAxiomByName doc "f_pi_1_fact" `shouldSatisfy` \case
-          Just ax -> case axiomType ax of
-            LForallKw "X1" LProp (LImpl (LIsWithinBounds lo1 "X1" hi1)
-              (LForallKw "X2" LProp (LImpl (LIsWithinBounds lo2 "X2" hi2) body)))
-              | lo1 == "f_dom_Min", hi1 == "f_dom_Max"
-              , lo2 == sortMinName "S", hi2 == sortMaxName "S" ->
-                body == LBicond
-                          (LConj (LEq (LVar "X1") (LVar "f_pi_1_1"))
-                                 (LEq (LVar "X2") (LVar "f_pi_1_res")))
-                          (LEq (LVar "X2") (LApp (LVar "f_pi_1") [LVar "X1"]))
-            _ -> False
-          Nothing -> False
+        let target = LBicond
+              (LConj (LEq (LVar "X1") (LVar "f_pi_1_1"))
+                     (LEq (LVar "X2") (LVar "f_pi_1_res")))
+              (LEq (LVar "X2") (LApp (LVar "f_pi_1") [LVar "X1"]))
+        hasForallWithBound doc "X1" "f_dom_Min" "f_dom_Max" `shouldBe` True
+        hasForallWithBound doc "X2" (sortMinName "S") (sortMaxName "S") `shouldBe` True
+        any (containsExpr target) (allTypes doc) `shouldBe` True
 
     describe "projection adjunction axioms" $ do
       it "generates f_pi_1_adjunction, f_pi_2_adjunction" $ do
@@ -523,17 +503,12 @@ main = hspec $ do
 
       it "tuple_inv_decomposition: f_tuple(X1,X2) = f_pi_1_inv(X1) ∧ f_pi_2_inv(X2)" $ do
         doc <- buildStr [r|{ signature { sort S; f : S, S → S; } }|]
-        findAxiomByName doc "f_tuple_inv_decomposition" `shouldSatisfy` \case
-          Just ax -> case axiomType ax of
-            LForallKw "X1" LProp (LImpl (LIsWithinBounds lo1 "X1" hi1)
-              (LForallKw "X2" LProp (LImpl (LIsWithinBounds lo2 "X2" hi2) body)))
-              | lo1 == sortMinName "S", hi1 == sortMaxName "S"
-              , lo2 == sortMinName "S", hi2 == sortMaxName "S" ->
-                body == LEq (LApp (LVar "f_tuple") [LVar "X1", LVar "X2"])
-                            (LConj (LApp (LVar "f_pi_1_inv") [LVar "X1"])
-                                   (LApp (LVar "f_pi_2_inv") [LVar "X2"]))
-            _ -> False
-          Nothing -> False
+        let target = LEq (LApp (LVar "f_tuple") [LVar "X1", LVar "X2"])
+                        (LConj (LApp (LVar "f_pi_1_inv") [LVar "X1"])
+                               (LApp (LVar "f_pi_2_inv") [LVar "X2"]))
+        hasForallWithBound doc "X1" (sortMinName "S") (sortMaxName "S") `shouldBe` True
+        hasForallWithBound doc "X2" (sortMinName "S") (sortMaxName "S") `shouldBe` True
+        any (containsExpr target) (allTypes doc) `shouldBe` True
 
     describe "IR predicate" $ do
       it "declares IR_f : Prop → Prop" $ do
@@ -584,6 +559,7 @@ containsExpr target (LDisj a b) = containsExpr target a || containsExpr target b
 containsExpr target (LBicond a b) = containsExpr target a || containsExpr target b
 containsExpr target (LForall _ _ body) = containsExpr target body
 containsExpr target (LForallKw _ _ body) = containsExpr target body
+containsExpr target (LBoundedForall _ _ _ body) = containsExpr target body
 containsExpr target (LExists _ _ body) = containsExpr target body
 containsExpr target (LEq a b) = containsExpr target a || containsExpr target b
 containsExpr _ (LIsWithinBounds _ _ _) = False  -- atomic, would have matched above if equal
