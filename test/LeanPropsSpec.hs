@@ -192,12 +192,20 @@ main = hspec $ do
       doc <- buildStr "{ }"
       hasPropDecl doc (propDeclName (pName ++ maxSuffix)) `shouldBe` True
 
-    it "always declares D_Min as Prop" $ do
+    it "does NOT declare D_Min as Prop when 𝔻 is unused" $ do
       doc <- buildStr "{ }"
+      hasPropDecl doc (propDeclName (dName ++ minSuffix)) `shouldBe` False
+
+    it "does NOT declare D_Max as Prop when 𝔻 is unused" $ do
+      doc <- buildStr "{ }"
+      hasPropDecl doc (propDeclName (dName ++ maxSuffix)) `shouldBe` False
+
+    it "declares D_Min as Prop when 𝔻 is used" $ do
+      doc <- buildStr [r|{ signature { MySet ⊆ 𝔻; } }|]
       hasPropDecl doc (propDeclName (dName ++ minSuffix)) `shouldBe` True
 
-    it "always declares D_Max as Prop" $ do
-      doc <- buildStr "{ }"
+    it "declares D_Max as Prop when 𝔻 is used" $ do
+      doc <- buildStr [r|{ signature { MySet ⊆ 𝔻; } }|]
       hasPropDecl doc (propDeclName (dName ++ maxSuffix)) `shouldBe` True
 
     it "always includes U_Max → P_Max in the sort ordering" $ do
@@ -212,8 +220,12 @@ main = hspec $ do
       doc <- buildStr "{ }"
       hasImplication doc pMin uMin `shouldBe` True
 
-    it "always includes D_Max → D_Min in the sort ordering" $ do
+    it "does NOT include D_Max → D_Min in sort ordering when 𝔻 is unused" $ do
       doc <- buildStr "{ }"
+      hasImplication doc dMax dMin `shouldBe` False
+
+    it "includes D_Max → D_Min in sort ordering when 𝔻 is used" $ do
+      doc <- buildStr [r|{ signature { MySet ⊆ 𝔻; } }|]
       hasImplication doc dMax dMin `shouldBe` True
 
     it "produces no duplicate axiom names in an empty theory" $ do
