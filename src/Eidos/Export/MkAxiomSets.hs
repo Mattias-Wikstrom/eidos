@@ -181,7 +181,8 @@ mkAxiomSets theory = concat
 
   mereoObjects =
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
-        , IR.mereoKind   m == IR.MereologicalEntityKindIndividual
+        , IR.mereoKind   m `elem` [ IR.MereologicalEntityKindIndividual
+                                  , IR.MereologicalEntityKindMereological ]
         , IR.mereoOrigin m == IR.FromSignature
         , IR.mereoName   m `notElem` [uMinName, uMaxName, "𝕌#min", "𝕌#max"]
         ]
