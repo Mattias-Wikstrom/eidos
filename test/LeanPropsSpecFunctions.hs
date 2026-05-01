@@ -11,6 +11,8 @@ import Eidos.Parser     (parseString)
 import Eidos.FromSyntax (buildTheoryPure)
 import Eidos.BuildMonad (emptyPureResolver)
 import Eidos.Export.LeanProps
+import Eidos.Export.MkAxiomSets (mkAxiomSets)
+import Eidos.Export.LeanAxiomSet (AxiomSet(..))
 
 -- ---------------------------------------------------------------------------
 -- Naming conventions (mirror LeanProps.hs — single point of change)
@@ -52,7 +54,10 @@ buildStr src = case parseString src of
   Left err  -> fail ("Parse error: " ++ show err)
   Right ast -> case buildTheoryPure emptyPureResolver Nothing ast of
     Left err -> fail ("Build error: " ++ err)
-    Right th -> return (theoryToLeanDoc th)
+    Right th ->
+      let axiomSets = mkAxiomSets th
+          decls = [ DeclAxiom ax | as <- axiomSets, ax <- asAxioms as ]
+      in return (LeanDoc "" decls)
 
 -- | All axioms in a doc.
 axioms :: LeanDoc -> [LeanAxiom]

@@ -2,8 +2,8 @@
 {-# LANGUAGE LambdaCase  #-}
 -- | Unit tests for Eidos.Export.LeanProps.
 --
--- Tests operate on the 'LeanDoc' internal representation produced by
--- 'theoryToLeanDoc'.  The key design principle is that tests query the doc
+-- Tests operate on the Lean axiom content produced by the /current/
+-- MkAxiomSets-based export path. The key design principle is that tests query the doc
 -- by *semantic content* (what LeanExprs are present) rather than by axiom
 -- names, label conventions, or ordering.  This makes the tests robust to
 -- naming-convention changes (e.g. _top vs _min, ax1 vs numbered differently)
@@ -20,6 +20,8 @@ import Eidos.Parser     (parseString)
 import Eidos.FromSyntax (buildTheoryPure)
 import Eidos.BuildMonad (emptyPureResolver)
 import Eidos.Export.LeanProps
+import Eidos.Export.MkAxiomSets (mkAxiomSets)
+import Eidos.Export.LeanAxiomSet (AxiomSet(..))
 
 -- ---------------------------------------------------------------------------
 -- Naming conventions
@@ -63,7 +65,10 @@ buildStr src = case parseString src of
   Left err  -> fail ("Parse error: " ++ show err)
   Right ast -> case buildTheoryPure emptyPureResolver Nothing ast of
     Left err -> fail ("Build error: " ++ err)
-    Right th -> return (theoryToLeanDoc th)
+    Right th ->
+      let axiomSets = mkAxiomSets th
+          decls = [ DeclAxiom ax | as <- axiomSets, ax <- asAxioms as ]
+      in return (LeanDoc "" decls)
 
 -- | All axioms in a doc.
 axioms :: LeanDoc -> [LeanAxiom]
