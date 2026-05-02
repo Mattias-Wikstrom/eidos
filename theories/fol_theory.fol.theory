@@ -1,0 +1,12 @@
+{
+  signature {
+    sort S;
+
+    i1 : S;
+  },
+  axioms {
+    assertions {
+      ∀X : S (X =^S X);
+    }
+  }
+}
