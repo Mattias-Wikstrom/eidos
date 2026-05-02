@@ -526,15 +526,30 @@ mkAxiomSets theory = concat
         let n       = sanitizeName (IR.mereoName m)
             sN      = IR.sortName (IR.mereoSort m)
             (lo,hi) = sortBounds sN
-        in [ axiomSet (pathFor m) (tags [TagFunction, TagSorting])
+            funcPath = findFunctionPath m
+        in [ axiomSet funcPath (tags [TagFunction, TagSorting])
                [ LeanAxiom (n ++ minSuffixForAxiomNames)
                    (LImpl pMin (LImpl (LVar n) (LVar lo)))
                , LeanAxiom (n ++ maxSuffixForAxiomNames)
                    (LImpl pMin (LImpl (LVar hi) (LVar n)))
                ]
            ]
-      pathFor m = [SGlobal]  -- obj sorting not easily attributed to one function
-
+      
+      -- Find which function this object belongs to
+      findFunctionPath m = 
+        case findFunctionForObject m of
+          Just f -> [SFunction (IR.funcName f)]
+          Nothing -> [SGlobal]  -- fallback, shouldn't happen for function objects
+      
+      -- Search through all functions to find which one owns this object
+      findFunctionForObject m =
+        let allFuncs = solFunctions ++ userDeclaredFolFunctions
+            matches f = any (\obj -> IR.mereoName obj == IR.mereoName m) 
+                           (IR.funcArgObjects f ++ [IR.funcResObject f])
+        in case filter matches allFuncs of
+             (f:_) -> Just f
+             [] -> Nothing
+             
   -- -------------------------------------------------------------------------
   -- 20. FOL inverse arg/res sorting axioms
   -- -------------------------------------------------------------------------
