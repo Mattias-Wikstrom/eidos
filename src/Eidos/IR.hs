@@ -119,6 +119,18 @@ entityOrigin (EntityTheory _)       = error "entityOrigin: EntityTheory has no O
 -- Sort
 -- ---------------------------------------------------------------------------
 
+-- | Relationship between a sort and a parent sort (for relational sort declarations).
+data SortRelationship
+  = NotRelational
+    -- ^ A regular (non-relational) sort declaration.
+  | SubSort
+    -- ^ Declared with @subsort@: child#min = parent#min, child#max ≤ parent#max
+  | Quotient
+    -- ^ Declared with @quotient@: parent#min ≤ child#min, child#max = parent#max
+  | SubQuotient
+    -- ^ Declared with @subquotient@: parent#min ≤ child#min, child#max ≤ parent#max
+  deriving (Show, Eq)
+
 data Sort = Sort
   { sortKind             :: EntityKind
   , sortTheory           :: Theory
@@ -128,7 +140,9 @@ data Sort = Sort
   , sortName             :: String
   , sortComponentSorts   :: [Sort]
   , sortAssociatedEntity :: Maybe Entity
-  , sortReflectedFrom    :: Maybe Theory   -- ^ Just originalTheory when this is a reflected copy
+  , sortReflectedFrom    :: Maybe Theory
+  , sortRelationship     :: SortRelationship
+  , sortParent           :: Maybe Sort
   }
 
 instance Show Sort where

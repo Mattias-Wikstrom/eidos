@@ -251,10 +251,9 @@ buildSignatureItem th0 th item = do
       return (if shouldInsert then addSortToTh th s else th)
 
     SigRelationalSort (RelationalSortDeclaration nm rel sortExprAST) -> do
-      parentSort <- either throwError return $
-        lookupSort th (sortConstant (sortRef sortExprAST))
+      parentSort <- either throwError return $ lookupSort th (sortConstant (sortRef sortExprAST))
       let th' = markTheorySortExprUsage th sortExprAST
-          s   = mkRelatedSort th' nm
+          s   = mkRelatedSort th' rel nm parentSort  -- pass rel and parentSort
           entity = EntitySort s
       shouldInsert <- shouldInsertDeclaration nm entity
       if shouldInsert
@@ -569,6 +568,8 @@ mkSort th k nm orig =
         , sortComponentSorts   = []
         , sortAssociatedEntity = Nothing
         , sortReflectedFrom    = Nothing
+        , sortRelationship     = NotRelational
+        , sortParent           = Nothing
         }
       sMin = MereologicalObject
         { mereoKind          = MereologicalEntityKindLowerLimitForSort
@@ -769,8 +770,17 @@ addSortToTh th s =
 -- | Build a sort that stands in a relational position to an existing sort.
 --   Returns just the Sort record; the caller is responsible for adding it to the theory
 --   (via addSortToTh) and emitting any relationship facts.
-mkRelatedSort :: Theory -> String -> Sort
-mkRelatedSort th nm = mkSort th SortKindFromSignature nm FromSignature
+mkRelatedSort :: Theory -> String -> String -> Sort -> Sort
+mkRelatedSort th rel nm parentS =
+  let relationship = case rel of
+        "subsort"     -> SubSort
+        "quotient"    -> Quotient
+        "subquotient" -> SubQuotient
+        _             -> NotRelational
+  in (mkSort th SortKindFromSignature nm FromSignature)
+       { sortRelationship = relationship
+       , sortParent       = Just parentS
+       }
 
 -- | Emit the min/max comparison facts for a relational sort declaration.
 relationalSortFacts :: Theory -> String -> Sort -> Sort -> Theory
@@ -834,7 +844,10 @@ reflectEntity (EntityFunction f) =
     else EntityFunction (f { funcReflectedFrom = Just (funcTheory f) })
 reflectEntity (EntitySort s) =
   EntitySort (s { sortKind          = SortKindFromReflection
-                , sortReflectedFrom = Just (sortTheory s) })
+                , sortReflectedFrom = Just (sortTheory s) 
+                , sortRelationship  = NotRelational  -- reflected sorts become non-relational
+                , sortParent        = Nothing         -- clear parent reference
+                })
 reflectEntity (EntityMereological m) =
   EntityMereological (m { mereoKind           = MereologicalEntityKindIndividual
                         , mereoReflectedFrom  = Just (mereoTheory m) })
@@ -1005,6 +1018,7 @@ createCanonicalEntity parentTh (EntitySort s) =
   EntitySort s { sortTheory       = parentTh
                , sortOrigin       = FromSubtheory
                , sortReflectedFrom = Nothing
+               -- sortRelationship and sortParent stay as-is
                }
 createCanonicalEntity parentTh (EntityFunction f) =
   EntityFunction f { funcTheory       = parentTh
