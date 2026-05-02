@@ -6,6 +6,8 @@ Things to Be Done
 
 * Individuals need to satisfy IsIndividual. (They are currently treated just like sets.)
 
+* The logic is supposed to be a form of free logic. Only with first-order /quantifiers/ do you get the claim that an individual expression stands for a unique object.
+
 * First-order identity (=_S).
 
 * Functions need to work correctly when applied to things outside their domains.
