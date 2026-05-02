@@ -367,12 +367,17 @@ addPropFact th0 fk th prop = do
     Left opErr -> throwError (sourceCtx ++ "Operation error in " ++ show fk ++ ": " ++ opErr)
     Right _ -> return ()
   
+  -- ADD THIS: Validate that facts don't contain negation or absurdity
+  case validateFactBody fk resolvedExpr of
+    Left factErr -> throwError (sourceCtx ++ factErr)
+    Right _ -> return ()
+  
   let fact = Fact
         { factIsMereologicalTranslation = False
         , factIsInherited               = False
         , factKind                      = fk
         , factPropExpr                  = resolvedExpr
-        , factFreeVars                  = freeVars  -- Store the free variables
+        , factFreeVars                  = freeVars
         }
   let th' = markTheoryPropExprUsage th prop
   return (th' { theoryFacts = theoryFacts th' ++ [fact] })
@@ -1640,3 +1645,93 @@ getResolvedTermType term = Right (resolvedTermType term)
 firstLetterIsUppercase :: String -> Bool
 firstLetterIsUppercase []    = False
 firstLetterIsUppercase (c:_) = isUpper c
+
+-- ---------------------------------------------------------------------------
+-- Fact body validation (negation/absurdity check)
+-- ---------------------------------------------------------------------------
+
+-- | Validate that facts don't contain negation (¬) or absurdity (⊥)
+validateFactBody :: FactKind -> ResolvedPropExpr -> Either String ()
+validateFactBody FactKindFact expr
+  | containsNegationOrAbsurdity expr = 
+      Left "Facts cannot contain negation (¬) or absurdity (⊥)"
+  | otherwise = Right ()
+validateFactBody _ _ = Right ()  -- assertions and metafacts can use anything
+
+-- | Check if a resolved proposition expression contains ¬ or ⊥
+containsNegationOrAbsurdity :: ResolvedPropExpr -> Bool
+containsNegationOrAbsurdity (ResolvedPropBicond left rests) =
+  containsNegationInRight left || 
+  any (containsNegationInRight . resolvedPropRestRight) rests
+
+containsNegationInRight :: ResolvedRightImpl -> Bool
+containsNegationInRight (ResolvedRightImpl left mbRight) =
+  containsNegationInLeft left || 
+  maybe False (\(_, rhs) -> containsNegationInRight rhs) mbRight
+
+containsNegationInLeft :: ResolvedLeftImpl -> Bool
+containsNegationInLeft (ResolvedLeftImpl left rests) =
+  containsNegationInDisj left || 
+  any (containsNegationInDisj . resolvedLirRight) rests
+
+containsNegationInDisj :: ResolvedDisj -> Bool
+containsNegationInDisj (ResolvedDisj left rests) =
+  containsNegationInConj left ||
+  any (containsNegationInConj . resolvedDisjRestRight) rests
+
+containsNegationInConj :: ResolvedConj -> Bool
+containsNegationInConj (ResolvedConj left rests) =
+  containsNegationInNeg left ||
+  any (containsNegationInNeg . resolvedConjRestRight) rests
+
+containsNegationInNeg :: ResolvedNeg -> Bool
+containsNegationInNeg (ResolvedNegNot _) = True  -- This is ¬
+containsNegationInNeg (ResolvedNegChild q) = containsNegationInQuantified q
+
+containsNegationInQuantified :: ResolvedQuantified -> Bool
+containsNegationInQuantified (ResolvedQuantified _ atom) = 
+  containsNegationOrAbsurdityInAtomic atom
+
+containsNegationOrAbsurdityInAtomic :: ResolvedAtomicProp -> Bool
+containsNegationOrAbsurdityInAtomic (ResolvedAtomicConstant ref) = 
+  resolvedConstRefName ref == "⊥"  -- Check for absurdity
+containsNegationOrAbsurdityInAtomic (ResolvedAtomicTermPair tp) = 
+  containsNegationInTermPair tp
+
+containsNegationInTermPair :: ResolvedTermPair -> Bool
+containsNegationInTermPair (ResolvedTermPair left rights _) =
+  containsNegationInTerm left || 
+  any containsNegationInRelation rights
+
+containsNegationInRelation :: ResolvedRelationFollowedByTerm -> Bool
+containsNegationInRelation (ResolvedRelationFollowedByTerm _ _ _ right) = 
+  containsNegationInTerm right
+
+containsNegationInTerm :: ResolvedTerm -> Bool
+containsNegationInTerm (ResolvedTerm left rights _) =
+  containsNegationInFactor left || 
+  any containsNegationInOperation rights
+
+containsNegationInOperation :: ResolvedOperationFollowedByFactor -> Bool
+containsNegationInOperation (ResolvedOperationFollowedByFactor _ _ right) = 
+  containsNegationInFactor right
+
+containsNegationInFactor :: ResolvedFactor -> Bool
+containsNegationInFactor (ResolvedFactor base _ _) =
+  containsNegationInBase base
+
+containsNegationInBase :: ResolvedBaseTerm -> Bool
+containsNegationInBase (ResolvedBTAtomic ref) = 
+  resolvedConstRefName ref == "⊥"  -- Check for absurdity at base level
+containsNegationInBase (ResolvedBTParen expr) = 
+  containsNegationOrAbsurdity expr
+containsNegationInBase (ResolvedBTSingleton t) = 
+  containsNegationInTerm t
+containsNegationInBase (ResolvedBTEvaluationInTheory eit) = 
+  containsNegationOrAbsurdity (resolvedEITOperand eit)
+containsNegationInBase (ResolvedBTProjectionToSort pts) = 
+  containsNegationInTerm (resolvedPTOperand pts)
+containsNegationInBase (ResolvedBTProjectionToInterval pti) = 
+  containsNegationInTerm (resolvedPTIOperand pti)
+containsNegationInBase (ResolvedBTGeneralizedSumOrProduct gsp) = 
+  containsNegationInTerm (resolvedGSPOperand gsp)
