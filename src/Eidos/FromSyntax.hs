@@ -23,6 +23,7 @@ import           Eidos.ExternalRef    hiding (mockResolver)
 import           Eidos.IR
 import           Eidos.Parser         (parseString)
 import           Eidos.TypeCheck
+import           Eidos.SubLanguage
 
 -- ---------------------------------------------------------------------------
 -- Public entry points
@@ -30,18 +31,19 @@ import           Eidos.TypeCheck
 
 -- | Build theory using IO (for CLI/main program) - reads files from disk
 buildTheoryIO :: TheoryDecl -> IO (Either BuildError Theory)
-buildTheoryIO td = runBuildM (decorateTheoryBody (AST.theoryBody td) Nothing "" False) Nothing
+buildTheoryIO td = runBuildM (decorateTheoryBody (AST.theoryBody td) Nothing "" False []) Nothing
 
 -- | Build theory from a file path (IO), using the file's directory as the resolution base
 buildTheoryFromFile :: FilePath -> TheoryDecl -> IO (Either BuildError Theory)
 buildTheoryFromFile filePath td =
-  runBuildM (decorateTheoryBody (AST.theoryBody td) Nothing "" False)
-            (Just (takeDirectory filePath))
+  let tt = theoryTypeFromFilePath filePath
+  in runBuildM (decorateTheoryBody (AST.theoryBody td) Nothing "" False [tt])
+               (Just (takeDirectory filePath))
 
 -- | Build theory using a pure resolver (for testing) - no file IO
 buildTheoryPure :: PureResolver -> Maybe String -> TheoryDecl -> Either BuildError Theory
 buildTheoryPure resolver baseContext td =
-  runReader (runBuildM (decorateTheoryBody (AST.theoryBody td) Nothing "" False) baseContext) resolver
+  runReader (runBuildM (decorateTheoryBody (AST.theoryBody td) Nothing "" False []) baseContext) resolver
 
 -- | Build theory with an explicit pure resolver function (for testing custom resolvers)
 buildTheoryWithResolver
@@ -51,7 +53,7 @@ buildTheoryWithResolver
   -> Either BuildError Theory
 buildTheoryWithResolver resolverFn baseContext td =
   runReader
-    (runBuildM (decorateTheoryBody (AST.theoryBody td) Nothing "" False) baseContext)
+    (runBuildM (decorateTheoryBody (AST.theoryBody td) Nothing "" False []) baseContext)
     (FnResolver resolverFn)
 
 -- ---------------------------------------------------------------------------
@@ -59,14 +61,23 @@ buildTheoryWithResolver resolverFn baseContext td =
 -- ---------------------------------------------------------------------------
 
 -- | Build a 'Theory' from a 'TheoryBody'.
+--
+-- 'constraints' is the accumulated list of 'TheoryType' restrictions in
+-- force for this body.  It starts as @[theoryTypeFromFilePath filePath]@
+-- at the top level and is extended when an external subtheory file adds its
+-- own 'TheoryType'.  Inline subtheory bodies inherit the parent list unchanged.
 decorateTheoryBody
   :: forall m. (MonadExternalRefResolver m)
   => TheoryBody
   -> Maybe Theory
   -> String
   -> Bool
+  -> [TheoryType]   -- ^ active sublanguage constraints
   -> BuildM m Theory
-decorateTheoryBody body parentMaybe name isReflection = do
+decorateTheoryBody body parentMaybe name isReflection constraints = do
+
+  -- ── Sublanguage check (before anything else) ──────────────────────────
+  either throwError return $ checkTheoryBody constraints body
 
   -- ── Base theory skeleton ──────────────────────────────────────────────
   let th0 = createTheory parentMaybe name isReflection
@@ -80,7 +91,7 @@ decorateTheoryBody body parentMaybe name isReflection = do
       thC = addSortToTh thB (theoryProp     th0)
 
   -- ── Pass 1: subtheories ───────────────────────────────────────────────
-  (th1, subtheories) <- foldM buildSubtheoryEntry (thC, []) (sections body)
+  (th1, subtheories) <- foldM (buildSubtheoryEntry constraints) (thC, []) (sections body)
   let th2 = th1 { theorySubtheories = subtheories }
 
   -- ── Pass 2: signature ─────────────────────────────────────────────────
@@ -101,26 +112,28 @@ decorateTheoryBody body parentMaybe name isReflection = do
 
 buildSubtheoryEntry
   :: forall m. (MonadExternalRefResolver m)
-  => (Theory, [Theory])
+  => [TheoryType]
+  -> (Theory, [Theory])
   -> Section
   -> BuildM m (Theory, [Theory])
-buildSubtheoryEntry (th, acc) (SectionSubtheories (SubtheoriesSection entries)) = do
-  foldM processEntry (th, acc) entries
-buildSubtheoryEntry (th, acc) _ = return (th, acc)
+buildSubtheoryEntry constraints (th, acc) (SectionSubtheories (SubtheoriesSection entries)) = do
+  foldM (processEntry constraints) (th, acc) entries
+buildSubtheoryEntry _ (th, acc) _ = return (th, acc)
 
 processEntry
   :: forall m. (MonadExternalRefResolver m)
-  => (Theory, [Theory])
+  => [TheoryType]
+  -> (Theory, [Theory])
   -> SubtheoryEntry
   -> BuildM m (Theory, [Theory])
-processEntry (th, subs) entry = case entry of
+processEntry constraints (th, subs) entry = case entry of
   SubtheoryEntryGroup (SubtheoryGroup kw items) -> do
-    foldM (processItem kw) (th, subs) items
+    foldM (processItem constraints kw) (th, subs) items
   SubtheoryEntryItem item -> do
     let kw = fromMaybe "named" (itemQualifier item)
-    processItem kw (th, subs) item
+    processItem constraints kw (th, subs) item
 
-processItem kw (th, subs) item = do
+processItem constraints kw (th, subs) item = do
   baseContext <- ask
   
   let subName = fromMaybe "" (itemName item)
@@ -133,14 +146,18 @@ processItem kw (th, subs) item = do
   
   (subBody, extInfo) <- resolveSubtheoryBody baseContext item
   
-  -- extInfo carries external-ref metadata (identifier + source) when the
-  -- subtheory body was loaded from an outside file; for inline bodies it is
-  -- Nothing.  In either case the subName drives the qualified name and the
-  -- baseContext is used unchanged for recursive resolution.
+  -- For external subtheories, the resolved file's TheoryType is added to the
+  -- constraint list — the body must satisfy both the parent file's constraints
+  -- and its own file's constraints.  Inline subtheory bodies inherit the
+  -- parent constraint list unchanged.
+  let subConstraints = case extInfo of
+        Nothing           -> constraints          -- inline: inherit parent
+        Just (_, extType) -> addConstraint constraints extType
+
   let subContext = baseContext
   
   sub <- local (const subContext) $ 
-    decorateTheoryBody subBody (Just th) subName isRefl
+    decorateTheoryBody subBody (Just th) subName isRefl subConstraints
   
   let th' = addSubtheoryToTheory th sub
   th'' <- either throwError return $ propagateSubtheory th' subName isImplicit isRefl sub
@@ -154,19 +171,29 @@ processItem kw (th, subs) item = do
 
   return (thFinal, subs ++ [sub])
 
--- | Resolve a subtheory definition using the resolver from the monad
+-- | Add a 'TheoryType' to the constraint list, skipping 'PlainTheory' and
+-- 'SOLTheory' (which are maximally permissive) and avoiding duplicates.
+addConstraint :: [TheoryType] -> TheoryType -> [TheoryType]
+addConstraint existing tt
+  | tt `elem` [PlainTheory, SOLTheory] = existing
+  | tt `elem` existing                 = existing
+  | otherwise                           = existing ++ [tt]
+
+-- | Resolve a subtheory definition using the resolver from the monad.
+-- For external refs, the second component carries the resolved 'TheoryType'
+-- so the caller can add it to the constraint list.
 resolveSubtheoryBody
   :: forall m. (MonadExternalRefResolver m)
   => Maybe String
   -> SubtheoryItem
-  -> BuildM m (TheoryBody, Maybe (String, ExternalRefSource))
+  -> BuildM m (TheoryBody, Maybe (String, TheoryType))
 resolveSubtheoryBody baseContext item = case itemDef item of
   SubtheoryBody b -> return (b, Nothing)
   
   SubtheoryExternalRef ref -> do
     let refPath = case ref of
-          '@':rest -> rest
-          _        -> ref
+          ('@':rest) -> rest
+          _          -> ref
     
     result <- lift $ resolveExternalRef baseContext refPath
     res <- case result of
@@ -179,7 +206,7 @@ resolveSubtheoryBody baseContext item = case itemDef item of
       Left parseErr -> throwError $ "Parse error in external theory " ++ extRefIdentifier res ++ ": " ++ show parseErr
       Right a -> return a
     let body = AST.theoryBody ast
-    return (body, Just (extRefIdentifier res, extRefSource res))
+    return (body, Just (extRefIdentifier res, extRefTheoryType res))
 
 addSubtheoryToTheory :: Theory -> Theory -> Theory
 addSubtheoryToTheory th sub =

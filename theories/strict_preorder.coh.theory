@@ -2,11 +2,11 @@
 {
   signature {
     sort D;
-    LessThan : D, D → Prop; // Order relation
+    LessThan ⊆ D, D; // Order relation
   },
   axioms {
     assertions {
-      x : D,  ¬LessThan(x, x); // Irreflexivity
+      x : D,  LessThan(x, x) → ⊥; // Irreflexivity
       x : D,  y : D,  z : D,  (LessThan(x, y) ∧ LessThan(y, z)) → LessThan(x, z); // Transitivity
     
       // The following follows automatically:

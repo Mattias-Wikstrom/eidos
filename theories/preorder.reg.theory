@@ -2,7 +2,7 @@
 {
   signature {
     sort D;
-    LessThanOrEq : D, D → Prop; // Order relation
+    LessThanOrEq ⊆  D, D; // Order relation
   },
   axioms {
     assertions {

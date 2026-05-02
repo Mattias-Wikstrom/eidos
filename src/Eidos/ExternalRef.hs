@@ -12,6 +12,7 @@ module Eidos.ExternalRef
   , extractIdentifier
   , theoryTypeToExtension
   , theoryTypeToSuffix
+  , theoryTypeFromFilePath
   , allTheoryTypes
     -- * Test helpers
   , mockResolver
@@ -65,6 +66,21 @@ theoryTypeToSuffix MereologicalTheory       = ".mereo"
 
 theoryTypeToExtension :: TheoryType -> String
 theoryTypeToExtension tt = theoryTypeToSuffix tt ++ ".theory"
+
+-- | Derive the 'TheoryType' from a file path by matching its extension.
+-- Falls back to 'PlainTheory' if no specific suffix is recognised.
+theoryTypeFromFilePath :: FilePath -> TheoryType
+theoryTypeFromFilePath path =
+  case filter (\tt -> theoryTypeToExtension tt `isSuffixOf` path) specificTypes of
+    (tt:_) -> tt
+    []     -> if ".theory" `isSuffixOf` path then PlainTheory else PlainTheory
+  where
+    -- Order matters: more specific suffixes (longer) must come first so that
+    -- e.g. ".eq.theory" is matched before ".theory".
+    specificTypes =
+      [ EquationalTheory, RegularTheory, CoherentTheory
+      , FOLTheory, SOLTheory, PropositionalTheory, MereologicalTheory
+      ]
 
 allTheoryTypes :: [TheoryType]
 allTheoryTypes = [minBound .. maxBound]
