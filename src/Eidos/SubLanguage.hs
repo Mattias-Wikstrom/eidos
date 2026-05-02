@@ -251,6 +251,10 @@ checkRegular body = concatMap checkSection (sections body)
 --
 -- Allowed: ∃, ∨, ∧, →; free variables; FOL functions; sorts.
 -- Forbidden: ¬; ⊥; ←; ↔; SOL functions.
+-- | Coherent logic (.coh)
+--
+-- Allowed: ∃, ∨, ∧, →; free variables; FOL functions; sorts; ⊥.
+-- Forbidden: ¬; ←; ↔; SOL functions.
 checkCoherent :: TheoryBody -> [Violation]
 checkCoherent body = concatMap checkSection (sections body)
   where
@@ -309,9 +313,13 @@ checkCoherent body = concatMap checkSection (sections body)
     checkNegCoherent ctx (NegChild q) = checkQuantifiedCoherent ctx q
 
     checkQuantifiedCoherent ctx (Quantified qs atomic) =
-      concatMap (checkQuantifierNoSOL ctx) qs ++
-      checkAtomicNoBottom ctx atomic
+      concatMap (checkQuantifierNoSOL ctx) qs
+      -- ← REMOVED: checkAtomicNoBottom ctx atomic
+      -- Coherent logic ALLOWS ⊥ (falsity)
+      -- We still need to check the atomic expression for other issues,
+      -- but ⊥ is fine, so we just don't check for it.
 
+      
 -- | First-order logic (.fol)
 --
 -- Allowed: all propositional connectives; ∀; ∃ over individuals;
