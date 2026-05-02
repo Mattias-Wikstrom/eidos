@@ -220,9 +220,16 @@ mkAxiomSets theory = concat
         , IR.sortKind  (IR.mereoSort m) == IR.SortKindFromSignature
         ]
 
+  userFacts =
+    [ f | f <- IR.theoryFacts theory
+        , IR.factKind f == IR.FactKindFact
+        , not (IR.factIsInherited f)
+        , not (IR.factIsMereologicalTranslation f)
+        ]
+
   userAssertions =
     [ f | f <- IR.theoryFacts theory
-        , IR.factKind f `elem` [IR.FactKindAssertion, IR.FactKindFact]
+        , IR.factKind f == IR.FactKindAssertion
         , not (IR.factIsInherited f)
         , not (IR.factIsMereologicalTranslation f)
         ]
@@ -1100,16 +1107,24 @@ mkAxiomSets theory = concat
   -- -------------------------------------------------------------------------
   userFactAxiomSets :: [AxiomSet]
   userFactAxiomSets =
-       zipWith mkAssertionAS [1..] userAssertions
-    ++ zipWith mkMetafactAS  [1 + length userAssertions..] userMetafacts
+       zipWith mkFactAS [1..] userFacts
+    ++ zipWith mkAssertionAS [1 + length userFacts..] userAssertions
+    ++ zipWith mkMetafactAS [1 + length userFacts + length userAssertions..] userMetafacts
     where
-      totalFacts = length userAssertions + length userMetafacts
+      totalFacts = length userFacts + length userAssertions + length userMetafacts
       mkLabel idx = if totalFacts > 1 then "ax" ++ show idx else ""
+
+      mkFactAS idx fact =
+        axiomSet [SGlobal] (tags [TagUserFact])
+          [LeanAxiom (mkLabel idx)
+            -- Facts: original structure without P_Max wrapping
+            (LBicond (LConj pMin (factBodyExpr fact)) pMin)]
 
       mkAssertionAS idx fact =
         axiomSet [SGlobal] (tags [TagUserFact])
           [LeanAxiom (mkLabel idx)
-            (LBicond (LConj pMin (factBodyExpr fact)) pMin)]
+            -- Assertions: wrap the body with (P_Max ∨ ...)
+            (LBicond (LConj pMin (LDisj pMax (factBodyExpr fact))) pMin)]
 
       mkMetafactAS idx fact =
         axiomSet [SGlobal] (tags [TagUserFact])

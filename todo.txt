@@ -43,8 +43,6 @@ Things to Be Done
 
 * There is currently support for '--pure', '--debug' and '--pretty'. None of these options was planned and they should probably be removed. They can be kept for a bit longer, though, to simplify debugging.
 
-* The facts, assertions, and metafacts should all involve their own restrictions and interpretations. They are currently interchangeable, but that is very wrong.
-
 * File endings such as ".coh.theory" and ".reg.theory" should impose restrictions on what you are allowed to express in the theory:
   .theory -- Maximally permissive, needed for 'mereological' things
   .sol.theory -- Second-order logic (with many sorts, where FOL and SOL can be used for each sort)
@@ -57,6 +55,8 @@ Things to Be Done
   (Note that these restrictions need to be enforced for subtheories as well as the theory itself.) 
 
 PARTLY IMPLEMENTED:
+* The facts, assertions, and metafacts should all involve their own restrictions and interpretations. They are currently interchangeable, but that is very wrong.
+
 * The generation of mereological facts needs to be checked. There should be unit tests which verify that the right things are generated.
 
 * Support for non-propositional Lean 4 output.
