@@ -38,7 +38,8 @@ module Eidos.Export.LeanProps
 
 import qualified Eidos.IR as IR
 import Eidos.Export.LeanExpr
-import Data.List (sortOn)
+import Data.List (intercalate, sortOn)
+import qualified Data.Set as Set
 import Eidos.Export.MkAxiomSets (mkAxiomSets)
 import Eidos.Export.LeanAxiomSet
 
@@ -91,8 +92,11 @@ renderAxiomSetsToDecls opts = concatMap renderOne
       let commentDecls = if optAddGroupComments opts
                          then [DeclComment (subjectPathComment (asPath as_))]
                          else []
+          tagDecls = if optAddTagComments opts
+                     then [DeclComment (tagSetComment (asTags as_))]
+                     else []
           axDecls = map (DeclAxiom . mapAxiom) (asAxioms as_)
-      in DeclBlankLine : commentDecls ++ axDecls
+      in DeclBlankLine : commentDecls ++ tagDecls ++ axDecls
 
     mapAxiom ax = ax { axiomType = rewriteBounded (axiomType ax) }
 
@@ -144,6 +148,7 @@ data LeanPropsOptions = LeanPropsOptions
   , optUseSortingAxioms   :: Bool
   , optAddGroupComments   :: Bool
   , optUseBoundedForallSyntax :: Bool
+  , optAddTagComments      :: Bool
   } deriving (Eq, Show)
 
 defaultLeanPropsOptions :: LeanPropsOptions
@@ -152,4 +157,9 @@ defaultLeanPropsOptions = LeanPropsOptions
   , optUseSortingAxioms = False
   , optAddGroupComments = False
   , optUseBoundedForallSyntax = False
+  , optAddTagComments = False
   }
+
+
+tagSetComment :: TagSet -> String
+tagSetComment ts = "tags: " ++ intercalate ", " (map show (Set.toAscList ts))
