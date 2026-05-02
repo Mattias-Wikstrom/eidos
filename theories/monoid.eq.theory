@@ -11,8 +11,8 @@
   },
   axioms {
     facts {
-      [x : D] x = op(n, x); // n is a neutral element for left multiplication
-      [x : D] x = op(x, n); // n is a neutral element for right multiplication
+      x : D,  x = op(n, x); // n is a neutral element for left multiplication
+      x : D,  x = op(x, n); // n is a neutral element for right multiplication
     }
   }
 }

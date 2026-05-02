@@ -9,7 +9,7 @@
   },
   axioms {
     assertions {
-      [X ⊆ S] (idS(X) = X);
+      X ⊆ S,  (idS(X) = X);
     }
   }
 }

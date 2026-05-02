@@ -243,7 +243,7 @@ data Fact = Fact
   , factIsInherited               :: Bool
   , factKind                      :: FactKind
   , factPropExpr                  :: ResolvedPropExpr
-  , factFreeVars                  :: [ResolvedVarDecl]  -- free variables from brackets
+  , factFreeVars                  :: [ResolvedVarDecl]  -- free variables declared before the expression
   }
   deriving (Show)
 

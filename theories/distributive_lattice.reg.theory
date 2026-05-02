@@ -7,8 +7,8 @@
   },
   axioms {
     facts {
-      [x : D] [y : D] [z : D] join(x, meet(y, z)) = meet(join(x, y), join(x, z));
-      [x : D] [y : D] [z : D] meet(x, join(y, z)) = join(meet(x, y), meet(x, z));   
+      x : D,  y : D,  z : D,  join(x, meet(y, z)) = meet(join(x, y), join(x, z));
+      x : D,  y : D,  z : D,  meet(x, join(y, z)) = join(meet(x, y), meet(x, z));   
     }
   }
 }

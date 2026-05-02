@@ -5,7 +5,7 @@
   },
   axioms {
     assertions {
-      [x : S] h(x) = x;
+      x : S,  h(x) = x;
     }
   }
 }

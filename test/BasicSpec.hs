@@ -136,15 +136,15 @@ main = hspec $ do
             },
             axioms {
                 assertions {
-                    [x : sub.S]∀z : S ∃y : S (y ⊆ y)↔((x ⊆ y)→((z ⊆ y)←((y ⊆ y)∨(y ⊆ y))));
-                    [x : sub.S][y : sub.S](y ⊆ y)↔((y ⊆ <<sub>>(∃y : S y))→((f(y, y) ⊆ f(f(x, x), y))←((y ⊆ y)∨(y ⊆ y))));
-                    [x : Q][y ⊆ Q](y ⊆ y)↔(y = y);
-                    [x : S][y : S] f(y, x) =_S f(x, y);
+                    x : sub.S, ∀z : S ∃y : S (y ⊆ y)↔((x ⊆ y)→((z ⊆ y)←((y ⊆ y)∨(y ⊆ y))));
+                    x : sub.S, y : sub.S, (y ⊆ y)↔((y ⊆ <<sub>>(∃y : S y))→((f(y, y) ⊆ f(f(x, x), y))←((y ⊆ y)∨(y ⊆ y))));
+                    x : Q, y ⊆ Q, (y ⊆ y)↔(y = y);
+                    x : S, y : S,  f(y, x) =_S f(x, y);
                     ⊥ ∨ ¬sub.⊤;
-                    [y : S] (f(f(y, y), y) ⊆ f(f(y, y), Σy : S(y)));
-                    [x : S] f(x, x)=sub.h(x);
+                    y : S,  (f(f(y, y), y) ⊆ f(f(y, y), Σy : S(y)));
+                    x : S,  f(x, x)=sub.h(x);
                     ¬⊥;
-                    [x : S] ⊥ ∨ ¬x⊆x ∨ x≤x ∧ ¬sub.h(x)=sub.h(x) ∧ ¬sub.h(x)=sub.h(x);
+                    x : S,  ⊥ ∨ ¬x⊆x ∨ x≤x ∧ ¬sub.h(x)=sub.h(x) ∧ ¬sub.h(x)=sub.h(x);
                 },
                 facts {
                 },
@@ -211,10 +211,10 @@ main = hspec $ do
              multiplicative_group.D = E;
              ring.one = multiplicative_group.n;
              multiplicative_inv = multiplicative_group.inv;
-             [x : E] [y : E] ring.prod(x, y) = multiplicative_group.op(x, y);
+             x : E,  y : E,  ring.prod(x, y) = multiplicative_group.op(x, y);
            },
            assertions {
-             [x : D] (x = 0) ∨ ∃y:E x=y; // Any element is either zero or non-zero
+             x : D,  (x = 0) ∨ ∃y:E x=y; // Any element is either zero or non-zero
            }
          }
         }|] `shouldSatisfy` isRight

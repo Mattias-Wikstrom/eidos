@@ -6,10 +6,10 @@
   },
   axioms {
     assertions {
-      [X : ℙ] (X ∨ ¬X);
+      X : ℙ,  (X ∨ ¬X);
       ¬P ∨ Q;
       ¬Q ∨ R;
-      [X : ℙ] [Y : ℙ] ((¬X ∨ Y) ↔ (X → Y));
+      X : ℙ,  Y : ℙ,  ((¬X ∨ Y) ↔ (X → Y));
     }
   }
 }

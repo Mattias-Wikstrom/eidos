@@ -11,8 +11,8 @@
   },
   axioms {
     facts {
-      [x : D] op(inv(x), x) = n; // Left inverse
-      [x : D] op(x, inv(x)) = n; // Right inverse
+      x : D,  op(inv(x), x) = n; // Left inverse
+      x : D,  op(x, inv(x)) = n; // Right inverse
     }
   }
 }

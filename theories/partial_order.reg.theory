@@ -7,7 +7,7 @@
   },
   axioms {
     assertions {
-      [x : D] [y : D] (LessThanOrEq(x, y) ∧ LessThanOrEq(y, x)) → (x = y); // Symmetry
+      x : D,  y : D,  (LessThanOrEq(x, y) ∧ LessThanOrEq(y, x)) → (x = y); // Symmetry
     }
   }
 }

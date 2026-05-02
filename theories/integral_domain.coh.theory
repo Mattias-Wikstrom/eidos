@@ -7,7 +7,7 @@
   },
   axioms {
     assertions {
-      [x : D] [y : D] (prod(x, y) = zero) → ((x = zero) ∨ (y = zero));
+      x : D,  y : D,  (prod(x, y) = zero) → ((x = zero) ∨ (y = zero));
     }
   }
 }

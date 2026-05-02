@@ -6,8 +6,8 @@
   },
   axioms {
     assertions {
-      [x : D] LessThanOrEq(x, x); // Reflexivity
-      [x : D] [y : D] [z : D] (LessThanOrEq(x, y) ∧ LessThanOrEq(y, z)) → LessThanOrEq(x, z); // Transitivity
+      x : D,  LessThanOrEq(x, x); // Reflexivity
+      x : D,  y : D,  z : D,  (LessThanOrEq(x, y) ∧ LessThanOrEq(y, z)) → LessThanOrEq(x, z); // Transitivity
     }
   }
 }

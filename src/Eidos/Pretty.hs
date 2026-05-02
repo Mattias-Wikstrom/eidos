@@ -301,12 +301,12 @@ prettySubtheoryDef def =
 
 prettyPropExprInclVars :: PropExprInclVars -> Doc
 prettyPropExprInclVars (PropExprInclVars _ _ vars expr) =
-  (if null vars then "" else concatMap prettyVarDecl vars ++ " ") ++
+  (if null vars then "" else intercalate ", " (map prettyVarDecl vars) ++ ", ") ++
   prettyPropExpr expr
 
 prettyVarDecl :: VarDecl -> Doc
 prettyVarDecl (VarDecl name op sortExpr) =
-  "[" ++ name ++ " " ++ op ++ " " ++ prettySortExpr sortExpr ++ "]"
+  name ++ " " ++ op ++ " " ++ prettySortExpr sortExpr
 
 prettyPropExpr :: PropExpr -> Doc
 prettyPropExpr (PropExpr left rests) =

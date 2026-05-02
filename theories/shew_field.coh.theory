@@ -18,10 +18,10 @@
       multiplicative_group.D = E;
       ring.one = multiplicative_group.n;
       multiplicative_inv = multiplicative_group.inv;
-      [x : E] [y : E] ring.prod(x, y) = multiplicative_group.op(x, y);
+      x : E,  y : E,  ring.prod(x, y) = multiplicative_group.op(x, y);
     },
     assertions {
-      [x : D] (x = zero) ∨ ∃y:E x=y; // Any element is either zero or non-zero
+      x : D,  (x = zero) ∨ ∃y:E x=y; // Any element is either zero or non-zero
     }
   }
 }

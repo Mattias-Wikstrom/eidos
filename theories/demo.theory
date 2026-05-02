@@ -23,8 +23,8 @@
       ∃X:Prop X = X; // There exists a proposition
       ∃x:A ∃Pr ⊆ A Pr(x); // x is an individual of sort A, Pr a monadic predicate
       ⊥ → ⊤; // ⊤ follows from ⊥
-      [x : A] x = x; // Free variables need to be given sortings using the notation [variable : NameOfSort]
-      [x : A] ∃y : B x = y; // Any object x of sort A is identical to some object of sort B 
+      x : A,  x = x; // Free variables are given sortings using the notation: variable : NameOfSort, expression
+      x : A,  ∃y : B x = y; // Any object x of sort A is identical to some object of sort B 
       𝕌#min ≤ 𝕌#max; // ≤ is the part-whole relation, 𝕌#min is part of 𝕌#max
       A#min ≤ o1; // <min>(A) is the minimum among things of sort A
       A#min ≤ Pred; // That includes predicates
@@ -47,7 +47,7 @@
         (Everything is given a mereological interpretation.)
       */
       o2 = sub1.o1; // What the inner theory calls 'o1', the outer theory calls 'sub1.o1'
-      [x : D] [y : D] x = y; // Any two objects x, y of sort D are identical 
+      x : D,  y : D,  x = y; // Any two objects x, y of sort D are identical 
     }
   },
   // A theory can extend other theories

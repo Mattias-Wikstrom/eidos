@@ -10,9 +10,9 @@
   },
   axioms {
     assertions {
-      [x : D] [y : D] LessThanOrEq(meet(x, y), x);
-      [x : D] [y : D] LessThanOrEq(meet(x, y), y);
-      [x : D] [y : D] [z : D] (LessThanOrEq(z, x) ∧ LessThanOrEq(z, y)) → LessThanOrEq(z, meet(x, y));
+      x : D,  y : D,  LessThanOrEq(meet(x, y), x);
+      x : D,  y : D,  LessThanOrEq(meet(x, y), y);
+      x : D,  y : D,  z : D,  (LessThanOrEq(z, x) ∧ LessThanOrEq(z, y)) → LessThanOrEq(z, meet(x, y));
     }
   }
 }

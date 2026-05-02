@@ -19,15 +19,15 @@
     axioms {
         assertions {
             // Comment 2
-            [X ⊆ sub.S][Y ⊆ sub.S]∀Z ⊆ S (∃Y ⊆ S (Y ⊆ Y)↔((X ⊆ Y)→((Z ⊆ Y)←((Y ⊆ Y)∨(Y ⊆ Y)))));
-            [X ⊆ sub.S][Y ⊆ sub.S](Y ⊆ Y)↔((Y ⊆ <<sub>>(∃Y ⊆ S Y))→((f(Y, Y) ⊆ f(f(X, X), Y))←((Y ⊆ Y)∨(Y ⊆ Y))));
-            [x : Q][Y ⊆ Q](Y ⊆ Y)↔(Y ⊆ Y);
-            [x : S][y : S] f(y, x) =_S f(x, y);
+            X ⊆ sub.S, Y ⊆ sub.S, ∀Z ⊆ S (∃Y ⊆ S (Y ⊆ Y)↔((X ⊆ Y)→((Z ⊆ Y)←((Y ⊆ Y)∨(Y ⊆ Y)))));
+            X ⊆ sub.S, Y ⊆ sub.S, (Y ⊆ Y)↔((Y ⊆ <<sub>>(∃Y ⊆ S Y))→((f(Y, Y) ⊆ f(f(X, X), Y))←((Y ⊆ Y)∨(Y ⊆ Y))));
+            x : Q, Y ⊆ Q, (Y ⊆ Y)↔(Y ⊆ Y);
+            x : S, y : S,  f(y, x) =_S f(x, y);
             ⊥ ∨ ¬sub.⊤;
-            [y : S] (f(f(y, y), y) ⊆ f(f(y, y), Σy:𝔻(y)));
-            [x : S] x = x;
+            y : S,  (f(f(y, y), y) ⊆ f(f(y, y), Σy:𝔻(y)));
+            x : S,  x = x;
             ¬⊥;
-            //[x : S] ⊥ ∨ ¬x⊆x ∨ x≤x ∧ ¬sub.h(x)=sub.h(x) ∧ ¬sub.h(x)=sub.h(x);
+            //x : S,  ⊥ ∨ ¬x⊆x ∨ x≤x ∧ ¬sub.h(x)=sub.h(x) ∧ ¬sub.h(x)=sub.h(x);
         },
         facts {
         },

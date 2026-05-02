@@ -309,10 +309,19 @@ pSubtheoryDef =
 
 pPropExprInclVars :: Parser PropExprInclVars
 pPropExprInclVars = do
-  pos <- getSourcePos
-  vars <- many (void lbrack *> pVarDecl <* void rbrack)
+  pos  <- getSourcePos
+  vars <- many (try pVarDeclWithComma)
   expr <- pPropExpr
   return $ PropExprInclVars (unPos $ sourceLine pos) (unPos $ sourceColumn pos) vars expr
+
+-- | A single free-variable declaration followed by a comma: «x : S ,»
+-- The comma is consumed here so that the trailing comma before the
+-- expression body is part of the var-decl syntax.
+pVarDeclWithComma :: Parser VarDecl
+pVarDeclWithComma = do
+  vd <- pVarDecl
+  void comma
+  return vd
 
 pVarDecl :: Parser VarDecl
 pVarDecl = do

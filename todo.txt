@@ -9,6 +9,7 @@ Things to Be Done
 * Check for language constructs that are ignored at the moment.
 
 * Check if the output can be written in a more abstract way on the Lean 4 side.
+* 'lean4' as the target will involve a 'support library' in Lean 4. This is the equivalent of a run-time library for an ordinary programming language. Having the right support functions should make it possible to make the generated Lean 4 code reasonably readable for humans.
 
 * All objects in the output for a theory have to fall within the limits of the universe of the theory.
 
@@ -23,8 +24,6 @@ Things to Be Done
 * Make sure this is rejected as ill-typed:
     [X : S] (IdS(X) = X);
 
-* The notation [x : S][y: T]some_expr for free variables was chosen to simplify parsing, not for any deep reasons. A better notation might be this: x : S, y: T, some_expr .
-
 * Support for reflection is not done by any means. What exists now is likely to be full of errors and there are not many unit tests that reflection works as it is supposed to. A separate document should be created with documentation on how reflection is supposed to work.
 
 * Documentation is also needed of all the mereological facts that get generated for a theory.
@@ -38,8 +37,6 @@ Things to Be Done
 1) straightforward translations into Lean 4 where theories in Eidos become specifications in Lean 4 that are roughly correspond to what the user might have used manually for the same mathematical concepts
 2) mereological interpretations.
 - If you specify 'mereological' as the target then you get a translation into mereology of the original theory.
-
-* 'lean4' as the target will involve a 'support library' in Lean 4. This is the equivalent of a run-time library for an ordinary programming language. Having the right support functions should make it possible to make the generated Lean 4 code reasonably readable for humans.
 
 * There is currently support for '--pure', '--debug' and '--pretty'. None of these options was planned and they should probably be removed. They can be kept for a bit longer, though, to simplify debugging.
 
@@ -67,6 +64,8 @@ PARTLY IMPLEMENTED:
 POSSIBLY DONE:
 
 DONE:
+* The notation [x : S][y: T]some_expr for free variables was chosen to simplify parsing, not for any deep reasons. A better notation might be this: x : S, y: T, some_expr .
+
 * #dom is not supported at the moment. Check that #1, #2, and #arg work.
 
 * Support for implicit and named subtheories may be done (although it is likely that there are errors or problems with the immediate representation), but documentation is needed on how this is supposed to work.

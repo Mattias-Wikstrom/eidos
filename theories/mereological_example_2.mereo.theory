@@ -7,10 +7,10 @@
   },
   axioms {
     metafacts {
-      [X : 𝕌] (X × (A - X));
+      X : 𝕌,  (X × (A - X));
       (A - P) × Q;
       (A - Q) × R;
-      [X : 𝕌] [Y : 𝕌] (((A - X) × Y) ∸ (Y - X));
+      X : 𝕌,  Y : 𝕌,  (((A - X) × Y) ∸ (Y - X));
     }
   }
 }

@@ -165,10 +165,10 @@ main = hspec $ do
     describe "Variable declarations" $ do
 
       it "accepts variable with valid sort" $
-        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { [x:S] x =_S x; } } }"
+        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { x : S,  x =_S x; } } }"
 
       it "accepts variable with set declaration" $
-        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { [x⊆S] x =_S x; } } }"
+        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { x ⊆ S,  x =_S x; } } }"
 
     --------------------------------------------------------
     -- Quantifiers
@@ -200,7 +200,7 @@ main = hspec $ do
             MySet ⊆ S; 
           }, axioms { 
             assertions { 
-              [x:S][y:S] (x ∈ MySet) ∧ (y ∈ MySet) → (x =_S y);
+              x : S, y : S,  (x ∈ MySet) ∧ (y ∈ MySet) → (x =_S y);
               P ∨ Q → ¬(P ∧ Q);
               (a ∈ MySet) ↔ (b ∈ MySet);
             } 

@@ -13,7 +13,7 @@
       P1 × P2;
       (MyMereologicalObject + (A - P1)) - Q;
       (A - P2) ∸ (A - MyMereologicalObject);
-      [X : 𝕌] ((A - (A - X)) - X);
+      X : 𝕌,  ((A - (A - X)) - X);
       Q - P1;
     }
   }

@@ -30,9 +30,9 @@
       P1 ∨ ℙ#max;
       Q → (MyProp ∧ ¬P1);
       (P2 → ⊥) ↔ (¬MyProp);
-      [X : ℙ] (X → (¬¬X));
+      X : ℙ,  (X → (¬¬X));
       Q ← P1;
-      [X : S] X = X;
+      X : S,  X = X;
     },
     metafacts {
       MySet1 - S#min;
@@ -44,7 +44,7 @@
       MP1 × MP2;
       (MyMereologicalObject + (A - MP1)) - MQ;
       (A - MP2) ∸ (A - MyMereologicalObject);
-      [X : 𝕌] ((A - (A - X)) - X);
+      X : 𝕌,  ((A - (A - X)) - X);
       MQ - MP1;
     }
   }

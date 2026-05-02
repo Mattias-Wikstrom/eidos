@@ -18,7 +18,7 @@
   },
   axioms {
     assertions {
-      [X ⊆ f#dom] X = X;
+      X ⊆ f#dom,  X = X;
       
     }
   }

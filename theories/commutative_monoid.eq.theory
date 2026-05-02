@@ -7,7 +7,7 @@
   },
   axioms {
     facts {
-      [x : D] [y : D] op(x, y) = op(y, x); // Commutativity
+      x : D,  y : D,  op(x, y) = op(y, x); // Commutativity
     }
   }
 }

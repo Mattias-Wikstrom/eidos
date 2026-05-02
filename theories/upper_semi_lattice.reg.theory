@@ -10,9 +10,9 @@
   },
   axioms {
     assertions {
-      [x : D] [y : D] LessThanOrEq(x, join(x, y));
-      [x : D] [y : D] LessThanOrEq(y, join(x, y));
-      [x : D] [y : D] [z : D] (LessThanOrEq(x, z) ∧ LessThanOrEq(y, z)) → LessThanOrEq(join(x, y), z);
+      x : D,  y : D,  LessThanOrEq(x, join(x, y));
+      x : D,  y : D,  LessThanOrEq(y, join(x, y));
+      x : D,  y : D,  z : D,  (LessThanOrEq(x, z) ∧ LessThanOrEq(y, z)) → LessThanOrEq(join(x, y), z);
     }
   }
 }
