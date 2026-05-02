@@ -1035,20 +1035,23 @@ mkAxiomSets theory = concat
   -- -------------------------------------------------------------------------
   sortOrderAxiomSets :: [AxiomSet]
   sortOrderAxiomSets =
-    [ axiomSet [SGlobal] (tags [TagSort, TagOrdering])
-        (  [ LeanAxiom "U_ordering" (LImpl uMax uMin)
-           , LeanAxiom "U_to_P"     (LImpl uMax pMax)
-           , LeanAxiom "P_ordering" (LImpl pMax pMin)
-           , LeanAxiom "P_to_U"     (LImpl pMin uMin)
-           ]
-        ++  if usesDomain then
-              [ LeanAxiom "D_upper"    (LImpl uMax (LVar "D_Max"))
-              , LeanAxiom "D_ordering" (LImpl (LVar "D_Max") (LVar "D_Min"))
-              , LeanAxiom "D_lower"    (LImpl (LVar "D_Min") pMax)
-              ]
-            else []
-        )
-    ]
+    [ axiomSet [SSort "U"] (tags [TagSort, TagOrdering])
+        [ LeanAxiom "U_ordering" (LImpl uMax uMin)
+        ]
+    , axiomSet [SSort "P"] (tags [TagSort, TagOrdering])
+        [ LeanAxiom "P_upper"     (LImpl uMax pMax)
+        , LeanAxiom "P_ordering" (LImpl pMax pMin)
+        , LeanAxiom "P_lower"     (LImpl pMin uMin)
+        ]
+    ] ++
+    (if usesDomain then
+      [ axiomSet [SSort "D"] (tags [TagSort, TagOrdering])
+          [ LeanAxiom "D_upper"    (LImpl uMax (LVar "D_Max"))
+          , LeanAxiom "D_ordering" (LImpl (LVar "D_Max") (LVar "D_Min"))
+          , LeanAxiom "D_lower"    (LImpl (LVar "D_Min") pMax)
+          ]
+      ]
+    else [])
     ++ map mkUserSortOrder userSorts
     where
       mkUserSortOrder s =

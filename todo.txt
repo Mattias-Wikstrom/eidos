@@ -2,6 +2,10 @@
 Things to Be Done
 =================
 
+* First-order identity (=_S).
+
+* Theory-path evaluation, sub-theory resolution, sub-theory infrastructure
+
 * Check for language constructs that are ignored at the moment.
 
 * Check if the output can be written in a more abstract way on the Lean 4 side.
