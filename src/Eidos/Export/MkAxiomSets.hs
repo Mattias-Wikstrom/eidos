@@ -90,9 +90,10 @@ bForall = LBoundedForall
 -- Tag-set helpers
 -- ---------------------------------------------------------------------------
 
-tSort, tSet, tFun, tFOL, tSOL :: [Tag]
+tSort, tSet, tIndividual, tFun, tFOL, tSOL :: [Tag]
 tSort = [TagSort, TagDecl]
 tSet  = [TagSet,  TagDecl]
+tIndividual = [TagIndividual, TagDecl]
 tFun  = [TagFunction, TagDecl]
 tFOL  = [TagFunction, TagFOLFunction, TagDecl]
 tSOL  = [TagFunction, TagSOLFunction, TagDecl]
@@ -141,7 +142,9 @@ mkAxiomSets theory = concat
   , irTupleProjAxiomSets
   , irProjFromTupleAxiomSets
   , irSeparatesAxiomSets
+  , individualDeclAxiomSets
   , mereoBoundsAxiomSets
+  , individualBoundsAxiomSets
   , propBoundsAxiomSets
   , setBoundsAxiomSets
   , userSortSetBoundsAxiomSets
@@ -179,10 +182,16 @@ mkAxiomSets theory = concat
     concatMap (\f -> IR.funcArgObjects f ++ [IR.funcResObject f]) solFunctions ++
     concatMap (\f -> IR.funcArgObjects f ++ [IR.funcResObject f]) userDeclaredFolFunctions
 
+  individualObjects =
+    [ m | IR.EntityMereological m <- IR.theoryObjects theory
+        , IR.mereoKind   m == IR.MereologicalEntityKindIndividual
+        , IR.mereoOrigin m == IR.FromSignature
+        , IR.mereoName   m `notElem` [uMinName, uMaxName, "𝕌#min", "𝕌#max"]
+        ]
+
   mereoObjects =
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
-        , IR.mereoKind   m `elem` [ IR.MereologicalEntityKindIndividual
-                                  , IR.MereologicalEntityKindMereological ]
+        , IR.mereoKind   m == IR.MereologicalEntityKindMereological
         , IR.mereoOrigin m == IR.FromSignature
         , IR.mereoName   m `notElem` [uMinName, uMaxName, "𝕌#min", "𝕌#max"]
         ]
@@ -230,14 +239,16 @@ mkAxiomSets theory = concat
   -- -------------------------------------------------------------------------
   headerAxiomSets :: [AxiomSet]
   headerAxiomSets =
-    [ axiomSet [SGlobal] (tags [TagSort, TagDecl])
+    [ axiomSet [SSort "U"] (tags [TagSort, TagDecl])
         [ LeanAxiom uMinName LProp
         , LeanAxiom uMaxName LProp
-        , LeanAxiom pMinName LProp
+        ]
+    , axiomSet [SSort "P"] (tags [TagSort, TagDecl])
+        [ LeanAxiom pMinName LProp
         , LeanAxiom pMaxName LProp
         ]
     ] ++
-    [ axiomSet [SGlobal] (tags [TagSort, TagDecl])
+    [ axiomSet [SSort "D"] (tags [TagSort, TagDecl])
         [ LeanAxiom "D_Min" LProp
         , LeanAxiom "D_Max" LProp
         ]
@@ -499,10 +510,10 @@ mkAxiomSets theory = concat
   -- 18. 𝔻-sorted set declarations
   -- -------------------------------------------------------------------------
   setDeclAxiomSets :: [AxiomSet]
-  setDeclAxiomSets = map mkSetDecl setObjects
+  setDeclAxiomSets = map mkSetDecl (setObjects ++ userSortSets)
     where
       mkSetDecl m =
-        axiomSet [SGlobal] (tags [TagDecl])
+        axiomSet [SSet (IR.mereoName m)] (tags [TagSet, TagDecl])
           [LeanAxiom (IR.mereoName m) LProp]
 
   -- -------------------------------------------------------------------------
@@ -938,6 +949,16 @@ mkAxiomSets theory = concat
              [LeanAxiom (irN ++ "_separates") qX]
 
   -- -------------------------------------------------------------------------
+  -- 35b. Individual declarations
+  -- -------------------------------------------------------------------------
+  individualDeclAxiomSets :: [AxiomSet]
+  individualDeclAxiomSets = map mkIndividualDecl individualObjects
+    where
+      mkIndividualDecl m =
+        axiomSet [SIndividual (IR.mereoName m)] (tags tIndividual)
+          [LeanAxiom (IR.mereoName m) LProp]
+
+  -- -------------------------------------------------------------------------
   -- 36. Mereological object bounds
   -- -------------------------------------------------------------------------
   mereoBoundsAxiomSets :: [AxiomSet]
@@ -948,6 +969,23 @@ mkAxiomSets theory = concat
         in axiomSet [SGlobal] (tags [TagSorting])
              [ LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) uMin)
              , LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl uMax (LVar n))
+             ]
+
+
+  -- -------------------------------------------------------------------------
+  -- 36a. Individual bounds
+  -- -------------------------------------------------------------------------
+  individualBoundsAxiomSets :: [AxiomSet]
+  individualBoundsAxiomSets = map mkIndividualBounds individualObjects
+    where
+      mkIndividualBounds m =
+        let n    = IR.mereoName m
+            sN   = IR.sortName (IR.mereoSort m)
+            sMin = sortMinName sN
+            sMax = sortMaxName sN
+        in axiomSet [SIndividual n] (tags [TagIndividual, TagSorting])
+             [ LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) (LVar sMin))
+             , LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl (LVar sMax) (LVar n))
              ]
 
   -- -------------------------------------------------------------------------
