@@ -79,6 +79,8 @@ data Tag = TagSort
     -- ^ Concerns a sort (including product-domain sorts like @f_dom@).
   | TagSet
     -- ^ Concerns a set declared with @S1 ⊆ S@.
+  | TagIndividual
+    -- ^ Concerns an individual declared with @i : S@.
   | TagFunction
     -- ^ Concerns a function (FOL or SOL, user-declared or generated).
     --   Always present when 'TagFOLFunction' or 'TagSOLFunction' is present,
@@ -192,6 +194,8 @@ data SubjectNode
     -- ^ A sort, identified by its name (e.g. @"S"@, @"T"@, @"f_dom"@).
   | SSet String
     -- ^ A set declared with @⊆@, identified by its name (e.g. @"S1"@).
+  | SIndividual String
+    -- ^ An individual declared with @:@, identified by name (e.g. @"i1"@).
   | SFunction String
     -- ^ A function, identified by its name (e.g. @"f"@, @"g"@, @"k"@).
     --   Always the root of a path that descends into sub-entities.
@@ -217,7 +221,7 @@ data SubjectNode
 --
 -- Invariants (not enforced by the type, but by 'axiomSet'):
 --
--- * The first node is always 'SGlobal', 'SSort', 'SSet', or 'SFunction'.
+-- * The first node is always 'SGlobal', 'SSort', 'SSet', 'SIndividual', or 'SFunction'.
 -- * Sub-entity nodes ('SImage', 'SProjection', 'STuple', 'SInverse',
 --   'SIR', 'SArgObject', 'SResObject') may only appear after 'SFunction'.
 -- * Paths have depth at most 3 (root + sub-entity + object).
@@ -244,7 +248,7 @@ data AxiomSet = AxiomSet
 --
 -- * @axs@ is non-empty.
 -- * @path@ is non-empty.
--- * The first path node is 'SGlobal', 'SSort', 'SSet', or 'SFunction'.
+-- * The first path node is 'SGlobal', 'SSort', 'SSet', 'SIndividual', or 'SFunction'.
 -- * Sub-entity nodes only appear when the first node is 'SFunction'.
 axiomSet :: SubjectPath -> TagSet -> [LeanAxiom] -> AxiomSet
 axiomSet path ts axs
@@ -256,6 +260,7 @@ axiomSet path ts axs
             SGlobal      -> True
             SSort _      -> True
             SSet _       -> True
+            SIndividual _ -> True
             SFunction _  -> True
             _            -> False
           subEntityNodes = tail path
@@ -263,7 +268,7 @@ axiomSet path ts axs
             SFunction _ -> True
             _           -> null subEntityNodes
       in if not validRoot
-           then error $ "LeanAxiomSet.axiomSet: path must start with SGlobal/SSort/SSet/SFunction, got: " ++ show root
+           then error $ "LeanAxiomSet.axiomSet: path must start with SGlobal/SSort/SSet/SIndividual/SFunction, got: " ++ show root
            else if not subEntityOk
              then error $ "LeanAxiomSet.axiomSet: sub-entity nodes only allowed under SFunction, path: " ++ show path
              else AxiomSet { asPath = path, asTags = ts, asAxioms = axs }
