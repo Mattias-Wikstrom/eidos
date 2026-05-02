@@ -1206,6 +1206,8 @@ resolveConstRef = resolveName . IR.resolvedConstRefName
 
 resolveName :: String -> String
 resolveName n = case n of
+  "⊤"     -> pMinName
+  "⊥"     -> pMaxName
   "ℙ#min" -> pMinName
   "ℙ#max" -> pMaxName
   "𝕌#min" -> uMinName
