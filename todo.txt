@@ -2,6 +2,8 @@
 Things to Be Done
 =================
 
+* Add syntax for set comprehension + a description operator.
+
 * Individuals need to satisfy IsIndividual. (They are currently treated just like sets.)
 
 * First-order identity (=_S).
