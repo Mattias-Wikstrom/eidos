@@ -239,14 +239,16 @@ mkAxiomSets theory = concat
   -- -------------------------------------------------------------------------
   headerAxiomSets :: [AxiomSet]
   headerAxiomSets =
-    [ axiomSet [SGlobal] (tags [TagSort, TagDecl])
+    [ axiomSet [SSort "U"] (tags [TagSort, TagDecl])
         [ LeanAxiom uMinName LProp
         , LeanAxiom uMaxName LProp
-        , LeanAxiom pMinName LProp
+        ]
+    , axiomSet [SSort "P"] (tags [TagSort, TagDecl])
+        [ LeanAxiom pMinName LProp
         , LeanAxiom pMaxName LProp
         ]
     ] ++
-    [ axiomSet [SGlobal] (tags [TagSort, TagDecl])
+    [ axiomSet [SSort "D"] (tags [TagSort, TagDecl])
         [ LeanAxiom "D_Min" LProp
         , LeanAxiom "D_Max" LProp
         ]
