@@ -6,7 +6,7 @@
   },
   axioms {
     assertions {
-      ∀X : S (X =^S X);
+      ∀x : S (x =^S x);
     }
   }
 }

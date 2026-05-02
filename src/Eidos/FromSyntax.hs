@@ -279,10 +279,12 @@ buildSignatureItem th0 th item = do
       
       -- Naming rules:
       -- - Propositions (ℙ): must start with uppercase
-      -- - Mereological objects (𝕌): can start with either case
+      -- - Bare mereological objects (𝕌): must start with uppercase
       -- - Individuals (other sorts): must start with lowercase
       when (isPropSort && not (firstLetterIsUppercase nm)) $
         throwError $ "Proposition names must start with uppercase: " ++ nm
+      when (isUniverseSort && not (firstLetterIsUppercase nm)) $
+        throwError $ "Bare mereological object names must start with uppercase: " ++ nm
       when (not isPropSort && not isUniverseSort && firstLetterIsUppercase nm) $
         throwError $ "Individual names must start with lowercase: " ++ nm
       
@@ -1290,7 +1292,19 @@ resolvePropExprInclVars th ctx (PropExprInclVars _ _ vars propExprAST) = do
     resolveAndBindVar c (VarDecl vid colonOrSubset sexpr) = do
       s <- lookupSortByExpr th sexpr
       let isSet' = colonOrSubset == "⊆"
-          rvd    = ResolvedVarDecl vid isSet' s
+      -- Naming rules (mirror signature declarations):
+      --   ⊆-bound variables:  must start with uppercase (set/relation)
+      --   ℙ-sort variables:   must start with uppercase (proposition)
+      --   𝕌-sort variables:   must start with uppercase (bare mereological)
+      --   other :-bound vars: must start with lowercase (individual)
+      if isSet'
+        then when (not (firstLetterIsUppercase vid)) $
+               Left $ "Free set variable must start with uppercase: " ++ vid
+        else when (not (isPropSort s) && not (isUniverseSort s) && firstLetterIsUppercase vid) $
+               Left $ "Free individual variable must start with lowercase: " ++ vid
+      when ((isPropSort s || isUniverseSort s) && not isSet' && not (firstLetterIsUppercase vid)) $
+        Left $ "Proposition/mereological variable must start with uppercase: " ++ vid
+      let rvd = ResolvedVarDecl vid isSet' s
       return (extendVarContext c rvd)
 
 resolvePropExpr :: Theory -> VarContext -> PropExpr -> Either BuildError ResolvedPropExpr
@@ -1347,7 +1361,20 @@ resolveQuantified th ctx (Quantified qs atomic) = do
 resolveVarDecl :: Theory -> VarContext -> VarDecl -> Either BuildError (ResolvedVarDecl, VarContext)
 resolveVarDecl th ctx (VarDecl vid cos sexpr) = do
   s <- lookupSortByExpr th sexpr
-  let rvd = ResolvedVarDecl vid (cos == "⊆") s
+  let isSet' = cos == "⊆"
+  -- Naming rules (mirror signature declarations):
+  --   ⊆-bound variables:  must start with uppercase (set/relation)
+  --   ℙ-sort variables:   must start with uppercase (proposition)
+  --   𝕌-sort variables:   must start with uppercase (bare mereological)
+  --   other :-bound vars: must start with lowercase (individual)
+  if isSet'
+    then when (not (firstLetterIsUppercase vid)) $
+           Left $ "Set/relation variable must start with uppercase: " ++ vid
+    else when (not (isPropSort s) && not (isUniverseSort s) && firstLetterIsUppercase vid) $
+           Left $ "Individual variable must start with lowercase: " ++ vid
+  when ((isPropSort s || isUniverseSort s) && not isSet' && not (firstLetterIsUppercase vid)) $
+    Left $ "Proposition/mereological variable must start with uppercase: " ++ vid
+  let rvd = ResolvedVarDecl vid isSet' s
   return (rvd, extendVarContext ctx rvd)
 
 resolveAtomicProp :: Theory -> VarContext -> AtomicProp -> Either BuildError ResolvedAtomicProp

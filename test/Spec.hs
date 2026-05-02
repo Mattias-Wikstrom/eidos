@@ -160,6 +160,18 @@ main = hspec $ do
           (\err -> err `shouldContainString` "Left operand of ∈ must be an individual")
 
     --------------------------------------------------------
+    -- Signature naming rules
+    --------------------------------------------------------
+    describe "Signature naming rules" $ do
+
+      it "rejects lowercase bare mereological object in signature" $
+        expectFailure (runExpectFail "{ signature { i2 : 𝕌; } }")
+          (\err -> err `shouldContainString` "Bare mereological object names must start with uppercase")
+
+      it "accepts uppercase bare mereological object in signature" $
+        expectSuccess $ run "{ signature { MyObj : 𝕌; } }"
+
+    --------------------------------------------------------
     -- Variables
     --------------------------------------------------------
     describe "Variable declarations" $ do
@@ -168,7 +180,15 @@ main = hspec $ do
         expectSuccess $ run "{ signature { sort S; }, axioms { assertions { x : S,  x =_S x; } } }"
 
       it "accepts variable with set declaration" $
-        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { x ⊆ S,  x =_S x; } } }"
+        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { X ⊆ S,  X ⊆ X; } } }"
+
+      it "rejects uppercase individual free variable" $
+        expectFailure (runExpectFail "{ signature { sort S; }, axioms { assertions { X : S,  X =_S X; } } }")
+          (\err -> err `shouldContainString` "Free individual variable must start with lowercase")
+
+      it "rejects lowercase set free variable" $
+        expectFailure (runExpectFail "{ signature { sort S; }, axioms { assertions { x ⊆ S,  x ⊆ x; } } }")
+          (\err -> err `shouldContainString` "Free set variable must start with uppercase")
 
     --------------------------------------------------------
     -- Quantifiers
@@ -179,7 +199,15 @@ main = hspec $ do
         expectSuccess $ run "{ signature { sort S; }, axioms { assertions { ∀x:S x =_S x; } } }"
 
       it "accepts ∀ over set" $
-        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { ∀x⊆S x ⊆ x; } } }"
+        expectSuccess $ run "{ signature { sort S; }, axioms { assertions { ∀X⊆S X ⊆ X; } } }"
+
+      it "rejects ∀ with uppercase individual variable" $
+        expectFailure (runExpectFail "{ signature { sort S; }, axioms { assertions { ∀X:S X =_S X; } } }")
+          (\err -> err `shouldContainString` "Individual variable must start with lowercase")
+
+      it "rejects ∀ with lowercase set variable" $
+        expectFailure (runExpectFail "{ signature { sort S; }, axioms { assertions { ∀x⊆S x ⊆ x; } } }")
+          (\err -> err `shouldContainString` "Set/relation variable must start with uppercase")
 
       it "accepts ∃ over proposition" $
         pendingWith "Proposition-typed quantifier variables not registered in variable context"

@@ -138,7 +138,7 @@ main = hspec $ do
                 assertions {
                     x : sub.S, ∀z : S ∃y : S (y ⊆ y)↔((x ⊆ y)→((z ⊆ y)←((y ⊆ y)∨(y ⊆ y))));
                     x : sub.S, y : sub.S, (y ⊆ y)↔((y ⊆ <<sub>>(∃y : S y))→((f(y, y) ⊆ f(f(x, x), y))←((y ⊆ y)∨(y ⊆ y))));
-                    x : Q, y ⊆ Q, (y ⊆ y)↔(y = y);
+                    x : Q, Y ⊆ Q, (Y ⊆ Y)↔(Y = Y);
                     x : S, y : S,  f(y, x) =_S f(x, y);
                     ⊥ ∨ ¬sub.⊤;
                     y : S,  (f(f(y, y), y) ⊆ f(f(y, y), Σy : S(y)));
