@@ -171,7 +171,7 @@ usage = do
       IO.hPutStrLn IO.stderr "  eidos-parser --pure <file.theory>       # Parse and build IR (pure mode, no external files)"
       IO.hPutStrLn IO.stderr "  eidos-parser --pretty <file.theory>     # Parse and pretty-print AST"
       IO.hPutStrLn IO.stderr "  eidos-parser --lean_using_props <file.theory>  # Export to Lean 4 (handles ℙ, 𝕌, and mixed theories)"
-      IO.hPutStrLn IO.stderr "    Optional flags before file: --group-by-entity --sorting-axioms --comment-groups --bounded-forall-syntax"
+      IO.hPutStrLn IO.stderr "    Optional flags before file: --group-by-entity --sorting-axioms --comment-groups --comment-tags --bounded-forall-syntax"
       IO.hPutStrLn IO.stderr "  eidos-parser --json <file.theory>             # Export IR as JSON"
       IO.hPutStrLn IO.stderr "  eidos-parser --json --compact <file.theory>   # Export IR as compact JSON"
       IO.hPutStrLn IO.stderr "  eidos-parser --lean <file.theory>                   # Export to Lean 4 using structure-based encoding (sorts → Types)"
@@ -185,4 +185,5 @@ parseLeanPropsOptions flags =
     apply o "--sorting-axioms" = o { LeanProps.optUseSortingAxioms = True }
     apply o "--comment-groups" = o { LeanProps.optAddGroupComments = True }
     apply o "--bounded-forall-syntax" = o { LeanProps.optUseBoundedForallSyntax = True }
+    apply o "--comment-tags" = o { LeanProps.optAddTagComments = True }
     apply o _ = o
