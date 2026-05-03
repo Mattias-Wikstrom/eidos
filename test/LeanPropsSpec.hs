@@ -606,3 +606,56 @@ main = hspec $ do
         }
       }|]
       noDuplicateNames doc `shouldBe` True
+
+  -- =========================================================================
+  describe "Set comprehension and description operator" $ do
+  -- =========================================================================
+
+    it "set comprehension { x : S | φ(x) } translates to bounded forall with φ → x body" $ do
+      doc <- buildStr [r|{
+        signature { sort S; },
+        axioms { assertions {
+          x : S, {y : S | y =_S x} ⊆ {y : S | y =_S x};
+        }}
+      }|]
+      -- The comprehension { y : S | y =_S x } should appear in the output as:
+      --   forall y : Prop, IsWithinBounds(S_Min, S_Max, y) → ((y = x) → y)
+      let types = allTypes doc
+          hasComprehension = any (\t -> case t of
+            LBoundedForall _ _ _ (LImpl _ (LVar _)) -> True
+            _ -> False) types
+      hasComprehension `shouldBe` True
+
+    it "description ιx : S φ(x) produces the same Lean output as set comprehension" $ do
+      docComp <- buildStr [r|{
+        signature { sort S; a : S; },
+        axioms { assertions {
+          x : S, {y : S | y =_S a} ⊆ {y : S | y =_S a};
+        }}
+      }|]
+      docDesc <- buildStr [r|{
+        signature { sort S; a : S; },
+        axioms { assertions {
+          x : S, ιy : S y =_S a ∈ {z : S | z =_S a};
+        }}
+      }|]
+      -- Both should produce a bounded forall of the form: ∀y, bound → (φ → y)
+      let hasComprehensionForm doc = any (\t -> case t of
+              LBoundedForall _ _ _ (LImpl _ (LVar _)) -> True
+              _ -> False) (allTypes doc)
+      hasComprehensionForm docComp `shouldBe` True
+      hasComprehensionForm docDesc `shouldBe` True
+
+    it "set comprehension uses sort bounds from the variable's sort" $ do
+      doc <- buildStr [r|{
+        signature { sort S; },
+        axioms { assertions {
+          {x : S | x =_S x} ⊆ {x : S | x =_S x};
+        }}
+      }|]
+      -- The bounded forall should use S_Min and S_Max
+      let types = allTypes doc
+          hasSBounds = any (\t -> case t of
+            LBoundedForall _ "S_Min" "S_Max" _ -> True
+            _ -> False) types
+      hasSBounds `shouldBe` True

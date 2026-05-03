@@ -1322,3 +1322,27 @@ baseTermToLean (IR.ResolvedBTGeneralizedSumOrProduct gsp) =
          error ("baseTermToLean: GeneralizedSumOrProduct with bare binder '"
                 ++ bareVar ++ "' for symbol '" ++ sym
                 ++ "' — sort annotation is required")
+
+-- | Both set comprehension { x : A | φ(x) } and description ιx : A φ(x)
+-- translate to the same Lean expression:
+--
+--   forall x : Prop, (IsWithinBounds A_Min A_Max x) → (φ'(x) → x)
+--
+-- This encodes the mereological reading: we are asserting x for all x
+-- that satisfy φ'(x) within the bounds of sort A, which gives us the
+-- sum of all such x — the mereological sum of the members of the set.
+baseTermToLean (IR.ResolvedBTSetComprehension sc) =
+  let vd      = IR.resolvedSCVar sc
+      varN    = IR.resolvedVarName vd
+      sn      = IR.sortName (IR.resolvedVarSort vd)
+      (lo,hi) = sortBounds sn
+      phi     = propExprToLean (IR.resolvedSCBody sc)
+  in LBoundedForall varN lo hi (LImpl phi (LVar varN))
+
+baseTermToLean (IR.ResolvedBTDescription desc) =
+  let vd      = IR.resolvedDescVar desc
+      varN    = IR.resolvedVarName vd
+      sn      = IR.sortName (IR.resolvedVarSort vd)
+      (lo,hi) = sortBounds sn
+      phi     = propExprToLean (IR.resolvedDescBody desc)
+  in LBoundedForall varN lo hi (LImpl phi (LVar varN))
