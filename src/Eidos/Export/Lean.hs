@@ -250,6 +250,18 @@ theoryToLeanTypeDoc theory =
       LTVar (IR.resolvedConstRefName ref)
     baseTermToLeanType (IR.ResolvedBTParen inner) =
       propExprToLeanType inner
+    -- Set comprehension { x : A | φ(x) } and description ιx : A φ(x) both
+    -- translate to: ∀ x : A, φ'(x) → x
+    baseTermToLeanType (IR.ResolvedBTSetComprehension sc) =
+      let varN = IR.resolvedVarName (IR.resolvedSCVar sc)
+          sn   = IR.sortName (IR.resolvedVarSort (IR.resolvedSCVar sc))
+          phi  = propExprToLeanType (IR.resolvedSCBody sc)
+      in LTForall varN (LTVar sn) (LTArrow phi (LTVar varN))
+    baseTermToLeanType (IR.ResolvedBTDescription desc) =
+      let varN = IR.resolvedVarName (IR.resolvedDescVar desc)
+          sn   = IR.sortName (IR.resolvedVarSort (IR.resolvedDescVar desc))
+          phi  = propExprToLeanType (IR.resolvedDescBody desc)
+      in LTForall varN (LTVar sn) (LTArrow phi (LTVar varN))
     baseTermToLeanType _ = LTVar "<unsupported-base>"
 
 -- ---------------------------------------------------------------------------
