@@ -14,7 +14,7 @@ module Main where
 
 import Test.Hspec
 import Text.RawString.QQ (r)
-import Data.List (nub, isPrefixOf)
+import Data.List (nub, isPrefixOf, isInfixOf)
 
 import Eidos.Parser     (parseString)
 import Eidos.FromSyntax (buildTheoryPure)
@@ -463,12 +463,47 @@ main = hspec $ do
         _ -> False)
         `shouldBe` True
         
-    it "bounded guard for user-defined sort quantifier uses IsWithinBounds S_Min X S_Max" $ do
+    it "bounded guard for ℙ-quantifier does not add IsIndividual (proposition, not FOL individual)" $ do
       doc <- buildStr [r|{
-        signature { sort S; },
-        axioms { assertions { [X : S] (X ↔ X); } }
+        axioms { assertions { X : ℙ, (X → ¬¬X); } }
       }|]
       hasWrappedFactWith doc pMin (\case
+        LBoundedForall "X" "P_Min" "P_Max" (LImpl (LIsIndividual _ _ _) _) -> False
+        LBoundedForall "X" "P_Min" "P_Max" _ -> True
+        _ -> False)
+        `shouldBe` True
+
+    it "bounded guard for 𝕌-quantifier does not add IsIndividual (mereological, not FOL individual)" $ do
+      doc <- buildStr [r|{
+        signature { A : 𝕌; },
+        axioms { metafacts { X : 𝕌, (A - (A - X)) - X; } }
+      }|]
+      hasWrappedFactWith doc uMin (\case
+        LBoundedForall "X" "U_Min" "U_Max" (LImpl (LIsIndividual _ _ _) _) -> False
+        LBoundedForall "X" "U_Min" "U_Max" _ -> True
+        _ -> False)
+        `shouldBe` True
+
+    it "individual free variable x : S does NOT add IsIndividual guard (free logic)" $ do
+      doc <- buildStr [r|{
+        signature { sort S; },
+        axioms { assertions { x : S, x =_S x; } }
+      }|]
+      -- Free variables lack existential import in Eidos (free logic).
+      -- So x : S wraps with bounds only, no IsIndividual guard.
+      hasWrappedFactWith doc pMin (\case
+        LBoundedForall "x" "S_Min" "S_Max" (LImpl (LIsIndividual _ _ _) _) -> False
+        LBoundedForall "x" "S_Min" "S_Max" _ -> True
+        _ -> False)
+        `shouldBe` True
+
+    it "set free variable X ⊆ S does not add IsIndividual guard" $ do
+      doc <- buildStr [r|{
+        signature { sort S; },
+        axioms { assertions { X ⊆ S, X ⊆ X; } }
+      }|]
+      hasWrappedFactWith doc pMin (\case
+        LBoundedForall "X" "S_Min" "S_Max" (LImpl (LIsIndividual _ _ _) _) -> False
         LBoundedForall "X" "S_Min" "S_Max" _ -> True
         _ -> False)
         `shouldBe` True
@@ -484,6 +519,18 @@ main = hspec $ do
     it "renders LIsWithinBounds for a user sort" $
       renderLeanExpr (LIsWithinBounds "S_Min" "X" "S_Max")
         `shouldBe` "(IsWithinBounds S_Min S_Max X)"
+
+  -- =========================================================================
+  describe "renderLeanExpr – LIsIndividual" $ do
+  -- =========================================================================
+
+    it "renders LIsIndividual as IsIndividual lo hi var" $
+      renderLeanExpr (LIsIndividual "S_Min" "x" "S_Max")
+        `shouldBe` "(IsIndividual S_Min S_Max x)"
+
+    it "IsIndividual is defined as always-true in the output header" $
+      renderLeanDoc (LeanDoc "" [])
+        `shouldSatisfy` ("def IsIndividual" `isInfixOf`)
 
   -- =========================================================================
   describe "theoryToLeanDoc – set union (∪), intersection (∩), subset (⊆) in metafacts" $ do
