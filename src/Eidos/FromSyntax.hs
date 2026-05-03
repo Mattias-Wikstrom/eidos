@@ -1226,6 +1226,10 @@ translateBaseTerm th bt = case bt of
   ResolvedBTGeneralizedSumOrProduct (ResolvedGeneralizedSumOrProduct sym var operand) ->
     ResolvedBTGeneralizedSumOrProduct
       (ResolvedGeneralizedSumOrProduct sym var (translateTerm th operand))
+  ResolvedBTSetComprehension (ResolvedSetComprehension rvd rbody) ->
+    ResolvedBTSetComprehension (ResolvedSetComprehension rvd (translatePropExpr th rbody))
+  ResolvedBTDescription (ResolvedDescription rvd rbody) ->
+    ResolvedBTDescription (ResolvedDescription rvd (translatePropExpr th rbody))
   ResolvedBTAtomic _ -> bt   -- atomic constants are left unchanged
 
 -- ---------------------------------------------------------------------------
@@ -1504,6 +1508,25 @@ resolveBaseTerm th ctx bt = case bt of
       RelationClass 1 -> Left "Cannot take singleton of a set (singleton only for individuals)"
       _ -> Left "Singleton argument must be an individual"
     return (ResolvedBTSingleton rt, RelationClass 1)
+
+  BTSetComprehension (SetComprehension vd body) -> do
+    -- { x : A | φ(x) } resolves to a set (RelationClass 1).
+    -- The bound variable is in scope only within the body.
+    (rvd, ctx') <- resolveVarDecl th ctx vd
+    when (isSet rvd) $
+      throwError "Set comprehension variable must be an individual (use ':', not '⊆')"
+    rbody <- resolvePropExpr th ctx' body
+    return ( ResolvedBTSetComprehension (ResolvedSetComprehension rvd rbody)
+           , RelationClass 1 )
+
+  BTDescription (Description vd body) -> do
+    -- ιx : A φ(x) resolves to the unique individual of sort A satisfying φ.
+    (rvd, ctx') <- resolveVarDecl th ctx vd
+    when (isSet rvd) $
+      throwError "Description variable must be an individual (use ':', not '⊆')"
+    rbody <- resolvePropExpr th ctx' body
+    return ( ResolvedBTDescription (ResolvedDescription rvd rbody)
+           , IndividualClass )
 
   BTParen inner -> do
     rp <- resolvePropExpr th ctx inner

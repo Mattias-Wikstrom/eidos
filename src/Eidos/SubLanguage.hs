@@ -106,7 +106,7 @@ checkEquational body = concatMap checkSection (sections body)
       concatMap checkSigItemEquational items
 
     checkSigItemEquational (SigFunction fd)
-      | isSOLName (funcName fd) =
+      | isSOLFunction fd =
           [viol "signature" $ "SOL function '" ++ funcName fd
                            ++ "' (uppercase name) is not allowed in equational logic"]
     checkSigItemEquational (SigIndividual (IndividualDeclaration nm se))
@@ -175,7 +175,8 @@ checkEquational body = concatMap checkSection (sections body)
       checkTermEquational ctx left ++
       concatMap (\(RelationFollowedByTerm _ _ _ r) -> checkTermEquational ctx r) rights
 
-    checkTermEquational ctx t = checkTermForBottom ctx t
+    checkTermEquational ctx t =
+      checkTermForBottom ctx t ++ checkTermNoComprehension ctx t
 
 -- | Regular logic (.reg)
 --
@@ -202,7 +203,7 @@ checkRegular body = concatMap checkSection (sections body)
       concatMap checkSigItemRegular items
 
     checkSigItemRegular (SigFunction fd)
-      | isSOLName (funcName fd) =
+      | isSOLFunction fd =
           [viol "signature" $ "SOL function '" ++ funcName fd
                            ++ "' is not allowed in regular logic"]
     checkSigItemRegular (SigIndividual (IndividualDeclaration nm se))
@@ -245,7 +246,8 @@ checkRegular body = concatMap checkSection (sections body)
       concatMap (checkQuantifierNoSOL ctx) qs ++
       checkAtomicNoBottom ctx atomic
 
-    checkAtomicNoBottom ctx (AtomicProp tp) = checkTermPairForBottom ctx tp
+    checkAtomicNoBottom ctx (AtomicProp tp) =
+      checkTermPairForBottom ctx tp ++ checkTPNoComp ctx tp
 
 -- | Coherent logic (.coh)
 --
@@ -274,7 +276,7 @@ checkCoherent body = concatMap checkSection (sections body)
       concatMap checkSigItemCoherent items
 
     checkSigItemCoherent (SigFunction fd)
-      | isSOLName (funcName fd) =
+      | isSOLFunction fd =
           [viol "signature" $ "SOL function '" ++ funcName fd
                            ++ "' is not allowed in coherent logic"]
     checkSigItemCoherent (SigIndividual (IndividualDeclaration nm se))
@@ -343,7 +345,7 @@ checkFOL body = concatMap checkSection (sections body)
     checkSigFOL (SignatureSection items) = concatMap checkSigItemFOL items
 
     checkSigItemFOL (SigFunction fd)
-      | isSOLName (funcName fd) =
+      | isSOLFunction fd =
           [viol "signature" $ "SOL function '" ++ funcName fd
                            ++ "' is not allowed in first-order logic"]
     checkSigItemFOL _ = []
@@ -427,7 +429,17 @@ checkPropositional body = concatMap checkSection (sections body)
                            ++ "' is not allowed in propositional logic; only ℙ-typed propositions are permitted"]
     checkSigItemProp _ = []
 
-    checkPropProp ctx (PropExprInclVars _ _ vars expr) = checkPropExprProp ctx expr
+    checkPropProp ctx (PropExprInclVars _ _ vars expr) =
+      -- Free variables over ℙ (schematic proposition variables) are fine.
+      -- Free variables over any other sort are not allowed in propositional logic.
+      concatMap (checkFreeVarProp ctx) vars ++
+      checkPropExprProp ctx expr
+
+    checkFreeVarProp ctx (VarDecl vid _ se)
+      | isPropSortExpr se = []  -- 'X : ℙ' is a legitimate schematic variable
+      | otherwise =
+          [viol ctx $ "Free variable '" ++ vid
+                   ++ "' has a non-ℙ sort; only proposition variables (X : ℙ) are allowed in propositional logic"]
 
     -- Propositional: all connectives allowed, but no quantifiers.
     checkPropExprProp ctx (PropExpr left rests) =
@@ -468,6 +480,10 @@ checkPropositional body = concatMap checkSection (sections body)
 
     checkFactorProp ctx (Factor base _) = checkBaseTermProp ctx base
 
+    checkBaseTermProp ctx (BTSetComprehension _) =
+      [viol ctx "set comprehension is not allowed in propositional logic"]
+    checkBaseTermProp ctx (BTDescription _) =
+      [viol ctx "description operator ι is not allowed in propositional logic"]
     checkBaseTermProp ctx (BTParen expr) = checkPropExprProp ctx expr
     checkBaseTermProp _   _              = []
     -- Non-paren base terms are identifiers, ⊤, ⊥ — these are fine in prop logic.
@@ -485,16 +501,18 @@ checkMereological body = concatMap checkSection (sections body)
     checkSection (SectionBareAxioms axs)   = checkBareAxiomsMereo axs
     checkSection (SectionSubtheories _)    = []
 
-    checkAxiomsWrapperMereo (AxiomsWrapper axss)
-      | null axss = []
-      | otherwise = []
+    checkAxiomsWrapperMereo (AxiomsWrapper axss) =
+      -- Allow the axioms wrapper if it only contains metafacts.
+      -- Assertions and facts are forbidden; metafacts are the correct vehicle
+      -- for expressing mereological relations.
+      concatMap checkBareAxiomsMereo axss
 
     checkBareAxiomsMereo (AxAssertions _) =
       [viol "assertions" "assertions are not allowed in mereological theories"]
     checkBareAxiomsMereo (AxFacts _) =
       [viol "facts" "facts are not allowed in mereological theories"]
     checkBareAxiomsMereo (AxMetafacts _) =
-      [viol "metafacts" "metafacts are not allowed in mereological theories"]
+      []  -- metafacts are the natural home for mereological expressions
 
     checkSigMereo (SignatureSection items) = concatMap checkSigItemMereo items
 
@@ -546,6 +564,74 @@ checkVarDeclsNoProp ctx = mapMaybe check
           Just $ viol ctx $ "Variable '" ++ vid
                          ++ "' has sort ℙ which is not allowed in this sublanguage"
     check _ = Nothing
+
+-- ---------------------------------------------------------------------------
+-- Comprehension / description helpers
+-- ---------------------------------------------------------------------------
+
+-- | Reject set comprehension { x : A | φ } anywhere in a term.
+checkTermNoComprehension :: String -> Term -> [Violation]
+checkTermNoComprehension ctx (Term left rests) =
+  checkFactorNoComprehension ctx left ++
+  concatMap (\(OperationFollowedByFactor _ _ f) -> checkFactorNoComprehension ctx f) rests
+
+checkFactorNoComprehension :: String -> Factor -> [Violation]
+checkFactorNoComprehension ctx (Factor base suffixes) =
+  checkBaseTermNoComprehension ctx base ++
+  concatMap (checkSuffixNoComprehension ctx) suffixes
+
+checkBaseTermNoComprehension :: String -> BaseTerm -> [Violation]
+checkBaseTermNoComprehension ctx (BTSetComprehension _) =
+  [viol ctx "set comprehension { x : A | φ } is not allowed in this sublanguage (requires .fol or higher)"]
+checkBaseTermNoComprehension ctx (BTDescription _) =
+  [viol ctx "description operator ι is not allowed in this sublanguage (requires .fol or higher)"]
+checkBaseTermNoComprehension ctx (BTParen expr) = checkPropExprNoComprehension ctx expr
+checkBaseTermNoComprehension ctx (BTSingleton t) = checkTermNoComprehension ctx t
+checkBaseTermNoComprehension _ _ = []
+
+checkSuffixNoComprehension :: String -> TermSuffix -> [Violation]
+checkSuffixNoComprehension ctx (SuffixCall (CallSuffix args)) =
+  concatMap (checkTermNoComprehension ctx) args
+checkSuffixNoComprehension _ _ = []
+
+checkPropExprNoComprehension :: String -> PropExpr -> [Violation]
+checkPropExprNoComprehension ctx (PropExpr left rests) =
+  checkRINoComp ctx left ++
+  concatMap (\(PropExprRest _ r) -> checkRINoComp ctx r) rests
+
+checkRINoComp :: String -> RightImpl -> [Violation]
+checkRINoComp ctx (RightImpl left mbRight) =
+  checkLINoComp ctx left ++
+  case mbRight of { Nothing -> []; Just (_, r) -> checkRINoComp ctx r }
+
+checkLINoComp :: String -> LeftImpl -> [Violation]
+checkLINoComp ctx (LeftImpl left rests) =
+  checkDisjNoComp ctx left ++
+  concatMap (\(LeftImplRest _ d) -> checkDisjNoComp ctx d) rests
+
+checkDisjNoComp :: String -> Disj -> [Violation]
+checkDisjNoComp ctx (Disj left rests) =
+  checkConjNoComp ctx left ++
+  concatMap (\(DisjRest _ c) -> checkConjNoComp ctx c) rests
+
+checkConjNoComp :: String -> Conj -> [Violation]
+checkConjNoComp ctx (Conj left rests) =
+  checkNegNoComp ctx left ++
+  concatMap (\(ConjRest _ n) -> checkNegNoComp ctx n) rests
+
+checkNegNoComp :: String -> Neg -> [Violation]
+checkNegNoComp ctx (NegNot inner) = checkNegNoComp ctx inner
+checkNegNoComp ctx (NegChild (Quantified _ atomic)) = checkAtomicNoComp ctx atomic
+
+checkAtomicNoComp :: String -> AtomicProp -> [Violation]
+checkAtomicNoComp ctx (AtomicProp tp) = checkTPNoComp ctx tp
+
+checkTPNoComp :: String -> TermPair -> [Violation]
+checkTPNoComp ctx (TermPair left rights) =
+  checkTermNoComprehension ctx left ++
+  concatMap (\(RelationFollowedByTerm _ _ _ r) -> checkTermNoComprehension ctx r) rights
+
+-- ---------------------------------------------------------------------------
 
 -- | Check that ⊥ doesn't appear in a term (looks for bare "⊥" constant refs).
 checkTermForBottom :: String -> Term -> [Violation]
@@ -630,7 +716,14 @@ sortExprName (SortExpr (SortRef specs c)) =
 -- Function name helpers
 -- ---------------------------------------------------------------------------
 
--- | True if a function name starts with uppercase (SOL convention).
-isSOLName :: String -> Bool
-isSOLName []    = False
-isSOLName (c:_) = c >= 'A' && c <= 'Z'
+-- | True if a function declaration is a SOL function.
+-- A function is SOL if its name starts with uppercase AND its codomain is
+-- not 'Prop' / ℙ.  Uppercase-named functions with codomain Prop are FOL
+-- predicates (relations) — they happen to use uppercase by convention but
+-- they are first-order.
+isSOLFunction :: FunctionDeclaration -> Bool
+isSOLFunction fd = startsUpper (funcName fd) && not (isPropSortExpr (funcCodomain fd))
+
+startsUpper :: String -> Bool
+startsUpper []    = False
+startsUpper (c:_) = c >= 'A' && c <= 'Z'

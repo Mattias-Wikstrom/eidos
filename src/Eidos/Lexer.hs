@@ -13,6 +13,7 @@ module Eidos.Lexer
   , symbol
     -- * Punctuation
   , lbrace, rbrace, lparen, rparen, lbrack, rbrack
+  , pipe, iotaOp
   , semi, colon, comma, dot, hash, at, underscore, caret
   , lt, gt, doubleLt, doubleGt
     -- * Operators
@@ -136,6 +137,12 @@ equals = symbol "="
 generSumSym, generProdSym :: Parser String
 generSumSym  = symbol "Σ"
 generProdSym = symbol "Π"
+
+pipe :: Parser String
+pipe = symbol "|"
+
+iotaOp :: Parser String
+iotaOp = symbol "ι"
 
 -- ---------------------------------------------------------------------------
 -- Keywords (word-boundary safe)

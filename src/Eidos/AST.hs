@@ -273,10 +273,25 @@ data BaseTerm
   | BTProjectionToInterval    ProjectionToInterval
   | BTProjectionToSort        ProjectionToSort
   | BTGeneralizedSumOrProduct GeneralizedSumOrProduct
+  | BTSetComprehension        SetComprehension   -- ^ { x : A | φ(x) }
+  | BTDescription             Description        -- ^ ιx : A φ(x)
   | BTSingleton               Term
   | BTParen                   PropExpr
   | BTAtomic                  ConstantRef
   deriving (Show, Eq)
+
+-- | Set comprehension { x : A | φ(x) } — yields a set (subset of sort A).
+data SetComprehension = SetComprehension
+  { scVar  :: VarDecl   -- ^ the bound variable with its sort
+  , scBody :: PropExpr  -- ^ the predicate body
+  } deriving (Show, Eq)
+
+-- | Description operator ιx : A φ(x) — yields the unique individual of
+--   sort A satisfying φ.
+data Description = Description
+  { descVar  :: VarDecl   -- ^ the bound variable with its sort
+  , descBody :: PropExpr  -- ^ the predicate body
+  } deriving (Show, Eq)
 
 data EvaluationInTheory = EvaluationInTheory
   { eitTheoryNames :: [TheoryName]
