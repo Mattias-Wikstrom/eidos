@@ -415,10 +415,24 @@ data ResolvedBaseTerm
   | ResolvedBTProjectionToInterval    ResolvedProjectionToInterval
   | ResolvedBTProjectionToSort        ResolvedProjectionToSort
   | ResolvedBTGeneralizedSumOrProduct ResolvedGeneralizedSumOrProduct
+  | ResolvedBTSetComprehension        ResolvedSetComprehension
+  | ResolvedBTDescription             ResolvedDescription
   | ResolvedBTSingleton               ResolvedTerm
   | ResolvedBTParen                   ResolvedPropExpr
   | ResolvedBTAtomic                  ResolvedConstantRef
   deriving (Show)
+
+-- | Resolved set comprehension { x : A | φ(x) }.
+data ResolvedSetComprehension = ResolvedSetComprehension
+  { resolvedSCVar  :: ResolvedVarDecl
+  , resolvedSCBody :: ResolvedPropExpr
+  } deriving (Show)
+
+-- | Resolved description ιx : A φ(x).
+data ResolvedDescription = ResolvedDescription
+  { resolvedDescVar  :: ResolvedVarDecl
+  , resolvedDescBody :: ResolvedPropExpr
+  } deriving (Show)
 
 data ResolvedEvaluationInTheory = ResolvedEvaluationInTheory
   { resolvedEITTheoryPath :: [String]

@@ -473,9 +473,35 @@ pBaseTerm =
   <|> BTProjectionToInterval    <$> try pProjectionToInterval
   <|> BTProjectionToSort        <$> try pProjectionToSort
   <|> BTGeneralizedSumOrProduct <$> try pGeneralizedSumOrProduct
+  -- Set comprehension { x : A | φ(x) } must be tried before singleton { term }
+  -- because both start with '{'. The pipe disambiguates.
+  <|> BTSetComprehension        <$> try pSetComprehension
+  <|> BTDescription             <$> try pDescription
   <|> BTSingleton               <$> try (between lbrace rbrace pTerm)
   <|> BTParen                   <$> try (between lparen rparen pPropExpr)
   <|> BTAtomic                  <$> pConstantRef
+
+-- | Set comprehension: { x : A | φ(x) }
+--   The variable declaration uses the same syntax as free variables and
+--   quantifiers.  The '|' pipe separates the binder from the body.
+pSetComprehension :: Parser SetComprehension
+pSetComprehension = do
+  void lbrace
+  v <- pTypedVarDecl
+  void pipe
+  body <- pPropExpr
+  void rbrace
+  return $ SetComprehension v body
+
+-- | Description operator: ι x : A φ(x)
+--   Introduces the unique individual of sort A satisfying φ.
+--   The sort annotation is required syntactically.
+pDescription :: Parser Description
+pDescription = do
+  void iotaOp
+  v    <- pTypedVarDecl
+  body <- pPropExpr
+  return $ Description v body
 
 -- | <<th1.th2>>(expr)
 pEvaluationInTheory :: Parser EvaluationInTheory

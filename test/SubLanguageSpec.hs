@@ -137,10 +137,18 @@ main = hspec $ do
         axioms { assertions { x =_S x ← x =_S x; } }
       }|]
 
-    it "rejects SOL function" $
+    it "rejects SOL function (non-Prop codomain)" $
       shouldReject "SOL function" $ check RegularTheory [r|{
         signature { sort S; F : S → S; },
         axioms { assertions { } }
+      }|]
+
+    it "accepts uppercase FOL predicate (Prop codomain) in signature" $
+      shouldAccept $ check RegularTheory [r|{
+        signature { sort D; LessThanOrEq : D, D → Prop; },
+        axioms { assertions {
+          x : D,  LessThanOrEq(x, x);
+        }}
       }|]
 
   ------------------------------------------------------------
@@ -172,10 +180,18 @@ main = hspec $ do
         axioms { assertions { (x =_S x) ↔ (x =_S x); } }
       }|]
 
-    it "rejects SOL function" $
+    it "rejects SOL function (non-Prop codomain)" $
       shouldReject "SOL function" $ check CoherentTheory [r|{
         signature { sort S; F : S → S; },
         axioms { assertions { } }
+      }|]
+
+    it "accepts uppercase FOL predicate (Prop codomain) in signature" $
+      shouldAccept $ check CoherentTheory [r|{
+        signature { sort D; LessThan : D, D → Prop; },
+        axioms { assertions {
+          x : D, y : D,  LessThan(x, y) → ∃z:D LessThan(x, z);
+        }}
       }|]
 
   ------------------------------------------------------------
@@ -246,10 +262,16 @@ main = hspec $ do
         axioms { assertions { ∀X:ℙ X → X; } }
       }|]
 
-    it "rejects free variable declaration" $
-      shouldReject "free variable declarations" $ check PropositionalTheory [r|{
-        signature { P : ℙ; },
-        axioms { assertions { X : ℙ,  X → X; } }
+    it "accepts free ℙ variable (schematic proposition variable)" $
+      shouldAccept $ check PropositionalTheory [r|{
+        signature { },
+        axioms { assertions { X : ℙ,  (X ∨ ¬X); } }
+      }|]
+
+    it "rejects free variable over non-ℙ sort" $
+      shouldReject "non-ℙ sort" $ check PropositionalTheory [r|{
+        signature { sort S; },
+        axioms { assertions { x : S,  x = x; } }
       }|]
 
   ------------------------------------------------------------
@@ -265,10 +287,22 @@ main = hspec $ do
         }
       }|]
 
-    it "rejects any axioms" $
-      shouldReject "axioms section" $ check MereologicalTheory [r|{
+    it "rejects facts" $
+      shouldReject "facts are not allowed" $ check MereologicalTheory [r|{
         signature { sort S; },
         axioms { facts { } }
+      }|]
+
+    it "rejects assertions" $
+      shouldReject "assertions are not allowed" $ check MereologicalTheory [r|{
+        signature { sort S; },
+        axioms { assertions { } }
+      }|]
+
+    it "accepts metafacts" $
+      shouldAccept $ check MereologicalTheory [r|{
+        signature { A : 𝕌; P : 𝕌; },
+        axioms { metafacts { P × (A - P); } }
       }|]
 
     it "rejects FOL function" $
@@ -314,3 +348,54 @@ main = hspec $ do
           case parseString "{ signature { sort S; x : S; y : S; }, axioms { facts { x =_S x ∨ y =_S y; } } }" of
             Right ast -> ast
             Left _    -> error "parse failed"
+
+  ------------------------------------------------------------
+  describe "Set comprehension and description" $ do
+
+    it "parses set comprehension { x : A | φ(x) }" $
+      case parseString "{ signature { sort S; }, axioms { assertions { {x : S | x =_S x} ⊆ {x : S | x =_S x}; } } }" of
+        Left err -> fail ("Parse failed: " ++ show err)
+        Right _  -> return ()
+
+    it "parses description ιx : A φ(x)" $
+      case parseString "{ signature { sort S; a : S; }, axioms { assertions { ιx : S x =_S a; } } }" of
+        Left err -> fail ("Parse failed: " ++ show err)
+        Right _  -> return ()
+
+    it "accepts set comprehension in .fol theory" $
+      shouldAccept $ check FOLTheory [r|{
+        signature { sort S; },
+        axioms { assertions {
+          {x : S | x =_S x} ⊆ {x : S | x =_S x};
+        }}
+      }|]
+
+    it "accepts description operator in .fol theory" $
+      shouldAccept $ check FOLTheory [r|{
+        signature { sort S; a : S; },
+        axioms { assertions { ιx : S x =_S a =_S a; } }
+      }|]
+
+    it "rejects set comprehension in .eq theory" $
+      shouldReject "set comprehension" $ check EquationalTheory [r|{
+        signature { sort S; },
+        axioms { facts { {x : S | x =_S x} = {x : S | x =_S x}; } }
+      }|]
+
+    it "rejects set comprehension in .reg theory" $
+      shouldReject "set comprehension" $ check RegularTheory [r|{
+        signature { sort S; },
+        axioms { assertions { {x : S | x =_S x} ⊆ {x : S | x =_S x}; } }
+      }|]
+
+    it "rejects set comprehension in .coh theory" $
+      shouldReject "set comprehension" $ check CoherentTheory [r|{
+        signature { sort S; },
+        axioms { assertions { {x : S | x =_S x} ⊆ {x : S | x =_S x}; } }
+      }|]
+
+    it "rejects description in .prop theory" $
+      shouldReject "description operator" $ check PropositionalTheory [r|{
+        signature { P : ℙ; },
+        axioms { assertions { ιX : ℙ X → X; } }
+      }|]

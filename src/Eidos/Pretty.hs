@@ -417,6 +417,10 @@ prettyBaseTerm bt =
          Left vd -> prettyVarDecl vd
          Right vid -> vid) ++
       "(" ++ prettyTerm operand ++ ")"
+    BTSetComprehension (SetComprehension vd body) ->
+      "{ " ++ prettyVarDecl vd ++ " | " ++ prettyPropExpr body ++ " }"
+    BTDescription (Description vd body) ->
+      "ι" ++ prettyVarDecl vd ++ " " ++ prettyPropExpr body
     BTSingleton inner ->
       "{" ++ prettyTerm inner ++ "}"
     BTParen inner ->
@@ -538,6 +542,14 @@ prettyResolvedBaseTermWithOpts :: PrettyOptions -> ResolvedBaseTerm -> Doc
 prettyResolvedBaseTermWithOpts opts bt = case bt of
   ResolvedBTAtomic ref -> prettyResolvedConstantRefWithOpts opts ref
   ResolvedBTParen inner -> "(" ++ prettyResolvedPropExprWithOpts opts inner ++ ")"
+  ResolvedBTSetComprehension (ResolvedSetComprehension rvd rbody) ->
+    let op = if resolvedVarIsSet rvd then " ⊆ " else " : "
+        binder = resolvedVarName rvd ++ op ++ IR.sortName (resolvedVarSort rvd)
+    in "{ " ++ binder ++ " | " ++ prettyResolvedPropExprWithOpts opts rbody ++ " }"
+  ResolvedBTDescription (ResolvedDescription rvd rbody) ->
+    let op = if resolvedVarIsSet rvd then " ⊆ " else " : "
+        binder = resolvedVarName rvd ++ op ++ IR.sortName (resolvedVarSort rvd)
+    in "ι" ++ binder ++ " " ++ prettyResolvedPropExprWithOpts opts rbody
   ResolvedBTSingleton t -> "{" ++ prettyResolvedTermWithOpts opts t ++ "}"
   ResolvedBTEvaluationInTheory (ResolvedEvaluationInTheory path _ inner) ->
     "<<" ++ intercalate "." path ++ ">>(" ++ prettyResolvedPropExprWithOpts opts inner ++ ")"
