@@ -541,7 +541,8 @@ prettyResolvedFactorWithOpts opts (ResolvedFactor base suffixes _) =
 prettyResolvedBaseTermWithOpts :: PrettyOptions -> ResolvedBaseTerm -> Doc
 prettyResolvedBaseTermWithOpts opts bt = case bt of
   ResolvedBTAtomic ref -> prettyResolvedConstantRefWithOpts opts ref
-  ResolvedBTParen inner -> "(" ++ prettyResolvedPropExprWithOpts opts inner ++ ")"
+  ResolvedBTPropParen inner -> "(" ++ prettyResolvedPropExprWithOpts opts inner ++ ")"
+  ResolvedBTTermParen term -> "(" ++ prettyResolvedTermWithOpts opts term ++ ")"
   ResolvedBTSetComprehension (ResolvedSetComprehension rvd rbody) ->
     let op = if resolvedVarIsSet rvd then " ⊆ " else " : "
         binder = resolvedVarName rvd ++ op ++ IR.sortName (resolvedVarSort rvd)

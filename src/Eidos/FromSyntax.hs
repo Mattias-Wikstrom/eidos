@@ -1207,16 +1207,18 @@ translateFactor th (ResolvedFactor base suffixes ty) =
 
 translateBaseTerm :: Theory -> ResolvedBaseTerm -> ResolvedBaseTerm
 translateBaseTerm th bt = case bt of
-  ResolvedBTParen inner ->
-    ResolvedBTParen (translatePropExpr th inner)
+  -- NEW: Proposition parentheses – translate inner proposition
+  ResolvedBTPropParen inner ->
+    ResolvedBTPropParen (translatePropExpr th inner)
+  -- NEW: Term parentheses – translate inner term
+  ResolvedBTTermParen term ->
+    ResolvedBTTermParen (translateTerm th term)
   ResolvedBTSingleton t ->
     ResolvedBTSingleton (translateTerm th t)
   ResolvedBTEvaluationInTheory (ResolvedEvaluationInTheory path subTh inner) ->
     ResolvedBTEvaluationInTheory
       (ResolvedEvaluationInTheory path subTh (translatePropExpr subTh inner))
   ResolvedBTProjectionToSort (ResolvedProjectionToSort s operand) ->
-    -- Projection to sort [S](t) becomes [S#min, S#max](t) at a lower level;
-    -- for now keep structure but translate the operand.
     ResolvedBTProjectionToSort (ResolvedProjectionToSort s (translateTerm th operand))
   ResolvedBTProjectionToInterval (ResolvedProjectionToInterval lo hi operand) ->
     ResolvedBTProjectionToInterval
@@ -1462,6 +1464,31 @@ resolveFactor th ctx (Factor base suffixes) = do
   (rs, resultType) <- foldM (resolveSuffix th ctx) ([], baseType) suffixes
   return (ResolvedFactor rb rs resultType)
 
+isSet :: ResolvedVarDecl -> Bool
+isSet (ResolvedVarDecl _ b _) = b
+
+-- | Extract a term from a proposition that is just a term in disguise.
+-- Returns Nothing if the proposition contains any logical structure.
+termIfPlain :: ResolvedPropExpr -> Maybe ResolvedTerm
+termIfPlain (ResolvedPropBicond (ResolvedRightImpl left Nothing) []) =
+  case left of
+    ResolvedLeftImpl (ResolvedDisj (ResolvedConj (ResolvedNegChild (ResolvedQuantified [] atomic)) [] ) [] ) [] ->
+      case atomic of
+        ResolvedAtomicTermPair tp
+          | null (resolvedTPRight tp) -> Just (resolvedTPLeft tp)
+        ResolvedAtomicConstant cr
+          | resolvedConstType cr /= PropositionClass ->
+              Just (termFromConstant cr)
+        _ -> Nothing
+    _ -> Nothing
+termIfPlain _ = Nothing
+
+-- | Build a ResolvedTerm from a constant reference (for the atomic constant case).
+termFromConstant :: ResolvedConstantRef -> ResolvedTerm
+termFromConstant cr =
+  let factor = ResolvedFactor (ResolvedBTAtomic cr) [] (resolvedConstType cr)
+  in ResolvedTerm factor [] (resolvedConstType cr)
+
 resolveBaseTerm :: Theory -> VarContext -> BaseTerm -> Either BuildError (ResolvedBaseTerm, ExprType)
 resolveBaseTerm th ctx bt = case bt of
 
@@ -1530,7 +1557,13 @@ resolveBaseTerm th ctx bt = case bt of
 
   BTParen inner -> do
     rp <- resolvePropExpr th ctx inner
-    return (ResolvedBTParen rp, PropositionClass)
+    case termIfPlain rp of
+      Just term | resolvedTermType term /= PropositionClass ->
+        -- It's a term, not a proposition → term parentheses
+        return (ResolvedBTTermParen term, resolvedTermType term)
+      _ ->
+        -- It's a genuine proposition → keep as proposition parentheses
+        return (ResolvedBTPropParen rp, PropositionClass)
 
 -- | Resolve term suffixes and propagate the type.
 resolveSuffix
@@ -1813,9 +1846,11 @@ containsNegationInFactor (ResolvedFactor base _ _) =
 
 containsNegationInBase :: ResolvedBaseTerm -> Bool
 containsNegationInBase (ResolvedBTAtomic ref) = 
-  resolvedConstRefName ref == "⊥"  -- Check for absurdity at base level
-containsNegationInBase (ResolvedBTParen expr) = 
+  resolvedConstRefName ref == "⊥"
+containsNegationInBase (ResolvedBTPropParen expr) = 
   containsNegationOrAbsurdity expr
+containsNegationInBase (ResolvedBTTermParen term) = 
+  containsNegationInTerm term   -- propagate through term parentheses
 containsNegationInBase (ResolvedBTSingleton t) = 
   containsNegationInTerm t
 containsNegationInBase (ResolvedBTEvaluationInTheory eit) = 

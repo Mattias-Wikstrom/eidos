@@ -432,7 +432,8 @@ data ResolvedBaseTerm
   | ResolvedBTSetComprehension        ResolvedSetComprehension
   | ResolvedBTDescription             ResolvedDescription
   | ResolvedBTSingleton               ResolvedTerm
-  | ResolvedBTParen                   ResolvedPropExpr
+  | ResolvedBTTermParen               ResolvedTerm   -- ( term )
+  | ResolvedBTPropParen               ResolvedPropExpr   -- ( proposition )
   | ResolvedBTAtomic                  ResolvedConstantRef
   deriving (Show)
 

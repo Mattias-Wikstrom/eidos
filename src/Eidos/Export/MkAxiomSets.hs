@@ -1341,8 +1341,8 @@ factorToLean (IR.ResolvedFactor base suffixes _) =
 baseTermToLean :: IR.ResolvedBaseTerm -> LeanExpr
 baseTermToLean (IR.ResolvedBTAtomic ref) =
   LVar (resolveConstRef ref)
-baseTermToLean (IR.ResolvedBTParen expr) =
-  propExprToLean expr
+baseTermToLean (IR.ResolvedBTPropParen expr) = propExprToLean expr
+baseTermToLean (IR.ResolvedBTTermParen term) = termToLean term
 baseTermToLean (IR.ResolvedBTSingleton t) =
   termToLean t
 baseTermToLean (IR.ResolvedBTEvaluationInTheory eit) =

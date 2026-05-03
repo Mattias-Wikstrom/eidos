@@ -263,7 +263,8 @@ renderFactor (IR.ResolvedFactor base suffixes _) =
 
 renderBase :: IR.ResolvedBaseTerm -> String
 renderBase (IR.ResolvedBTAtomic ref) = IR.resolvedConstRefName ref
-renderBase (IR.ResolvedBTParen inner) = "(" ++ renderPropExpr inner ++ ")"
+renderBase (IR.ResolvedBTPropParen inner) = "(" ++ renderPropExpr inner ++ ")"
+renderBase (IR.ResolvedBTTermParen term) = "(" ++ renderTerm term ++ ")"
 renderBase (IR.ResolvedBTSingleton t) = "{" ++ renderTerm t ++ "}"
 renderBase (IR.ResolvedBTEvaluationInTheory (IR.ResolvedEvaluationInTheory path _ inner)) =
   "<<" ++ intercalate "." path ++ ">>(" ++ renderPropExpr inner ++ ")"

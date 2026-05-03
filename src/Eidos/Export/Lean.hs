@@ -248,8 +248,8 @@ theoryToLeanTypeDoc theory =
     baseTermToLeanType :: IR.ResolvedBaseTerm -> LeanTypeExpr
     baseTermToLeanType (IR.ResolvedBTAtomic ref) =
       LTVar (IR.resolvedConstRefName ref)
-    baseTermToLeanType (IR.ResolvedBTParen inner) =
-      propExprToLeanType inner
+    baseTermToLeanType (IR.ResolvedBTPropParen inner) = propExprToLeanType inner
+    baseTermToLeanType (IR.ResolvedBTTermParen term) = termToLeanType term
     -- Set comprehension { x : A | φ(x) } and description ιx : A φ(x) both
     -- translate to: ∀ x : A, φ'(x) → x
     baseTermToLeanType (IR.ResolvedBTSetComprehension sc) =

@@ -520,6 +520,9 @@ checkResolvedFactor :: ResolvedFactor -> Either String ()
 checkResolvedFactor (ResolvedFactor base _ _) = do
   checkResolvedBaseTerm base
 
+checkResolvedPropExpr :: ResolvedPropExpr -> Either String ()
+checkResolvedPropExpr = typeCheckResolvedExpr
+
 checkResolvedBaseTerm :: ResolvedBaseTerm -> Either String ()
 checkResolvedBaseTerm (ResolvedBTAtomic constRef) = do
   case resolvedConstEntity constRef of
@@ -551,7 +554,10 @@ checkResolvedBaseTerm (ResolvedBTGeneralizedSumOrProduct (ResolvedGeneralizedSum
 checkResolvedBaseTerm (ResolvedBTSingleton inner) = do
   _ <- checkResolvedTerm inner
   return ()
-checkResolvedBaseTerm (ResolvedBTParen _) = Right ()
+checkResolvedBaseTerm (ResolvedBTTermParen term) = do
+  _ <- checkResolvedTerm term
+  return ()
+checkResolvedBaseTerm (ResolvedBTPropParen prop) = checkResolvedPropExpr prop
 
 -- Helper to create a ResolvedTerm from a ResolvedFactor (simplified)
 termFromFactor :: ResolvedFactor -> ResolvedTerm
