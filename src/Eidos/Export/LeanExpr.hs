@@ -77,6 +77,12 @@ data LeanExpr
     --   All three fields are variable /names/ (not expressions), kept as
     --   'String' because 'IsWithinBounds' is always applied to atomic names
     --   in our encoding.
+  | LIsIndividual String String String
+    -- ^ @LIsIndividual lo var hi@ renders as
+    --   @(IsIndividual lo hi var)@.
+    --   Guards first-order (individual) quantification.  In the current
+    --   version 'IsIndividual' is defined as always true (@\_ _ _ => True@)
+    --   but the hook is in place for future refinement.
   | LBoundedForall String String String LeanExpr
     -- ^ @LBoundedForall var lo hi body@ renders as
     --   @forall var : Prop, (IsWithinBounds lo hi var) → body@.
@@ -101,6 +107,7 @@ renderLeanDoc doc =
        , ""
        , "def IsWithinBounds (lo hi x : Prop) : Prop := (hi → x) ∧ (x → lo)"
        , "def ProjectIntoInterval (x lo hi : Prop) : Prop := (x ∧ lo) ∨ hi"
+       , "def IsIndividual (lo hi x : Prop) : Prop := True"
        , ""
        ]
     ++ map renderDecl (leanDocDecls doc)
@@ -140,6 +147,8 @@ renderLeanExpr (LEq a b) =
   renderLeanExpr a ++ " = " ++ renderLeanExpr b
 renderLeanExpr (LIsWithinBounds lo v hi) =
   "(IsWithinBounds " ++ lo ++ " " ++ hi ++ " " ++ v ++ ")"
+renderLeanExpr (LIsIndividual lo v hi) =
+  "(IsIndividual " ++ lo ++ " " ++ hi ++ " " ++ v ++ ")"
 renderLeanExpr (LBoundedForall var lo hi body) =
   "forall " ++ var ++ " : Prop, "
     ++ renderLeanExpr (LIsWithinBounds lo var hi)

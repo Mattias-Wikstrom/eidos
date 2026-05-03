@@ -1140,7 +1140,12 @@ mkAxiomSets theory = concat
         let varN     = IR.resolvedVarName vd
             sn       = IR.sortName (IR.resolvedVarSort vd)
             (lo, hi) = sortBounds sn
-        in LBoundedForall varN lo hi (wrapFreeVars' rest body)
+            inner    = wrapFreeVars' rest body
+        in if isFOLIndividual vd
+           -- x : A, φ(x): FOL individual — bounds + individuality guard.
+           then LBoundedForall varN lo hi (LImpl (LIsIndividual lo varN hi) inner)
+           -- X ⊆ A / X : ℙ / X : 𝕌 — bounds only, no individuality guard.
+           else LBoundedForall varN lo hi inner
 
       -- Inline prop-expr translator (mirrors LeanProps.propExprToLean)
       propExprToLean' = propExprToLean
@@ -1185,17 +1190,37 @@ quantifiedToLean (IR.ResolvedQuantified [] atom) = atomicPropToLean atom
 quantifiedToLean (IR.ResolvedQuantified qs atom) =
   foldr quantifierToLean (atomicPropToLean atom) qs
 
+-- | True when a resolved variable represents a first-order individual —
+-- that is, it is bound with ':' (not '⊆') over a user-declared sort
+-- (not ℙ or 𝕌).  Only these variables receive the 'IsIndividual' guard.
+isFOLIndividual :: IR.ResolvedVarDecl -> Bool
+isFOLIndividual vd =
+  not (IR.resolvedVarIsSet vd)          -- bound with ':', not '⊆'
+  && not (IR.isPropSort    s)            -- not a proposition variable
+  && not (IR.isUniverseSort s)           -- not a bare mereological variable
+  where s = IR.resolvedVarSort vd
+
 quantifierToLean :: IR.ResolvedQuantifier -> LeanExpr -> LeanExpr
 quantifierToLean (IR.ResolvedQForall vd) body =
   let varN     = IR.resolvedVarName vd
       sn       = IR.sortName (IR.resolvedVarSort vd)
       (lo, hi) = sortBounds sn
-  in LBoundedForall varN lo hi body
+  in if isFOLIndividual vd
+     -- ∀x : A φ(x): FOL individual — bounds + individuality guard.
+     then LBoundedForall varN lo hi (LImpl (LIsIndividual lo varN hi) body)
+     -- ∀X ⊆ A / ∀X : ℙ / ∀X : 𝕌 — bounds only, no individuality guard.
+     else LBoundedForall varN lo hi body
 quantifierToLean (IR.ResolvedQExists vd) body =
   let varN     = IR.resolvedVarName vd
       sn       = IR.sortName (IR.resolvedVarSort vd)
       (lo, hi) = sortBounds sn
-  in LExists varN (LVar "Prop") (LImpl (LIsWithinBounds lo varN hi) body)
+  in if isFOLIndividual vd
+     -- ∃x : A φ(x): FOL individual — bounds + individuality guard.
+     then LExists varN (LVar "Prop")
+            (LImpl (LIsWithinBounds lo varN hi)
+              (LImpl (LIsIndividual lo varN hi) body))
+     -- ∃X ⊆ A / ∃X : ℙ / ∃X : 𝕌 — bounds only, no individuality guard.
+     else LExists varN (LVar "Prop") (LImpl (LIsWithinBounds lo varN hi) body)
 
 atomicPropToLean :: IR.ResolvedAtomicProp -> LeanExpr
 atomicPropToLean (IR.ResolvedAtomicConstant ref) = LVar (resolveConstRef ref)
