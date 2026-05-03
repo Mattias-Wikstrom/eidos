@@ -484,13 +484,16 @@ main = hspec $ do
         _ -> False)
         `shouldBe` True
 
-    it "individual free variable x : S adds IsIndividual guard" $ do
+    it "individual free variable x : S does NOT add IsIndividual guard (free logic)" $ do
       doc <- buildStr [r|{
         signature { sort S; },
         axioms { assertions { x : S, x =_S x; } }
       }|]
+      -- Free variables lack existential import in Eidos (free logic).
+      -- So x : S wraps with bounds only, no IsIndividual guard.
       hasWrappedFactWith doc pMin (\case
-        LBoundedForall "x" "S_Min" "S_Max" (LImpl (LIsIndividual "S_Min" "x" "S_Max") _) -> True
+        LBoundedForall "x" "S_Min" "S_Max" (LImpl (LIsIndividual _ _ _) _) -> False
+        LBoundedForall "x" "S_Min" "S_Max" _ -> True
         _ -> False)
         `shouldBe` True
 

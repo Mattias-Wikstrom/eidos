@@ -1140,12 +1140,10 @@ mkAxiomSets theory = concat
         let varN     = IR.resolvedVarName vd
             sn       = IR.sortName (IR.resolvedVarSort vd)
             (lo, hi) = sortBounds sn
-            inner    = wrapFreeVars' rest body
-        in if isFOLIndividual vd
-           -- x : A, φ(x): FOL individual — bounds + individuality guard.
-           then LBoundedForall varN lo hi (LImpl (LIsIndividual lo varN hi) inner)
-           -- X ⊆ A / X : ℙ / X : 𝕌 — bounds only, no individuality guard.
-           else LBoundedForall varN lo hi inner
+        -- Free variables use bounds only — no IsIndividual guard.
+        -- Eidos uses free logic: free variables and constants lack
+        -- existential import, so asserting IsIndividual here would be wrong.
+        in LBoundedForall varN lo hi (wrapFreeVars' rest body)
 
       -- Inline prop-expr translator (mirrors LeanProps.propExprToLean)
       propExprToLean' = propExprToLean
