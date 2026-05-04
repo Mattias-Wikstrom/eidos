@@ -28,7 +28,8 @@ library
                     , Eidos.Export.LeanProps
                     , Eidos.Export.LeanAxiomSet
                     , Eidos.Export.MkAxiomSets
-                    , Eidos.BuildMonad 
+                    , Eidos.BuildMonad
+                    , Eidos.Wasm
     hs-source-dirs:   src
     default-language: GHC2021
     build-depends:    megaparsec >=9.0
@@ -180,3 +181,25 @@ test-suite sublanguage-tests
                     base,
                     raw-strings-qq,
                     megaparsec
+-- ---------------------------------------------------------------------------
+-- Wasm executable
+--
+-- Build with the GHC Wasm toolchain:
+--   wasm32-wasi-cabal build exe:eidos-wasm
+--
+-- See wasm/README.md for the full build and deployment instructions.
+-- ---------------------------------------------------------------------------
+
+executable eidos-wasm
+    import:           warnings, deps
+    main-is:          WasmMain.hs
+    other-modules:    WasmFFI
+    hs-source-dirs:   wasm-app
+    default-language: GHC2021
+    -- -no-hs-main: the JS host drives execution via hs_init + foreign exports.
+    -- Only pass this when building for Wasm; a normal GHC build can use the
+    -- trivial `main = return ()` in WasmMain.hs without this flag.
+    -- ghc-options:   -no-hs-main
+    build-depends:    eidos-parser
+                    , containers
+                    , base >=4.17 && <5
