@@ -92,6 +92,20 @@ data LeanExpr
     --   macro syntax).
   | LProjectIntoInterval LeanExpr LeanExpr LeanExpr
     -- ^ @ProjectIntoInterval x lo hi@
+  | LFactWrapper LeanExpr
+    -- ^ A plain (non-assertion, non-metafact) fact, keyed by @P_Min@.
+    --   Currently renders as @(P_Min ∧ body) ↔ P_Min@.
+    --   Making this a first-class node lets tests pattern-match on the
+    --   semantic intent — "this is a fact" — independently of the exact
+    --   Lean 4 encoding, which may change.
+  | LAssertionWrapper LeanExpr
+    -- ^ A ℙ-sorted assertion, keyed by @P_Min@ and @P_Max@.
+    --   Currently renders as @(P_Min ∧ (P_Max ∨ body)) ↔ P_Min@.
+    --   A future version might use @P_Min → (P_Max ∨ body)@; either way
+    --   the body is preserved for test inspection.
+  | LMetafactWrapper LeanExpr
+    -- ^ A 𝕌-sorted metafact, keyed by @U_Min@.
+    --   Currently renders as @(U_Min ∧ body) ↔ U_Min@.
   deriving (Eq, Show)
 
 -- ---------------------------------------------------------------------------
@@ -158,3 +172,9 @@ renderLeanExpr (LProjectIntoInterval x lo hi) =
     ++ renderLeanExpr x ++ " "
     ++ renderLeanExpr lo ++ " "
     ++ renderLeanExpr hi ++ ")"
+renderLeanExpr (LFactWrapper body) =
+  renderLeanExpr (LBicond (LConj (LVar "P_Min") body) (LVar "P_Min"))
+renderLeanExpr (LAssertionWrapper body) =
+  renderLeanExpr (LBicond (LConj (LVar "P_Min") (LDisj (LVar "P_Max") body)) (LVar "P_Min"))
+renderLeanExpr (LMetafactWrapper body) =
+  renderLeanExpr (LBicond (LConj (LVar "U_Min") body) (LVar "U_Min"))

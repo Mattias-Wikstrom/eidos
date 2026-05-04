@@ -1148,19 +1148,17 @@ mkAxiomSets theory = concat
       mkFactAS idx fact =
         axiomSet [SGlobal] (tags [TagUserFact])
           [LeanAxiom (mkLabel idx)
-            -- Facts: original structure without P_Max wrapping
-            (LBicond (LConj pMin (factBodyExpr fact)) pMin)]
+            (LFactWrapper (factBodyExpr fact))]
 
       mkAssertionAS idx fact =
         axiomSet [SGlobal] (tags [TagUserFact])
           [LeanAxiom (mkLabel idx)
-            -- Assertions: wrap the body with (P_Max ∨ ...)
-            (LBicond (LConj pMin (LDisj pMax (factBodyExpr fact))) pMin)]
+            (LAssertionWrapper (factBodyExpr fact))]
 
       mkMetafactAS idx fact =
         axiomSet [SGlobal] (tags [TagUserFact])
           [LeanAxiom (mkLabel idx)
-            (LBicond (LConj uMin (factBodyExpr fact)) uMin)]
+            (LMetafactWrapper (factBodyExpr fact))]
 
       factBodyExpr fact =
         wrapFreeVars' (IR.factFreeVars fact) (propExprToLean' (IR.factPropExpr fact))

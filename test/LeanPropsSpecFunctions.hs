@@ -145,23 +145,6 @@ findAxiomByName doc name =
     (a:_) -> Just a
     _     -> Nothing
 
--- | Collect all LeanExprs that are the body of a wrapped fact with this wrapper.
-wrappedBodies :: LeanDoc -> LeanExpr -> [LeanExpr]
-wrappedBodies doc wrapper =
-  [ body
-  | LBicond (LConj w body) w' <- allTypes doc
-  , w == wrapper, w' == wrapper
-  ]
-
--- | True when the doc contains a wrapped fact (wrapper ∧ body) ↔ wrapper
---   where body satisfies the predicate (checking any sub-expression).
-hasWrappedFactWith :: LeanDoc -> LeanExpr -> (LeanExpr -> Bool) -> Bool
-hasWrappedFactWith doc wrapper p =
-  any matches (allTypes doc)
-  where
-    matches (LBicond (LConj w body) w') = w == wrapper && w' == wrapper && p body
-    matches _                           = False
-
 -- ---------------------------------------------------------------------------
 -- Main
 -- ---------------------------------------------------------------------------

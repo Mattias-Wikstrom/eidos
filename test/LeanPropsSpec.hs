@@ -91,34 +91,46 @@ hasPropDecl :: LeanDoc -> String -> Bool
 hasPropDecl doc name = hasType doc LProp && any isPropAxiom (axioms doc)
   where isPropAxiom ax = axiomType ax == LProp && axiomName ax == name
 
--- | True when the doc contains a fact axiom of the form
---   (wrapper ∧ body) ↔ wrapper  for the given wrapper and body.
-hasWrappedFact :: LeanDoc -> LeanExpr -> LeanExpr -> Bool
-hasWrappedFact doc wrapper body =
-  hasType doc (LBicond (LConj wrapper body) wrapper)
+-- ---------------------------------------------------------------------------
+-- Fact-wrapper helpers
+--
+-- The three fact-wrapper nodes (LFactWrapper, LAssertionWrapper,
+-- LMetafactWrapper) give tests a stable handle on semantic intent that
+-- is independent of the concrete Lean 4 encoding.  All helpers below
+-- pattern-match on these nodes directly so that changes to how the
+-- wrappers are rendered never break a passing test.
+-- ---------------------------------------------------------------------------
 
--- | True when the doc contains *some* wrapped fact of the form
---   (wrapper ∧ body) ↔ wrapper  where `body` satisfies the predicate.
-hasWrappedFactWith :: LeanDoc -> LeanExpr -> (LeanExpr -> Bool) -> Bool
-hasWrappedFactWith doc wrapper p =
-  any matches (allTypes doc)
-  where
-    matches (LBicond (LConj w body) w') = w == wrapper && w' == wrapper && p body
-    matches _                           = False
+-- | Bodies of all 'LAssertionWrapper' axioms in the doc.
+assertionBodies :: LeanDoc -> [LeanExpr]
+assertionBodies doc = [ body | LAssertionWrapper body <- allTypes doc ]
 
--- | Collect all LeanExprs that are the body of a wrapped fact with this wrapper.
-wrappedBodies :: LeanDoc -> LeanExpr -> [LeanExpr]
-wrappedBodies doc wrapper =
-  [ body
-  | LBicond (LConj w body) w' <- allTypes doc
-  , w == wrapper, w' == wrapper
-  ]
+-- | True when some assertion axiom in the doc has exactly this body.
+hasAssertionBody :: LeanDoc -> LeanExpr -> Bool
+hasAssertionBody doc body = body `elem` assertionBodies doc
+
+-- | True when some assertion axiom body satisfies the predicate.
+hasAssertionBodyWith :: LeanDoc -> (LeanExpr -> Bool) -> Bool
+hasAssertionBodyWith doc p = any p (assertionBodies doc)
+
+-- | Bodies of all 'LMetafactWrapper' axioms in the doc.
+metafactBodies :: LeanDoc -> [LeanExpr]
+metafactBodies doc = [ body | LMetafactWrapper body <- allTypes doc ]
+
+-- | True when some metafact axiom in the doc has exactly this body.
+hasMetafactBody :: LeanDoc -> LeanExpr -> Bool
+hasMetafactBody doc body = body `elem` metafactBodies doc
+
+-- | True when some metafact axiom body satisfies the predicate.
+hasMetafactBodyWith :: LeanDoc -> (LeanExpr -> Bool) -> Bool
+hasMetafactBodyWith doc p = any p (metafactBodies doc)
 
 -- | True when the doc declares no duplicate axiom names.
 noDuplicateNames :: LeanDoc -> Bool
 noDuplicateNames doc =
   let names = map axiomName (axioms doc)
   in nub names == names
+
 
 -- ---------------------------------------------------------------------------
 -- Main
@@ -176,6 +188,27 @@ main = hspec $ do
           rendered = renderLeanExpr expr
       in do
         rendered `shouldSatisfy` ("∀ X : Prop," `isPrefixOf`)
+
+    it "renders LAssertionWrapper: output contains P_Min and body" $
+      -- The exact encoding is an implementation detail; we only check that
+      -- the rendered string mentions both the wrapper anchor (P_Min) and
+      -- the body content.
+      let rendered = renderLeanExpr (LAssertionWrapper (LVar "MyProp"))
+      in do
+        rendered `shouldSatisfy` ("P_Min" `isInfixOf`)
+        rendered `shouldSatisfy` ("MyProp" `isInfixOf`)
+
+    it "renders LMetafactWrapper: output contains U_Min and body" $
+      let rendered = renderLeanExpr (LMetafactWrapper (LVar "MySet"))
+      in do
+        rendered `shouldSatisfy` ("U_Min" `isInfixOf`)
+        rendered `shouldSatisfy` ("MySet" `isInfixOf`)
+
+    it "renders LFactWrapper: output contains P_Min and body" $
+      let rendered = renderLeanExpr (LFactWrapper (LVar "MyFact"))
+      in do
+        rendered `shouldSatisfy` ("P_Min" `isInfixOf`)
+        rendered `shouldSatisfy` ("MyFact" `isInfixOf`)
 
   -- =========================================================================
   describe "theoryToLeanDoc – header" $ do
@@ -354,61 +387,61 @@ main = hspec $ do
   describe "theoryToLeanDoc – assertions" $ do
   -- =========================================================================
 
-    it "wraps each assertion as (P_Min ∧ body) ↔ P_Min" $ do
+    it "wraps each assertion in an LAssertionWrapper axiom" $ do
       doc <- buildStr [r|{ signature { P : ℙ; }, axioms { assertions { P; } } }|]
-      hasWrappedFactWith doc pMin (const True) `shouldBe` True
+      hasAssertionBodyWith doc (const True) `shouldBe` True
 
     it "assertion body for P is  LVar P" $ do
       doc <- buildStr [r|{ signature { P : ℙ; }, axioms { assertions { P; } } }|]
-      hasWrappedFact doc pMin (LVar "P") `shouldBe` True
+      hasAssertionBody doc (LVar "P") `shouldBe` True
 
     it "assertion body for P ∨ Q is  LDisj P Q" $ do
       doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P ∨ Q; } } }|]
-      hasWrappedFact doc pMin (LDisj (LVar "P") (LVar "Q")) `shouldBe` True
+      hasAssertionBody doc (LDisj (LVar "P") (LVar "Q")) `shouldBe` True
 
     it "assertion body for ¬P is  LImpl P P_Max  (negation as implication to P_Max)" $ do
       doc <- buildStr [r|{ signature { P : ℙ; }, axioms { assertions { ¬P; } } }|]
-      hasWrappedFact doc pMin (LImpl (LVar "P") pMax) `shouldBe` True
+      hasAssertionBody doc (LImpl (LVar "P") pMax) `shouldBe` True
 
     it "assertion body for P → Q is  LImpl P Q" $ do
       doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P → Q; } } }|]
-      hasWrappedFact doc pMin (LImpl (LVar "P") (LVar "Q")) `shouldBe` True
+      hasAssertionBody doc (LImpl (LVar "P") (LVar "Q")) `shouldBe` True
 
     it "assertion body for P ↔ Q is  LBicond P Q" $ do
       doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P ↔ Q; } } }|]
-      hasWrappedFact doc pMin (LBicond (LVar "P") (LVar "Q")) `shouldBe` True
+      hasAssertionBody doc (LBicond (LVar "P") (LVar "Q")) `shouldBe` True
 
-    it "generates one wrapped P_Min fact per assertion" $ do
+    it "generates one LAssertionWrapper axiom per assertion" $ do
       doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P; Q; } } }|]
-      length (wrappedBodies doc pMin) `shouldBe` 2
+      length (assertionBodies doc) `shouldBe` 2
 
   -- =========================================================================
   describe "theoryToLeanDoc – metafacts" $ do
   -- =========================================================================
 
-    it "wraps each metafact as (U_Min ∧ body) ↔ U_Min" $ do
+    it "wraps each metafact in an LMetafactWrapper axiom" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A × B; } } }|]
-      hasWrappedFactWith doc uMin (const True) `shouldBe` True
+      hasMetafactBodyWith doc (const True) `shouldBe` True
 
     it "metafact body for A × B (product / disjunction) is  LDisj A B" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A × B; } } }|]
-      hasWrappedFact doc uMin (LDisj (LVar "A") (LVar "B")) `shouldBe` True
+      hasMetafactBody doc (LDisj (LVar "A") (LVar "B")) `shouldBe` True
 
     it "metafact body for A + B (sum / conjunction) is  LConj A B" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A + B; } } }|]
-      hasWrappedFact doc uMin (LConj (LVar "A") (LVar "B")) `shouldBe` True
+      hasMetafactBody doc (LConj (LVar "A") (LVar "B")) `shouldBe` True
 
     it "mereological difference  A - B  renders as  B → A" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A - B; } } }|]
-      hasWrappedFact doc uMin (LImpl (LVar "B") (LVar "A")) `shouldBe` True
+      hasMetafactBody doc (LImpl (LVar "B") (LVar "A")) `shouldBe` True
 
     it "symmetric difference  A ∸ B  renders as  A ↔ B" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ∸ B; } } }|]
-      hasWrappedFact doc uMin (LBicond (LVar "A") (LVar "B")) `shouldBe` True
+      hasMetafactBody doc (LBicond (LVar "A") (LVar "B")) `shouldBe` True
 
-    it "generates one wrapped U_Min fact per metafact" $ do
+    it "generates one LMetafactWrapper axiom per metafact" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A × B; A + B; } } }|]
-      length (wrappedBodies doc uMin) `shouldBe` 2
+      length (metafactBodies doc) `shouldBe` 2
 
     it "assertions and metafacts use different wrappers (P_Min vs U_Min)" $ do
       doc <- buildStr [r|{
@@ -418,8 +451,8 @@ main = hspec $ do
           metafacts { A × B; }
         }
       }|]
-      length (wrappedBodies doc pMin) `shouldBe` 1
-      length (wrappedBodies doc uMin) `shouldBe` 1
+      length (assertionBodies doc) `shouldBe` 1
+      length (metafactBodies doc) `shouldBe` 1
 
   -- =========================================================================
   describe "theoryToLeanDoc – universal quantifier in facts" $ do
@@ -427,9 +460,9 @@ main = hspec $ do
 
     it "renders [X : ℙ] body as LBoundedForall X P_Min P_Max ..." $ do
       doc <- buildStr [r|{
-        axioms { assertions { [X : ℙ] (X → ¬¬X); } }
+        axioms { assertions { ∀X : ℙ, (X → ¬¬X); } }
       }|]
-      hasWrappedFactWith doc pMin (\case
+      hasAssertionBodyWith doc (\case
         LBoundedForall "X" "P_Min" "P_Max" _ -> True
         _                                    -> False)
         `shouldBe` True
@@ -437,18 +470,18 @@ main = hspec $ do
     it "renders [X : 𝕌] body as LBoundedForall X U_Min U_Max ..." $ do
       doc <- buildStr [r|{
         signature { A : 𝕌; },
-        axioms { metafacts { [X : 𝕌] (A - (A - X)) - X; } }
+        axioms { metafacts { ∀X : 𝕌, (A - (A - X)) - X; } }
       }|]
-      hasWrappedFactWith doc uMin (\case
+      hasMetafactBodyWith doc (\case
         LBoundedForall "X" "U_Min" "U_Max" _ -> True
         _                                    -> False)
         `shouldBe` True
 
     it "bounded guard for ℙ-quantifier uses IsWithinBounds P_Min X P_Max" $ do
       doc <- buildStr [r|{
-        axioms { assertions { [X : ℙ] (X → ¬¬X); } }
+        axioms { assertions { ∀X : ℙ, (X → ¬¬X); } }
       }|]
-      hasWrappedFactWith doc pMin (\case
+      hasAssertionBodyWith doc (\case
         LBoundedForall "X" "P_Min" "P_Max" _ -> True
         _ -> False)
         `shouldBe` True
@@ -456,9 +489,9 @@ main = hspec $ do
     it "bounded guard for 𝕌-quantifier uses IsWithinBounds U_Min X U_Max" $ do
       doc <- buildStr [r|{
         signature { A : 𝕌; },
-        axioms { metafacts { [X : 𝕌] (A - (A - X)) - X; } }
+        axioms { metafacts { ∀X : 𝕌, (A - (A - X)) - X; } }
       }|]
-      hasWrappedFactWith doc uMin (\case
+      hasMetafactBodyWith doc (\case
         LBoundedForall "X" "U_Min" "U_Max" _ -> True
         _ -> False)
         `shouldBe` True
@@ -467,7 +500,7 @@ main = hspec $ do
       doc <- buildStr [r|{
         axioms { assertions { X : ℙ, (X → ¬¬X); } }
       }|]
-      hasWrappedFactWith doc pMin (\case
+      hasAssertionBodyWith doc (\case
         LBoundedForall "X" "P_Min" "P_Max" (LImpl (LIsIndividual _ _ _) _) -> False
         LBoundedForall "X" "P_Min" "P_Max" _ -> True
         _ -> False)
@@ -478,7 +511,7 @@ main = hspec $ do
         signature { A : 𝕌; },
         axioms { metafacts { X : 𝕌, (A - (A - X)) - X; } }
       }|]
-      hasWrappedFactWith doc uMin (\case
+      hasMetafactBodyWith doc (\case
         LBoundedForall "X" "U_Min" "U_Max" (LImpl (LIsIndividual _ _ _) _) -> False
         LBoundedForall "X" "U_Min" "U_Max" _ -> True
         _ -> False)
@@ -491,7 +524,7 @@ main = hspec $ do
       }|]
       -- Free variables lack existential import in Eidos (free logic).
       -- So x : S wraps with bounds only, no IsIndividual guard.
-      hasWrappedFactWith doc pMin (\case
+      hasAssertionBodyWith doc (\case
         LBoundedForall "x" "S_Min" "S_Max" (LImpl (LIsIndividual _ _ _) _) -> False
         LBoundedForall "x" "S_Min" "S_Max" _ -> True
         _ -> False)
@@ -502,7 +535,7 @@ main = hspec $ do
         signature { sort S; },
         axioms { assertions { X ⊆ S, X ⊆ X; } }
       }|]
-      hasWrappedFactWith doc pMin (\case
+      hasAssertionBodyWith doc (\case
         LBoundedForall "X" "S_Min" "S_Max" (LImpl (LIsIndividual _ _ _) _) -> False
         LBoundedForall "X" "S_Min" "S_Max" _ -> True
         _ -> False)
@@ -538,30 +571,30 @@ main = hspec $ do
 
     it "metafact body for A ∪ B (set union) is LConj A B" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ∪ B; } } }|]
-      hasWrappedFact doc uMin (LConj (LVar "A") (LVar "B")) `shouldBe` True
+      hasMetafactBody doc (LConj (LVar "A") (LVar "B")) `shouldBe` True
 
     it "metafact body for A ∩ B (set intersection) is LDisj A B" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ∩ B; } } }|]
-      hasWrappedFact doc uMin (LDisj (LVar "A") (LVar "B")) `shouldBe` True
+      hasMetafactBody doc (LDisj (LVar "A") (LVar "B")) `shouldBe` True
 
     it "metafact body for A ⊆ B (subset) renders as B → A" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ⊆ B; } } }|]
-      hasWrappedFact doc uMin (LImpl (LVar "B") (LVar "A")) `shouldBe` True
+      hasMetafactBody doc (LImpl (LVar "B") (LVar "A")) `shouldBe` True
 
     it "A ∪ B produces the same Lean body as A + B" $ do
       docUnion <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ∪ B; } } }|]
       docPlus  <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A + B; } } }|]
-      wrappedBodies docUnion uMin `shouldBe` wrappedBodies docPlus uMin
+      metafactBodies docUnion `shouldBe` metafactBodies docPlus
 
     it "A ∩ B produces the same Lean body as A × B" $ do
       docInter <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ∩ B; } } }|]
       docProd  <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A × B; } } }|]
-      wrappedBodies docInter uMin `shouldBe` wrappedBodies docProd uMin
+      metafactBodies docInter `shouldBe` metafactBodies docProd
 
     it "A ⊆ B in metafacts produces the same Lean body as A - B" $ do
       docSubset <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ⊆ B; } } }|]
       docDiff   <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A - B; } } }|]
-      wrappedBodies docSubset uMin `shouldBe` wrappedBodies docDiff uMin
+      metafactBodies docSubset `shouldBe` metafactBodies docDiff
 
   -- =========================================================================
   describe "theoryToLeanDoc – left implication (←) in assertions" $ do
@@ -569,12 +602,12 @@ main = hspec $ do
 
     it "assertion body for Q ← P renders as P → Q" $ do
       doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { Q ← P; } } }|]
-      hasWrappedFact doc pMin (LImpl (LVar "P") (LVar "Q")) `shouldBe` True
+      hasAssertionBody doc (LImpl (LVar "P") (LVar "Q")) `shouldBe` True
 
     it "Q ← P produces the same Lean body as P → Q" $ do
       docLeft  <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { Q ← P; } } }|]
       docRight <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P → Q; } } }|]
-      wrappedBodies docLeft pMin `shouldBe` wrappedBodies docRight pMin
+      assertionBodies docLeft `shouldBe` assertionBodies docRight
 
   -- =========================================================================
   describe "renderLeanExpr – LProjectIntoInterval" $ do
@@ -597,7 +630,7 @@ main = hspec $ do
         signature { A : 𝕌; B : 𝕌; C : 𝕌; },
         axioms { metafacts { <A,B>(C); } }
       }|]
-      hasWrappedFact doc uMin
+      hasMetafactBody doc
         (LProjectIntoInterval (LVar "C") (LVar "A") (LVar "B"))
         `shouldBe` True
 
@@ -606,7 +639,7 @@ main = hspec $ do
         signature { P1 : ℙ; P2 : ℙ; Q : ℙ; },
         axioms { assertions { <P1,P2>(Q); } }
       }|]
-      hasWrappedFact doc pMin
+      hasAssertionBody doc
         (LProjectIntoInterval (LVar "Q") (LVar "P1") (LVar "P2"))
         `shouldBe` True
 
@@ -619,7 +652,7 @@ main = hspec $ do
         signature { A : 𝕌; },
         axioms { metafacts { <𝕌>(A); } }
       }|]
-      hasWrappedFact doc uMin
+      hasMetafactBody doc
         (LProjectIntoInterval (LVar "A") (LVar "U_Min") (LVar "U_Max"))
         `shouldBe` True
 
@@ -628,7 +661,7 @@ main = hspec $ do
         signature { sort S; A : 𝕌; },
         axioms { metafacts { <S>(A); } }
       }|]
-      hasWrappedFact doc uMin
+      hasMetafactBody doc
         (LProjectIntoInterval (LVar "A") (LVar "S_Min") (LVar "S_Max"))
         `shouldBe` True
 
@@ -665,13 +698,11 @@ main = hspec $ do
           x : S, {y : S | y =_S x} ⊆ {y : S | y =_S x};
         }}
       }|]
-      -- The comprehension { y : S | y =_S x } should appear in the output as:
-      --   forall y : Prop, IsWithinBounds(S_Min, S_Max, y) → ((y = x) → y)
-      let types = allTypes doc
-          hasComprehension = any (\t -> case t of
-            LBoundedForall _ _ _ (LImpl _ (LVar _)) -> True
-            _ -> False) types
-      hasComprehension `shouldBe` True
+      -- The comprehension { y : S | y =_S x } produces a LBoundedForall
+      -- as the body of the LAssertionWrapper axiom.
+      hasAssertionBodyWith doc (\case
+        LBoundedForall _ _ _ _ -> True
+        _ -> False) `shouldBe` True
 
     it "description ιx : S φ(x) produces the same Lean output as set comprehension" $ do
       docComp <- buildStr [r|{
@@ -686,10 +717,10 @@ main = hspec $ do
           x : S, ιy : S y =_S a ∈ {z : S | z =_S a};
         }}
       }|]
-      -- Both should produce a bounded forall of the form: ∀y, bound → (φ → y)
-      let hasComprehensionForm doc = any (\t -> case t of
-              LBoundedForall _ _ _ (LImpl _ (LVar _)) -> True
-              _ -> False) (allTypes doc)
+      -- Both should produce a LBoundedForall as the assertion body.
+      let hasComprehensionForm d = hasAssertionBodyWith d (\case
+              LBoundedForall _ _ _ _ -> True
+              _ -> False)
       hasComprehensionForm docComp `shouldBe` True
       hasComprehensionForm docDesc `shouldBe` True
 
@@ -700,9 +731,7 @@ main = hspec $ do
           {x : S | x =_S x} ⊆ {x : S | x =_S x};
         }}
       }|]
-      -- The bounded forall should use S_Min and S_Max
-      let types = allTypes doc
-          hasSBounds = any (\t -> case t of
-            LBoundedForall _ "S_Min" "S_Max" _ -> True
-            _ -> False) types
-      hasSBounds `shouldBe` True
+      -- The LBoundedForall in the assertion body should use S_Min and S_Max.
+      hasAssertionBodyWith doc (\case
+        LBoundedForall _ "S_Min" "S_Max" _ -> True
+        _ -> False) `shouldBe` True

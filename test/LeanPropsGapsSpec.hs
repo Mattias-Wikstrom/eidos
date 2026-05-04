@@ -56,19 +56,21 @@ allTypes doc = [ axiomType ax | DeclAxiom ax <- leanDocDecls doc ]
 hasType :: LeanDoc -> LeanExpr -> Bool
 hasType doc ty = ty `elem` allTypes doc
 
--- | True when the doc contains a fact axiom of the form
---   (wrapper ∧ body) ↔ wrapper.
-hasWrappedFact :: LeanDoc -> LeanExpr -> LeanExpr -> Bool
-hasWrappedFact doc wrapper body =
-  hasType doc (LBicond (LConj wrapper body) wrapper)
+-- | Bodies of all 'LAssertionWrapper' axioms in the doc.
+assertionBodies :: LeanDoc -> [LeanExpr]
+assertionBodies doc = [ body | LAssertionWrapper body <- allTypes doc ]
 
--- | Collect all body expressions of wrapped facts with the given wrapper.
-wrappedBodies :: LeanDoc -> LeanExpr -> [LeanExpr]
-wrappedBodies doc wrapper =
-  [ body
-  | LBicond (LConj w body) w' <- allTypes doc
-  , w == wrapper, w' == wrapper
-  ]
+-- | True when some assertion body equals the given expression.
+hasAssertionBody :: LeanDoc -> LeanExpr -> Bool
+hasAssertionBody doc body = body `elem` assertionBodies doc
+
+-- | Bodies of all 'LMetafactWrapper' axioms in the doc.
+metafactBodies :: LeanDoc -> [LeanExpr]
+metafactBodies doc = [ body | LMetafactWrapper body <- allTypes doc ]
+
+-- | Bodies of all 'LFactWrapper' axioms in the doc.
+factBodies :: LeanDoc -> [LeanExpr]
+factBodies doc = [ body | LFactWrapper body <- allTypes doc ]
 
 -- ---------------------------------------------------------------------------
 -- Main
@@ -92,7 +94,7 @@ main = hspec $ do
         signature { P : ℙ; },
         axioms { facts { P; } }
       }|]
-      hasWrappedFact doc pMin (LVar "P") `shouldBe` True
+      hasAssertionBody doc (LVar "P") `shouldBe` True
 
     it "(SPEC) facts { P → Q; } produces the same pMin-wrapped axiom as assertions { P → Q; }" $ do
       docFacts <- buildStr [r|{
@@ -103,7 +105,8 @@ main = hspec $ do
         signature { P : ℙ; Q : ℙ; },
         axioms { assertions { P → Q; } }
       }|]
-      wrappedBodies docFacts pMin `shouldBe` wrappedBodies docAssertions pMin
+      -- Facts and assertions should produce the same wrapper node body.
+      factBodies docFacts `shouldBe` assertionBodies docAssertions
 
     it "(SPEC) a theory with both facts and assertions exports both" $ do
       doc <- buildStr [r|{
@@ -113,8 +116,8 @@ main = hspec $ do
           facts { Q; }
         }
       }|]
-      hasWrappedFact doc pMin (LVar "P") `shouldBe` True
-      hasWrappedFact doc pMin (LVar "Q") `shouldBe` True
+      hasAssertionBody doc (LVar "P") `shouldBe` True
+      hasAssertionBody doc (LVar "Q") `shouldBe` True
 
   -- =========================================================================
   -- Gap 2: Biconditional chains are truncated
@@ -135,7 +138,7 @@ main = hspec $ do
         axioms { assertions { A ↔ B ↔ C; } }
       }|]
       -- The outer type is (P_Min ∧ body) ↔ P_Min; we inspect `body`.
-      let bodies = wrappedBodies doc pMin
+      let bodies = assertionBodies doc
       -- body must mention C (the second rest), not just A ↔ B
       let mentionsC (LBicond l r) = mentionsC l || mentionsC r
           mentionsC (LVar "C")    = True
@@ -154,7 +157,7 @@ main = hspec $ do
         axioms { assertions { A ↔ B ↔ C; } }
       }|]
       -- The bodies for the 3-element chain must differ from those of the 2-element chain.
-      wrappedBodies doc3 pMin `shouldNotBe` wrappedBodies doc2 pMin
+      assertionBodies doc3 `shouldNotBe` assertionBodies doc2
 
   -- =========================================================================
   -- Gap 3: Relation sort qualifier =^S is ignored
@@ -176,7 +179,7 @@ main = hspec $ do
       }|]
       let projP = LProjectIntoInterval (LVar "P") (sortMin "S") (sortMax "S")
           projQ = LProjectIntoInterval (LVar "Q") (sortMin "S") (sortMax "S")
-      hasWrappedFact doc pMin (LBicond projP projQ) `shouldBe` True
+      hasAssertionBody doc (LBicond projP projQ) `shouldBe` True
 
     it "(SPEC) P =^S Q produces a different Lean body than P = Q" $ do
       docQual  <- buildStr [r|{
@@ -187,7 +190,7 @@ main = hspec $ do
         signature { sort S; P : ℙ; Q : ℙ; },
         axioms { assertions { P = Q; } }
       }|]
-      wrappedBodies docQual pMin `shouldNotBe` wrappedBodies docPlain pMin
+      assertionBodies docQual `shouldNotBe` assertionBodies docPlain
 
     it "(SPEC) P =^𝕌 Q projects into U_Min / U_Max" $ do
       doc <- buildStr [r|{
@@ -196,7 +199,7 @@ main = hspec $ do
       }|]
       let projP = LProjectIntoInterval (LVar "P") uMin uMax
           projQ = LProjectIntoInterval (LVar "Q") uMin uMax
-      hasWrappedFact doc pMin (LBicond projP projQ) `shouldBe` True
+      hasAssertionBody doc (LBicond projP projQ) `shouldBe` True
 
   -- =========================================================================
   -- Gap 5: Generalised Σ / Π drop both operator and binder
@@ -222,7 +225,7 @@ main = hspec $ do
         signature { sort S; A : 𝕌; },
         axioms { metafacts { Σx : S(A); } }
       }|]
-      let bodies = wrappedBodies doc uMin
+      let bodies = metafactBodies doc
       let isBoundedForall (LBoundedForall _ "S_Min" "S_Max" _) = True
           isBoundedForall _                                      = False
       any isBoundedForall bodies `shouldBe` True
@@ -232,7 +235,7 @@ main = hspec $ do
         signature { sort S; A : 𝕌; },
         axioms { metafacts { Πx : S(A); } }
       }|]
-      let bodies = wrappedBodies doc uMin
+      let bodies = metafactBodies doc
       let isExists (LExists _ _ _) = True
           isExists _                = False
       any isExists bodies `shouldBe` True
@@ -248,7 +251,7 @@ main = hspec $ do
       }|]
       -- After the fix the Sigma body is wrapped in a forall; currently both
       -- give the same flat LVar "A".
-      wrappedBodies docSigma uMin `shouldNotBe` wrappedBodies docPlain uMin
+      metafactBodies docSigma `shouldNotBe` metafactBodies docPlain
 
     it "(SPEC) Π x : S . A gives a different body than Σ x : S . A" $ do
       docSigma <- buildStr [r|{
@@ -259,4 +262,4 @@ main = hspec $ do
         signature { sort S; A : 𝕌; },
         axioms { metafacts { Πx : S(A); } }
       }|]
-      wrappedBodies docSigma uMin `shouldNotBe` wrappedBodies docPi uMin
+      metafactBodies docSigma `shouldNotBe` metafactBodies docPi
