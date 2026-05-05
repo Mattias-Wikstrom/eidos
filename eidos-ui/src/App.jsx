@@ -17,7 +17,9 @@ const theoryEntries = Object.keys(theoryModules)
 export default function App() {
   const eidos = useEidos();
   const [selectedTheory, setSelectedTheory] = useState(theoryEntries[0]?.name ?? '');
-  const [theoryText, setTheoryText] = useState('');
+  const [files, setFiles] = useState({ '__main__.theory': '' });
+  const [activeFile, setActiveFile] = useState('__main__.theory');
+  const [entryFile, setEntryFile] = useState('__main__.theory');
   const [output, setOutput] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -26,6 +28,8 @@ export default function App() {
     [selectedTheory]
   );
 
+  const fileNames = useMemo(() => Object.keys(files).sort(), [files]);
+
   useEffect(() => {
     if (!selectedPath) return;
 
@@ -33,7 +37,10 @@ export default function App() {
 
     theoryModules[selectedPath]().then((text) => {
       if (!cancelled) {
-        setTheoryText(text);
+        setFiles({ '__main__.theory': text });
+        setActiveFile('__main__.theory');
+        setEntryFile('__main__.theory');
+        setOutput('');
       }
     });
 
@@ -42,12 +49,42 @@ export default function App() {
     };
   }, [selectedPath]);
 
+  const updateFileContent = (name, text) => {
+    setFiles((prev) => ({ ...prev, [name]: text }));
+  };
+
+  const addFile = () => {
+    const name = window.prompt('New file name (for example: group.eq.theory)');
+    if (!name) return;
+    if (files[name]) {
+      setOutput(`Error: file "${name}" already exists.`);
+      return;
+    }
+    setFiles((prev) => ({ ...prev, [name]: '' }));
+    setActiveFile(name);
+  };
+
+  const removeActiveFile = () => {
+    if (activeFile === '__main__.theory') {
+      setOutput('Error: __main__.theory cannot be deleted.');
+      return;
+    }
+    const nextFiles = { ...files };
+    delete nextFiles[activeFile];
+    setFiles(nextFiles);
+    if (entryFile === activeFile) setEntryFile('__main__.theory');
+    setActiveFile('__main__.theory');
+  };
+
   const compile = async () => {
     if (!eidos) return;
 
     setLoading(true);
     try {
-      const result = await eidos.compileSingle(theoryText);
+      const bundle = Object.fromEntries(
+        Object.entries(files).map(([name, src]) => [name === entryFile ? '__main__' : name, src])
+      );
+      const result = await eidos.compileBundle(bundle);
       setOutput(result);
     } catch (err) {
       setOutput('Error: ' + err.message);
@@ -59,7 +96,7 @@ export default function App() {
     <div style={{ padding: 20, fontFamily: 'sans-serif' }}>
       <h1>Eidos → Lean</h1>
       <label htmlFor="theory-select" style={{ display: 'block', marginBottom: 8 }}>
-        Theory
+        Starter theory
       </label>
       <select
         id="theory-select"
@@ -74,15 +111,47 @@ export default function App() {
         ))}
       </select>
 
+      <div style={{ display: 'flex', gap: 12, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <label htmlFor="entry-select">Entry file:</label>
+        <select id="entry-select" value={entryFile} onChange={(event) => setEntryFile(event.target.value)}>
+          {fileNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <button onClick={addFile}>Add file</button>
+        <button onClick={removeActiveFile} disabled={activeFile === '__main__.theory'}>
+          Delete active file
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+        {fileNames.map((name) => (
+          <button
+            key={name}
+            onClick={() => setActiveFile(name)}
+            style={{
+              padding: '4px 8px',
+              border: name === activeFile ? '2px solid #2c7' : '1px solid #ccc',
+              borderRadius: 4,
+              background: name === activeFile ? '#f4fff8' : '#fff',
+            }}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+
       <Editor
         height="420px"
         defaultLanguage="plaintext"
-        value={theoryText}
-        onChange={(value) => setTheoryText(value ?? '')}
+        value={files[activeFile] ?? ''}
+        onChange={(value) => updateFileContent(activeFile, value ?? '')}
       />
 
       <button onClick={compile} disabled={!eidos || loading} style={{ marginTop: 12 }}>
-        {loading ? 'Compiling...' : 'Compile'}
+        {loading ? 'Compiling...' : 'Compile bundle'}
       </button>
 
       <pre
