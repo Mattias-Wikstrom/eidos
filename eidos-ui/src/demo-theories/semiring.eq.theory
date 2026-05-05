@@ -1,0 +1,21 @@
+/* Equational theory that axiomatizes the concept of a semiring */
+{
+  subtheories {
+    implicit {
+      semiring_without_unity: @semiring_without_unity,
+    }, 
+    named {
+      multiplicative_monoid: @monoid
+    }    
+  },
+  signature {
+    one: D;
+  },
+  axioms {
+    facts {
+      semiring_without_unity.D = multiplicative_monoid.D; // There is only a single domain D
+      semiring_without_unity.prod = multiplicative_monoid.op;
+      one = multiplicative_monoid.n; // One is the neutral element for multiplication
+    }
+  }
+}

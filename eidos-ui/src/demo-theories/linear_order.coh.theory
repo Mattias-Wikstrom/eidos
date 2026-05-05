@@ -1,0 +1,13 @@
+/* Theory in coherent logic that axiomatizes the concept of a linear (=total) order */
+{
+  subtheories {
+    implicit {
+      partial_order: @partial_order
+    }
+  },
+  axioms {
+    assertions {
+      x : D,  y : D,  (LessThanOrEq(x, y) ∨ LessThanOrEq(y, x)); // Totality
+    }
+  }
+}

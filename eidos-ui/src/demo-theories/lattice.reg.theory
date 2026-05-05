@@ -1,0 +1,9 @@
+/* Theory in regular logic that axiomatizes the concept of a lattice */
+{
+  subtheories {
+    implicit {
+      lower_semi_lattice: @lower_semi_lattice,
+      upper_semi_lattice: @upper_semi_lattice
+    }
+  }
+}
