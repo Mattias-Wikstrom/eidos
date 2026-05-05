@@ -1,0 +1,12 @@
+<html>
+<body>
+    <script type="module">
+import { loadEidos } from './wasm/eidos_wasm.mjs';
+
+const eidos = await loadEidos(new URL('./wasm/eidos.wasm', import.meta.url));
+
+console.log(await eidos.compileSingle('{ signature { P : ℙ; } }'));
+    </script>
+    Test!!!
+</body>
+</html>

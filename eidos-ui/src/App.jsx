@@ -7,6 +7,10 @@ const theoryModules = import.meta.glob('./demo-theories/*.theory', {
   import: 'default',
 });
 
+const ENTRY_FILE = '__main__.theory';
+const RESERVED_BUNDLE_KEY = '__main__';
+const REFERENCE_KEY_PATTERN = /^[A-Za-z0-9_.-]+$/;
+
 const theoryEntries = Object.keys(theoryModules)
   .map((path) => ({
     path,
@@ -14,16 +18,14 @@ const theoryEntries = Object.keys(theoryModules)
   }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
-function theoryLookupKey(fileName) {
-  return fileName.replace(/\.theory$/, '').split('.')[0];
-}
-
 export default function App() {
-  const eidos = useEidos();
+  const { eidos, loadingWasm, wasmError } = useEidos();
   const [selectedTheory, setSelectedTheory] = useState(theoryEntries[0]?.name ?? '');
-  const [files, setFiles] = useState({ '__main__.theory': '' });
-  const [activeFile, setActiveFile] = useState('__main__.theory');
-  const [entryFile, setEntryFile] = useState('__main__.theory');
+  const [files, setFiles] = useState({ [ENTRY_FILE]: '' });
+  const [referenceKeys, setReferenceKeys] = useState({});
+  const [activeFile, setActiveFile] = useState(ENTRY_FILE);
+  const [entryFile, setEntryFile] = useState(ENTRY_FILE);
+  const [compileMode, setCompileMode] = useState('lean_using_props');
   const [output, setOutput] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -49,10 +51,11 @@ export default function App() {
       await Promise.all(loadTasks);
 
       if (!cancelled) {
-        loadedFiles['__main__.theory'] = loadedFiles[selectedTheory] ?? '';
+        loadedFiles[ENTRY_FILE] = loadedFiles[selectedTheory] ?? '';
         setFiles(loadedFiles);
-        setActiveFile('__main__.theory');
-        setEntryFile('__main__.theory');
+        setReferenceKeys(buildDefaultReferenceKeys(loadedFiles));
+        setActiveFile(ENTRY_FILE);
+        setEntryFile(ENTRY_FILE);
         setOutput('');
       }
     })();
@@ -66,6 +69,10 @@ export default function App() {
     setFiles((prev) => ({ ...prev, [name]: text }));
   };
 
+  const updateReferenceKey = (name, key) => {
+    setReferenceKeys((prev) => ({ ...prev, [name]: key }));
+  };
+
   const addFile = () => {
     const name = window.prompt('New file name (for example: group.eq.theory)');
     if (!name) return;
@@ -74,40 +81,57 @@ export default function App() {
       return;
     }
     setFiles((prev) => ({ ...prev, [name]: '' }));
+    setReferenceKeys((prev) => ({ ...prev, [name]: defaultReferenceKey(name) }));
     setActiveFile(name);
   };
 
   const removeActiveFile = () => {
-    if (activeFile === '__main__.theory') {
-      setOutput('Error: __main__.theory cannot be deleted.');
+    if (activeFile === ENTRY_FILE) {
+      setOutput(`Error: ${ENTRY_FILE} cannot be deleted.`);
       return;
     }
     const nextFiles = { ...files };
     delete nextFiles[activeFile];
     setFiles(nextFiles);
-    if (entryFile === activeFile) setEntryFile('__main__.theory');
-    setActiveFile('__main__.theory');
+    setReferenceKeys((prev) => {
+      const nextKeys = { ...prev };
+      delete nextKeys[activeFile];
+      return nextKeys;
+    });
+    if (entryFile === activeFile) setEntryFile(ENTRY_FILE);
+    setActiveFile(ENTRY_FILE);
+  };
+
+  const compileWithMode = async (bundle) => {
+    if (compileMode === 'lean_using_props') {
+      return eidos.compileBundle(bundle);
+    }
+
+    if (compileMode === 'lean') {
+      if (typeof eidos.compileBundleWithMode === 'function') {
+        return eidos.compileBundleWithMode(bundle, { mode: 'lean' });
+      }
+      throw new Error(
+        'Compile mode "--lean" is selected, but the current Wasm runtime does not expose mode-aware compilation yet.'
+      );
+    }
+
+    throw new Error(`Unsupported compile mode: ${compileMode}`);
   };
 
   const compile = async () => {
     if (!eidos) return;
 
-    setLoading(true);
     try {
-      const bundle = {};
-      for (const [name, src] of Object.entries(files)) {
-        if (name === entryFile) {
-          bundle.__main__ = src;
-        } else {
-          bundle[theoryLookupKey(name)] = src;
-        }
-      }
-      const result = await eidos.compileBundle(bundle);
+      const bundle = createBundle(files, referenceKeys, entryFile);
+      setLoading(true);
+      const result = await compileWithMode(bundle);
       setOutput(result);
     } catch (err) {
-      setOutput('Error: ' + err.message);
+      setOutput('Error: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -138,8 +162,13 @@ export default function App() {
             </option>
           ))}
         </select>
+        <label htmlFor="mode-select">Mode:</label>
+        <select id="mode-select" value={compileMode} onChange={(event) => setCompileMode(event.target.value)}>
+          <option value="lean_using_props">--lean_using_props</option>
+          <option value="lean">--lean</option>
+        </select>
         <button onClick={addFile}>Add file</button>
-        <button onClick={removeActiveFile} disabled={activeFile === '__main__.theory'}>
+        <button onClick={removeActiveFile} disabled={activeFile === ENTRY_FILE}>
           Delete active file
         </button>
       </div>
@@ -168,8 +197,29 @@ export default function App() {
         onChange={(value) => updateFileContent(activeFile, value ?? '')}
       />
 
-      <button onClick={compile} disabled={!eidos || loading} style={{ marginTop: 12 }}>
-        {loading ? 'Compiling...' : 'Compile bundle'}
+      <div style={{ marginTop: 12 }}>
+        <label htmlFor="reference-key-input" style={{ display: 'block', marginBottom: 4 }}>
+          Reference key for active file
+        </label>
+        <input
+          id="reference-key-input"
+          type="text"
+          value={referenceKeys[activeFile] ?? ''}
+          onChange={(event) => updateReferenceKey(activeFile, event.target.value)}
+          disabled={activeFile === entryFile}
+          placeholder={activeFile === entryFile ? 'Entry file maps to __main__' : 'e.g. group'}
+          style={{ minWidth: 320 }}
+        />
+      </div>
+
+      {wasmError && (
+        <div style={{ marginTop: 10, color: '#b00020' }}>
+          Wasm failed to load: {wasmError}
+        </div>
+      )}
+
+      <button onClick={compile} disabled={!eidos || loading || loadingWasm} style={{ marginTop: 12 }}>
+        {loadingWasm ? 'Loading Wasm...' : loading ? 'Compiling...' : 'Compile bundle'}
       </button>
 
       <pre
@@ -185,4 +235,53 @@ export default function App() {
       </pre>
     </div>
   );
+}
+
+function defaultReferenceKey(name) {
+  return name.replace(/\.theory$/i, '').trim();
+}
+
+function buildDefaultReferenceKeys(fileMap) {
+  const keys = {};
+  for (const fileName of Object.keys(fileMap)) {
+    keys[fileName] = defaultReferenceKey(fileName);
+  }
+  return keys;
+}
+
+function createBundle(fileMap, refKeyMap, entryFile) {
+  if (!Object.prototype.hasOwnProperty.call(fileMap, entryFile)) {
+    throw new Error(`Entry file "${entryFile}" does not exist.`);
+  }
+
+  const bundle = {};
+  const seenRefKeys = new Set();
+
+  for (const [fileName, src] of Object.entries(fileMap)) {
+    if (fileName === entryFile) {
+      bundle[RESERVED_BUNDLE_KEY] = src;
+      continue;
+    }
+
+    const key = (refKeyMap[fileName] ?? '').trim();
+    if (!key) {
+      throw new Error(`File "${fileName}" is missing a reference key.`);
+    }
+    if (key === RESERVED_BUNDLE_KEY) {
+      throw new Error(`Reference key "${RESERVED_BUNDLE_KEY}" is reserved for the entry file.`);
+    }
+    if (!REFERENCE_KEY_PATTERN.test(key)) {
+      throw new Error(
+        `Reference key "${key}" for "${fileName}" is invalid. Allowed characters: A-Z a-z 0-9 _ . -`
+      );
+    }
+    if (seenRefKeys.has(key)) {
+      throw new Error(`Reference key "${key}" is duplicated. Keys must be unique across the bundle.`);
+    }
+
+    seenRefKeys.add(key);
+    bundle[key] = src;
+  }
+
+  return bundle;
 }

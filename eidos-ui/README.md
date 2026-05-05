@@ -1,16 +1,54 @@
-# React + Vite
+# Eidos UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Browser UI for compiling Eidos theory bundles to Lean through the Wasm runtime.
 
-Currently, two official plugins are available:
+## Runtime File Map
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `public/wasm/eidos.wasm`: Wasm binary loaded by the browser.
+- `src/wasm/eidos_wasm.mjs`: browser glue that exposes `loadEidos(...)`.
+- `src/useEidos.js`: initializes Wasm and exposes `{ eidos, loadingWasm, wasmError }`.
+- `src/App.jsx`: editor + bundle construction + compile workflow.
 
-## React Compiler
+## Bundle Contract (UI -> Wasm)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The UI sends a single JSON object to `compileBundle(...)`.
 
-## Expanding the ESLint configuration
+- The entry file is always mapped to `__main__`.
+- Every non-entry file must provide an explicit reference key.
+- Reference keys must be unique across the bundle.
+- `__main__` is reserved and cannot be used as a non-entry key.
+- Allowed key characters are `[A-Za-z0-9_.-]`.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Example payload:
+
+```json
+{
+  "__main__": "{ signature { P : 𝒫; } ... }",
+  "group": "{ signature { G : S; } ... }",
+  "ring.core": "{ signature { R : S; } ... }"
+}
+```
+
+## Compile Modes
+
+The UI exposes two compile modes:
+
+- `--lean_using_props`: default path, calls `eidos.compileBundle(bundle)`.
+- `--lean`: forward-compatible path for future mode-aware Wasm APIs.
+
+If `--lean` is selected but the loaded runtime does not expose mode-aware compilation, the UI fails early with a clear error instead of silently compiling with the wrong mode.
+
+## Development
+
+Install dependencies and run dev server:
+
+```bash
+npm install
+npm run dev
+```
+
+Build production assets:
+
+```bash
+npm run build
+```
