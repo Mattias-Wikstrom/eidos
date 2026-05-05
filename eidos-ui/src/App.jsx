@@ -14,6 +14,10 @@ const theoryEntries = Object.keys(theoryModules)
   }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
+function theoryLookupKey(fileName) {
+  return fileName.replace(/\.theory$/, '').split('.')[0];
+}
+
 export default function App() {
   const eidos = useEidos();
   const [selectedTheory, setSelectedTheory] = useState(theoryEntries[0]?.name ?? '');
@@ -35,19 +39,28 @@ export default function App() {
 
     let cancelled = false;
 
-    theoryModules[selectedPath]().then((text) => {
+    (async () => {
+      const loadedFiles = {};
+      const loadTasks = theoryEntries.map(async (entry) => {
+        const text = await theoryModules[entry.path]();
+        loadedFiles[entry.name] = text;
+      });
+
+      await Promise.all(loadTasks);
+
       if (!cancelled) {
-        setFiles({ '__main__.theory': text });
+        loadedFiles['__main__.theory'] = loadedFiles[selectedTheory] ?? '';
+        setFiles(loadedFiles);
         setActiveFile('__main__.theory');
         setEntryFile('__main__.theory');
         setOutput('');
       }
-    });
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [selectedPath]);
+  }, [selectedPath, selectedTheory]);
 
   const updateFileContent = (name, text) => {
     setFiles((prev) => ({ ...prev, [name]: text }));
@@ -81,9 +94,14 @@ export default function App() {
 
     setLoading(true);
     try {
-      const bundle = Object.fromEntries(
-        Object.entries(files).map(([name, src]) => [name === entryFile ? '__main__' : name, src])
-      );
+      const bundle = {};
+      for (const [name, src] of Object.entries(files)) {
+        if (name === entryFile) {
+          bundle.__main__ = src;
+        } else {
+          bundle[theoryLookupKey(name)] = src;
+        }
+      }
       const result = await eidos.compileBundle(bundle);
       setOutput(result);
     } catch (err) {
