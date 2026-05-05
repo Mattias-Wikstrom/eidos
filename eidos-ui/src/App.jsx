@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { useEidos } from './useEidos';
+import './App.css';
 
 const theoryModules = import.meta.glob('./demo-theories/*.theory', {
   query: '?raw',
@@ -13,11 +14,38 @@ const THEORY_TYPE_META_PREFIX = '__theory_type__.';
 const REFERENCE_KEY_PATTERN = /^[A-Za-z0-9_.-]+$/;
 
 const theoryEntries = Object.keys(theoryModules)
-  .map((path) => ({
-    path,
-    name: path.split('/').pop(),
-  }))
+  .map((path) => ({ path, name: path.split('/').pop() }))
   .sort((a, b) => a.name.localeCompare(b.name));
+
+const TYPE_TAG_COLORS = {
+  eq:    '#c8a96e',
+  reg:   '#7eb8c8',
+  coh:   '#9ec87e',
+  fol:   '#c87eb8',
+  sol:   '#e0876a',
+  prop:  '#a08ec8',
+  mereo: '#6abfa8',
+  plain: '#555',
+};
+
+function TheoryTypeTag({ tag }) {
+  const color = TYPE_TAG_COLORS[tag] || TYPE_TAG_COLORS.plain;
+  return (
+    <span style={{
+      fontSize: '9px',
+      fontFamily: 'var(--font-mono)',
+      letterSpacing: '0.06em',
+      color,
+      border: `1px solid ${color}55`,
+      borderRadius: '2px',
+      padding: '1px 4px',
+      marginLeft: '6px',
+      verticalAlign: 'middle',
+    }}>
+      {tag}
+    </span>
+  );
+}
 
 export default function App() {
   const { eidos, loadingWasm, wasmError } = useEidos();
@@ -29,9 +57,10 @@ export default function App() {
   const [compileMode, setCompileMode] = useState('lean_using_props');
   const [output, setOutput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [outputIsError, setOutputIsError] = useState(false);
 
   const selectedPath = useMemo(
-    () => theoryEntries.find((entry) => entry.name === selectedTheory)?.path,
+    () => theoryEntries.find((e) => e.name === selectedTheory)?.path,
     [selectedTheory]
   );
 
@@ -39,18 +68,14 @@ export default function App() {
 
   useEffect(() => {
     if (!selectedPath) return;
-
     let cancelled = false;
-
     (async () => {
       const loadedFiles = {};
-      const loadTasks = theoryEntries.map(async (entry) => {
-        const text = await theoryModules[entry.path]();
-        loadedFiles[entry.name] = text;
-      });
-
-      await Promise.all(loadTasks);
-
+      await Promise.all(
+        theoryEntries.map(async (entry) => {
+          loadedFiles[entry.name] = await theoryModules[entry.path]();
+        })
+      );
       if (!cancelled) {
         loadedFiles[ENTRY_FILE] = loadedFiles[selectedTheory] ?? '';
         setFiles(loadedFiles);
@@ -58,27 +83,24 @@ export default function App() {
         setActiveFile(ENTRY_FILE);
         setEntryFile(ENTRY_FILE);
         setOutput('');
+        setOutputIsError(false);
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [selectedPath, selectedTheory]);
 
-  const updateFileContent = (name, text) => {
-    setFiles((prev) => ({ ...prev, [name]: text }));
-  };
+  const updateFileContent = (name, text) =>
+    setFiles((prev) => ({ ...prev, [name]: text ?? '' }));
 
-  const updateReferenceKey = (name, key) => {
+  const updateReferenceKey = (name, key) =>
     setReferenceKeys((prev) => ({ ...prev, [name]: key }));
-  };
 
   const addFile = () => {
-    const name = window.prompt('New file name (for example: group.eq.theory)');
+    const name = window.prompt('New file name (e.g. group.eq.theory)');
     if (!name) return;
     if (files[name]) {
       setOutput(`Error: file "${name}" already exists.`);
+      setOutputIsError(true);
       return;
     }
     setFiles((prev) => ({ ...prev, [name]: '' }));
@@ -89,151 +111,187 @@ export default function App() {
   const removeActiveFile = () => {
     if (activeFile === ENTRY_FILE) {
       setOutput(`Error: ${ENTRY_FILE} cannot be deleted.`);
+      setOutputIsError(true);
       return;
     }
     const nextFiles = { ...files };
     delete nextFiles[activeFile];
     setFiles(nextFiles);
-    setReferenceKeys((prev) => {
-      const nextKeys = { ...prev };
-      delete nextKeys[activeFile];
-      return nextKeys;
-    });
+    setReferenceKeys((prev) => { const n = { ...prev }; delete n[activeFile]; return n; });
     if (entryFile === activeFile) setEntryFile(ENTRY_FILE);
     setActiveFile(ENTRY_FILE);
   };
 
-  const compileWithMode = async (bundle) => {
-    if (compileMode === 'lean_using_props') {
-      return eidos.compileBundle(bundle);
-    }
-
-    if (compileMode === 'lean') {
-      if (typeof eidos.compileBundleWithMode === 'function') {
-        return eidos.compileBundleWithMode(bundle, { mode: 'lean' });
-      }
-      throw new Error(
-        'Compile mode "--lean" is selected, but the current Wasm runtime does not expose mode-aware compilation yet.'
-      );
-    }
-
-    throw new Error(`Unsupported compile mode: ${compileMode}`);
-  };
-
   const compile = async () => {
     if (!eidos) return;
-
     try {
       const bundle = createBundle(files, referenceKeys, entryFile);
       setLoading(true);
-      const result = await compileWithMode(bundle);
+      const result = await eidos.compileBundle(bundle);
       setOutput(result);
+      setOutputIsError(result.startsWith('Error:'));
     } catch (err) {
       setOutput('Error: ' + (err instanceof Error ? err.message : String(err)));
+      setOutputIsError(true);
     } finally {
       setLoading(false);
     }
   };
 
+  const activeTag = inferTheoryTypeTag(activeFile);
+
   return (
-    <div style={{ padding: 20, fontFamily: 'sans-serif' }}>
-      <h1>Eidos → Lean</h1>
-      <label htmlFor="theory-select" style={{ display: 'block', marginBottom: 8 }}>
-        Starter theory
-      </label>
-      <select
-        id="theory-select"
-        value={selectedTheory}
-        onChange={(event) => setSelectedTheory(event.target.value)}
-        style={{ marginBottom: 12, minWidth: 360 }}
-      >
-        {theoryEntries.map((entry) => (
-          <option key={entry.path} value={entry.name}>
-            {entry.name}
-          </option>
-        ))}
-      </select>
-
-      <div style={{ display: 'flex', gap: 12, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <label htmlFor="entry-select">Entry file:</label>
-        <select id="entry-select" value={entryFile} onChange={(event) => setEntryFile(event.target.value)}>
-          {fileNames.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <label htmlFor="mode-select">Mode:</label>
-        <select id="mode-select" value={compileMode} onChange={(event) => setCompileMode(event.target.value)}>
-          <option value="lean_using_props">--lean_using_props</option>
-          <option value="lean">--lean</option>
-        </select>
-        <button onClick={addFile}>Add file</button>
-        <button onClick={removeActiveFile} disabled={activeFile === ENTRY_FILE}>
-          Delete active file
-        </button>
-      </div>
-
-      <div style={{ display: 'flex', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
-        {fileNames.map((name) => (
-          <button
-            key={name}
-            onClick={() => setActiveFile(name)}
-            style={{
-              padding: '4px 8px',
-              border: name === activeFile ? '2px solid #2c7' : '1px solid #ccc',
-              borderRadius: 4,
-              background: name === activeFile ? '#f4fff8' : '#fff',
-            }}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
-
-      <Editor
-        height="420px"
-        defaultLanguage="plaintext"
-        value={files[activeFile] ?? ''}
-        onChange={(value) => updateFileContent(activeFile, value ?? '')}
-      />
-
-      <div style={{ marginTop: 12 }}>
-        <label htmlFor="reference-key-input" style={{ display: 'block', marginBottom: 4 }}>
-          Reference key for active file
-        </label>
-        <input
-          id="reference-key-input"
-          type="text"
-          value={referenceKeys[activeFile] ?? ''}
-          onChange={(event) => updateReferenceKey(activeFile, event.target.value)}
-          disabled={activeFile === entryFile}
-          placeholder={activeFile === entryFile ? 'Entry file maps to __main__' : 'e.g. group'}
-          style={{ minWidth: 320 }}
-        />
-      </div>
-
-      {wasmError && (
-        <div style={{ marginTop: 10, color: '#b00020' }}>
-          Wasm failed to load: {wasmError}
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="header-wordmark">
+          <span className="wordmark-eidos">Eidos</span>
+          <span className="wordmark-arrow">→</span>
+          <span className="wordmark-lean">Lean</span>
         </div>
-      )}
+        <div className="header-controls">
+          <div className="control-group">
+            <label className="control-label">starter theory</label>
+            <div className="select-wrap">
+              <select
+                value={selectedTheory}
+                onChange={(e) => setSelectedTheory(e.target.value)}
+                className="styled-select"
+              >
+                {theoryEntries.map((entry) => (
+                  <option key={entry.path} value={entry.name}>{entry.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="control-group">
+            <label className="control-label">entry file</label>
+            <div className="select-wrap">
+              <select
+                value={entryFile}
+                onChange={(e) => setEntryFile(e.target.value)}
+                className="styled-select"
+              >
+                {fileNames.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="control-group">
+            <label className="control-label">mode</label>
+            <div className="select-wrap">
+              <select
+                value={compileMode}
+                onChange={(e) => setCompileMode(e.target.value)}
+                className="styled-select"
+              >
+                <option value="lean_using_props">--lean_using_props</option>
+                <option value="lean">--lean</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </header>
 
-      <button onClick={compile} disabled={!eidos || loading || loadingWasm} style={{ marginTop: 12 }}>
-        {loadingWasm ? 'Loading Wasm...' : loading ? 'Compiling...' : 'Compile bundle'}
-      </button>
+      <div className="app-body">
+        <div className="editor-panel">
+          <div className="tab-bar">
+            <div className="tab-list">
+              {fileNames.map((name) => {
+                const tag = inferTheoryTypeTag(name);
+                const isActive = name === activeFile;
+                const isEntry = name === entryFile;
+                return (
+                  <button
+                    key={name}
+                    className={`tab ${isActive ? 'tab--active' : ''} ${isEntry ? 'tab--entry' : ''}`}
+                    onClick={() => setActiveFile(name)}
+                    title={name}
+                  >
+                    <span className="tab-name">{name}</span>
+                    {tag !== 'plain' && <TheoryTypeTag tag={tag} />}
+                    {isEntry && <span className="tab-entry-dot" title="entry file" />}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="tab-actions">
+              <button className="icon-btn" onClick={addFile} title="Add file">＋</button>
+              <button
+                className="icon-btn icon-btn--danger"
+                onClick={removeActiveFile}
+                disabled={activeFile === ENTRY_FILE}
+                title="Delete active file"
+              >✕</button>
+            </div>
+          </div>
 
-      <pre
-        style={{
-          marginTop: 20,
-          background: '#111',
-          color: '#0f0',
-          padding: 10,
-          whiteSpace: 'pre-wrap',
-        }}
-      >
-        {output}
-      </pre>
+          <div className="editor-wrap">
+            <Editor
+              height="100%"
+              defaultLanguage="plaintext"
+              theme="vs-dark"
+              value={files[activeFile] ?? ''}
+              onChange={(value) => updateFileContent(activeFile, value ?? '')}
+              options={{
+                fontSize: 13,
+                fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+                fontLigatures: true,
+                lineHeight: 20,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                renderLineHighlight: 'gutter',
+                padding: { top: 16, bottom: 16 },
+              }}
+            />
+          </div>
+
+          <div className="refkey-bar">
+            <span className="refkey-label">ref key</span>
+            <input
+              type="text"
+              className="refkey-input"
+              value={referenceKeys[activeFile] ?? ''}
+              onChange={(e) => updateReferenceKey(activeFile, e.target.value)}
+              disabled={activeFile === entryFile}
+              placeholder={activeFile === entryFile ? '__main__  (entry file)' : 'e.g. group'}
+            />
+            {activeFile !== entryFile && activeTag !== 'plain' && (
+              <span className="refkey-type-hint">
+                inferred type: <TheoryTypeTag tag={activeTag} />
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="output-panel">
+          <div className="output-header">
+            <span className="output-title">output</span>
+            {wasmError && <span className="wasm-error-badge">wasm error</span>}
+            <button
+              className={`compile-btn ${loading ? 'compile-btn--loading' : ''}`}
+              onClick={compile}
+              disabled={!eidos || loading || loadingWasm}
+            >
+              {loadingWasm ? (
+                <><span className="spinner" /> loading wasm…</>
+              ) : loading ? (
+                <><span className="spinner" /> compiling…</>
+              ) : (
+                'compile bundle'
+              )}
+            </button>
+          </div>
+
+          {wasmError && (
+            <div className="wasm-error-msg">Wasm failed to load: {wasmError}</div>
+          )}
+
+          <pre className={`output-pre ${outputIsError ? 'output-pre--error' : output ? 'output-pre--success' : ''}`}>
+            {output || <span className="output-placeholder">// output will appear here</span>}
+          </pre>
+        </div>
+      </div>
     </div>
   );
 }
@@ -250,56 +308,34 @@ function buildDefaultReferenceKeys(fileMap) {
   return keys;
 }
 
+function inferTheoryTypeTag(fileName) {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.eq.theory'))    return 'eq';
+  if (lower.endsWith('.reg.theory'))   return 'reg';
+  if (lower.endsWith('.coh.theory'))   return 'coh';
+  if (lower.endsWith('.fol.theory'))   return 'fol';
+  if (lower.endsWith('.sol.theory'))   return 'sol';
+  if (lower.endsWith('.prop.theory'))  return 'prop';
+  if (lower.endsWith('.mereo.theory')) return 'mereo';
+  return 'plain';
+}
+
 function createBundle(fileMap, refKeyMap, entryFile) {
   if (!Object.prototype.hasOwnProperty.call(fileMap, entryFile)) {
     throw new Error(`Entry file "${entryFile}" does not exist.`);
   }
-
   const bundle = {};
   const seenRefKeys = new Set();
-
   for (const [fileName, src] of Object.entries(fileMap)) {
-    if (fileName === entryFile) {
-      bundle[RESERVED_BUNDLE_KEY] = src;
-      continue;
-    }
-
+    if (fileName === entryFile) { bundle[RESERVED_BUNDLE_KEY] = src; continue; }
     const key = (refKeyMap[fileName] ?? '').trim();
-    if (!key) {
-      throw new Error(`File "${fileName}" is missing a reference key.`);
-    }
-    if (key === RESERVED_BUNDLE_KEY) {
-      throw new Error(`Reference key "${RESERVED_BUNDLE_KEY}" is reserved for the entry file.`);
-    }
-    if (!REFERENCE_KEY_PATTERN.test(key)) {
-      throw new Error(
-        `Reference key "${key}" for "${fileName}" is invalid. Allowed characters: A-Z a-z 0-9 _ . -`
-      );
-    }
-    if (seenRefKeys.has(key)) {
-      throw new Error(`Reference key "${key}" is duplicated. Keys must be unique across the bundle.`);
-    }
-
+    if (!key) throw new Error(`File "${fileName}" is missing a reference key.`);
+    if (key === RESERVED_BUNDLE_KEY) throw new Error(`Key "${RESERVED_BUNDLE_KEY}" is reserved.`);
+    if (!REFERENCE_KEY_PATTERN.test(key)) throw new Error(`Key "${key}" for "${fileName}" is invalid.`);
+    if (seenRefKeys.has(key)) throw new Error(`Key "${key}" is duplicated.`);
     seenRefKeys.add(key);
     bundle[key] = src;
-    bundle[theoryTypeMetadataKey(key)] = inferTheoryTypeTag(fileName);
+    bundle[`${THEORY_TYPE_META_PREFIX}${key}`] = inferTheoryTypeTag(fileName);
   }
-
   return bundle;
-}
-
-function theoryTypeMetadataKey(refKey) {
-  return `${THEORY_TYPE_META_PREFIX}${refKey}`;
-}
-
-function inferTheoryTypeTag(fileName) {
-  const lower = fileName.toLowerCase();
-  if (lower.endsWith('.eq.theory')) return 'eq';
-  if (lower.endsWith('.reg.theory')) return 'reg';
-  if (lower.endsWith('.coh.theory')) return 'coh';
-  if (lower.endsWith('.fol.theory')) return 'fol';
-  if (lower.endsWith('.sol.theory')) return 'sol';
-  if (lower.endsWith('.prop.theory')) return 'prop';
-  if (lower.endsWith('.mereo.theory')) return 'mereo';
-  return 'plain';
 }
