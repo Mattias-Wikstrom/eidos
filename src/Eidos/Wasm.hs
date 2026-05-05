@@ -36,6 +36,7 @@
 
 module Eidos.Wasm
   ( compileBundle
+  , compileBundleWithTypes
   , compileSingle
   , mainKey
   ) where
@@ -44,7 +45,8 @@ import qualified Data.Map.Strict as Map
 
 import Text.Megaparsec          (errorBundlePretty)
 import Eidos.Parser            (parseString)
-import Eidos.BuildMonad        (mkPureResolver, emptyPureResolver)
+import Eidos.BuildMonad        (mkPureResolverWithTypes, emptyPureResolver)
+import Eidos.ExternalRef       (TheoryType(..))
 import Eidos.FromSyntax        (buildTheoryPure)
 import Eidos.Export.LeanProps  (exportToLeanProps)
 
@@ -76,19 +78,24 @@ compileBundle bundle =
     Nothing ->
       "Error: bundle does not contain a \"" ++ mainKey ++ "\" entry"
     Just mainSrc ->
-      case parseString mainSrc of
-        Left err ->
-          "Error: parse error:\n" ++ errorBundlePretty err
-        Right ast ->
-          let deps     = Map.toList (Map.delete mainKey bundle)
-              resolver = if null deps
-                           then emptyPureResolver
-                           else mkPureResolver deps
-          in case buildTheoryPure resolver Nothing ast of
-               Left buildErr ->
-                 "Error: build error: " ++ buildErr
-               Right theory ->
-                 exportToLeanProps theory
+      let deps = [ (ref, src, PlainTheory) | (ref, src) <- Map.toList (Map.delete mainKey bundle) ]
+      in compileBundleWithTypes mainSrc deps
+
+-- | Compile a main theory source together with typed dependency entries.
+compileBundleWithTypes :: String -> [(String, String, TheoryType)] -> String
+compileBundleWithTypes mainSrc deps =
+  case parseString mainSrc of
+    Left err ->
+      "Error: parse error:\n" ++ errorBundlePretty err
+    Right ast ->
+      let resolver = if null deps
+                       then emptyPureResolver
+                       else mkPureResolverWithTypes deps
+      in case buildTheoryPure resolver Nothing ast of
+           Left buildErr ->
+             "Error: build error: " ++ buildErr
+           Right theory ->
+             exportToLeanProps theory
 
 -- ---------------------------------------------------------------------------
 -- Foreign exports (Wasm target only)

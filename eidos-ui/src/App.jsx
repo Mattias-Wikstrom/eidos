@@ -9,6 +9,7 @@ const theoryModules = import.meta.glob('./demo-theories/*.theory', {
 
 const ENTRY_FILE = '__main__.theory';
 const RESERVED_BUNDLE_KEY = '__main__';
+const THEORY_TYPE_META_PREFIX = '__theory_type__.';
 const REFERENCE_KEY_PATTERN = /^[A-Za-z0-9_.-]+$/;
 
 const theoryEntries = Object.keys(theoryModules)
@@ -238,7 +239,7 @@ export default function App() {
 }
 
 function defaultReferenceKey(name) {
-  return name.replace(/\.theory$/i, '').trim();
+  return name.split('.')[0].trim();
 }
 
 function buildDefaultReferenceKeys(fileMap) {
@@ -281,7 +282,24 @@ function createBundle(fileMap, refKeyMap, entryFile) {
 
     seenRefKeys.add(key);
     bundle[key] = src;
+    bundle[theoryTypeMetadataKey(key)] = inferTheoryTypeTag(fileName);
   }
 
   return bundle;
+}
+
+function theoryTypeMetadataKey(refKey) {
+  return `${THEORY_TYPE_META_PREFIX}${refKey}`;
+}
+
+function inferTheoryTypeTag(fileName) {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith('.eq.theory')) return 'eq';
+  if (lower.endsWith('.reg.theory')) return 'reg';
+  if (lower.endsWith('.coh.theory')) return 'coh';
+  if (lower.endsWith('.fol.theory')) return 'fol';
+  if (lower.endsWith('.sol.theory')) return 'sol';
+  if (lower.endsWith('.prop.theory')) return 'prop';
+  if (lower.endsWith('.mereo.theory')) return 'mereo';
+  return 'plain';
 }

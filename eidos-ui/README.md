@@ -15,6 +15,8 @@ The UI sends a single JSON object to `compileBundle(...)`.
 
 - The entry file is always mapped to `__main__`.
 - Every non-entry file must provide an explicit reference key.
+- Default key generation uses the filename stem before extensions (for example, `group.eq.theory` -> `group`).
+- Each non-entry reference also gets a metadata key `__theory_type__.<ref>` so Wasm can enforce sublanguage constraints for imports.
 - Reference keys must be unique across the bundle.
 - `__main__` is reserved and cannot be used as a non-entry key.
 - Allowed key characters are `[A-Za-z0-9_.-]`.
@@ -25,9 +27,13 @@ Example payload:
 {
   "__main__": "{ signature { P : 𝒫; } ... }",
   "group": "{ signature { G : S; } ... }",
-  "ring.core": "{ signature { R : S; } ... }"
+  "__theory_type__.group": "eq",
+  "ring.core": "{ signature { R : S; } ... }",
+  "__theory_type__.ring.core": "plain"
 }
 ```
+
+Theory-type tags are inferred from filename suffixes (`.eq.theory`, `.coh.theory`, `.reg.theory`, `.fol.theory`, `.sol.theory`, `.prop.theory`, `.mereo.theory`); default is `plain`.
 
 ## Compile Modes
 

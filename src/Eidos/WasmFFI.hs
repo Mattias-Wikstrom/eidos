@@ -41,7 +41,8 @@ module Eidos.WasmFFI where
 import Foreign.C.String  (CString, newCString, peekCString)
 import qualified Data.Map.Strict as Map
 
-import Eidos.Wasm (compileBundle, compileSingle, mainKey)
+import Eidos.Wasm (compileBundleWithTypes, compileSingle, mainKey)
+import Eidos.ExternalRef (TheoryType(..))
 
 -- ---------------------------------------------------------------------------
 -- hs_compile_single
@@ -81,11 +82,81 @@ hs_compile_bundle cJson = do
 -- We use a hand-rolled parser instead of aeson to keep the Wasm binary
 -- small.  The format is intentionally simple: a flat JSON object whose
 -- keys and values are both JSON strings.  No nesting is supported.
+--
+-- Backward-compatible input:
+--   { "__main__": "...", "group": "..." }
+--
+-- Typed dependency metadata (optional):
+--   { "__main__": "...",
+--     "group": "...",
+--     "__theory_type__.group": "eq" }
+--
+-- Allowed type tags: plain, eq, reg, coh, fol, sol, prop, mereo.
 compileBundleFromJSON :: String -> String
 compileBundleFromJSON json =
   case parseSimpleStringMap json of
     Left err     -> "Error: JSON parse error: " ++ err
-    Right bundle -> compileBundle (Map.fromList bundle)
+    Right bundle ->
+      case buildTypedBundle bundle of
+        Left err ->
+          "Error: bundle metadata error: " ++ err
+        Right (mainSrc, deps) ->
+          compileBundleWithTypes mainSrc deps
+
+theoryTypePrefix :: String
+theoryTypePrefix = "__theory_type__."
+
+buildTypedBundle :: [(String, String)] -> Either String (String, [(String, String, TheoryType)])
+buildTypedBundle entries = do
+  mainSrc <- case lookup mainKey entries of
+    Nothing -> Left $ "bundle does not contain a \"" ++ mainKey ++ "\" entry"
+    Just src -> Right src
+  depTypeMap <- parseTypeMetadata entries
+  let dependencies =
+        [ (ref, src, Map.findWithDefault PlainTheory ref depTypeMap)
+        | (ref, src) <- entries
+        , ref /= mainKey
+        , not (isTheoryTypeMetadataKey ref)
+        ]
+      dependencyRefs = Map.fromList [ (ref, ()) | (ref, _, _) <- dependencies ]
+  mapM_ (ensureMetadataRefExists dependencyRefs) (Map.keys depTypeMap)
+  Right (mainSrc, dependencies)
+
+ensureMetadataRefExists :: Map.Map String () -> String -> Either String ()
+ensureMetadataRefExists dependencyRefs ref =
+  if Map.member ref dependencyRefs
+    then Right ()
+    else Left $ "theory-type metadata references unknown dependency \"" ++ ref ++ "\""
+
+parseTypeMetadata :: [(String, String)] -> Either String (Map.Map String TheoryType)
+parseTypeMetadata entries = foldl step (Right Map.empty) entries
+  where
+    step :: Either String (Map.Map String TheoryType) -> (String, String) -> Either String (Map.Map String TheoryType)
+    step acc (k, v)
+      | not (isTheoryTypeMetadataKey k) = acc
+      | otherwise = do
+          current <- acc
+          let ref = drop (length theoryTypePrefix) k
+          if null ref
+            then Left "empty reference key in theory-type metadata"
+            else do
+              theoryType <- parseTheoryTypeTag v
+              Right (Map.insert ref theoryType current)
+
+isTheoryTypeMetadataKey :: String -> Bool
+isTheoryTypeMetadataKey key = take (length theoryTypePrefix) key == theoryTypePrefix
+
+parseTheoryTypeTag :: String -> Either String TheoryType
+parseTheoryTypeTag tag = case tag of
+  "plain" -> Right PlainTheory
+  "eq"    -> Right EquationalTheory
+  "reg"   -> Right RegularTheory
+  "coh"   -> Right CoherentTheory
+  "fol"   -> Right FOLTheory
+  "sol"   -> Right SOLTheory
+  "prop"  -> Right PropositionalTheory
+  "mereo" -> Right MereologicalTheory
+  _       -> Left $ "unknown theory type tag \"" ++ tag ++ "\""
 
 -- | Parse a flat JSON object @{ "k": "v", ... }@ into a list of pairs.
 -- Handles basic JSON string escaping (\n \t \\ \").

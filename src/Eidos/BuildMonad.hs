@@ -14,6 +14,7 @@ module Eidos.BuildMonad
   , PureResolver
   , FnResolver(..)
   , mkPureResolver
+  , mkPureResolverWithTypes
   , emptyPureResolver
   , ioResolver
   , module Control.Monad.Except
@@ -126,6 +127,17 @@ mkPureResolver entries = PureResolver $ Map.fromList
         , extRefSource = MemorySource content
         })
   | (ref, content) <- entries
+  ]
+
+-- | Helper to create a pure resolver from typed entries.
+mkPureResolverWithTypes :: [(String, String, TheoryType)] -> PureResolver
+mkPureResolverWithTypes entries = PureResolver $ Map.fromList
+  [ (ref, Right $ ExternalRefResult
+        { extRefIdentifier = ref
+        , extRefTheoryType = theoryType
+        , extRefSource = MemorySource content
+        })
+  | (ref, content, theoryType) <- entries
   ]
 
 -- | Helper to create a pure resolver that fails for all references
