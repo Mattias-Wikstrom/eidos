@@ -32,10 +32,10 @@ sortMinName s = s ++ minSuffix
 sortMaxName s = s ++ maxSuffix
 
 uMinName, uMaxName, pMinName, pMaxName :: String
-uMinName = "𝕌_Min"
-uMaxName = "𝕌_Max"
-pMinName = "ℙ_Min"
-pMaxName = "ℙ_Max"
+uMinName = "U_Min"
+uMaxName = "U_Max"
+pMinName = "P_Min"
+pMaxName = "P_Max"
 
 uMin, uMax, pMin, pMax :: LeanExpr
 uMin = LVar uMinName
@@ -152,7 +152,6 @@ mkAxiomSets theory = concat
   , sortOrderAxiomSets
   , productSortOrderAxiomSets
   , userFactAxiomSets
-  , implicitMergeAxiomSets
   ]
   where
   -- -------------------------------------------------------------------------
@@ -162,18 +161,10 @@ mkAxiomSets theory = concat
 
   userSorts =
     [ s | IR.EntitySort s <- IR.theoryObjects theory
-        , IR.sortKind s == IR.SortKindFromSignature
-        , IR.sortOrigin s == IR.FromSignature ]
+        , IR.sortKind s == IR.SortKindFromSignature ]
 
-  solFunctions =
-    [ f | IR.EntityFunction f <- IR.theoryObjects theory
-        , IR.funcKind f == IR.FunctionKindSOLFunctionFromTheory
-        , IR.funcOrigin f == IR.FromSignature ]
-
-  folFunctions =
-    [ f | IR.EntityFunction f <- IR.theoryObjects theory
-        , IR.funcKind f == IR.FunctionKindFOLFunctionFromTheory
-        , IR.funcOrigin f == IR.FromSignature ]
+  solFunctions = IR.theorySOLFunctions theory
+  folFunctions = IR.theoryFOLFunctions theory
 
   folSingleArgFunctions =
     filter (\f -> length (IR.funcArgSorts f) == 1
@@ -251,30 +242,23 @@ mkAxiomSets theory = concat
         , not (IR.factIsMereologicalTranslation f)
         ]
 
-  implicitMergeFacts =
-    [ f | f <- IR.theoryFacts theory
-        , IR.factKind f == IR.FactKindImplicitMerge
-        , not (IR.factIsInherited f)
-        , not (IR.factIsMereologicalTranslation f)
-        ]
-
   -- -------------------------------------------------------------------------
   -- 1. Header: U/P (and optionally D) limit objects
   -- -------------------------------------------------------------------------
   headerAxiomSets :: [AxiomSet]
   headerAxiomSets =
-    [ axiomSet [SSort "𝕌"] (tags [TagSort, TagDecl])
+    [ axiomSet [SSort "U"] (tags [TagSort, TagDecl])
         [ LeanAxiom uMinName LProp
         , LeanAxiom uMaxName LProp
         ]
-    , axiomSet [SSort "ℙ"] (tags [TagSort, TagDecl])
+    , axiomSet [SSort "P"] (tags [TagSort, TagDecl])
         [ LeanAxiom pMinName LProp
         , LeanAxiom pMaxName LProp
         ]
     ] ++
-    [ axiomSet [SSort "𝔻"] (tags [TagSort, TagDecl])
-        [ LeanAxiom "𝔻_Min" LProp
-        , LeanAxiom "𝔻_Max" LProp
+    [ axiomSet [SSort "D"] (tags [TagSort, TagDecl])
+        [ LeanAxiom "D_Min" LProp
+        , LeanAxiom "D_Max" LProp
         ]
     | usesDomain
     ]
@@ -1074,20 +1058,20 @@ mkAxiomSets theory = concat
   -- -------------------------------------------------------------------------
   sortOrderAxiomSets :: [AxiomSet]
   sortOrderAxiomSets =
-      [ axiomSet [SSort "𝕌"] (tags [TagSort, TagOrdering])
-          [ LeanAxiom "𝕌_ordering" (LImpl uMax uMin)
+      [ axiomSet [SSort "U"] (tags [TagSort, TagOrdering])
+          [ LeanAxiom "U_ordering" (LImpl uMax uMin)
           ]
-      , axiomSet [SSort "ℙ"] (tags [TagSort, TagOrdering])
-          [ LeanAxiom "ℙ_upper"     (LImpl uMax pMax)
-          , LeanAxiom "ℙ_ordering" (LImpl pMax pMin)
-          , LeanAxiom "ℙ_lower"     (LImpl pMin uMin)
+      , axiomSet [SSort "P"] (tags [TagSort, TagOrdering])
+          [ LeanAxiom "P_upper"     (LImpl uMax pMax)
+          , LeanAxiom "P_ordering" (LImpl pMax pMin)
+          , LeanAxiom "P_lower"     (LImpl pMin uMin)
           ]
       ] ++
       (if usesDomain then
-        [ axiomSet [SSort "𝔻"] (tags [TagSort, TagOrdering])
-            [ LeanAxiom "𝔻_upper"    (LImpl uMax (LVar "𝔻_Max"))
-            , LeanAxiom "𝔻_ordering" (LImpl (LVar "𝔻_Max") (LVar "𝔻_Min"))
-            , LeanAxiom "𝔻_lower"    (LImpl (LVar "𝔻_Min") pMax)
+        [ axiomSet [SSort "D"] (tags [TagSort, TagOrdering])
+            [ LeanAxiom "D_upper"    (LImpl uMax (LVar "D_Max"))
+            , LeanAxiom "D_ordering" (LImpl (LVar "D_Max") (LVar "D_Min"))
+            , LeanAxiom "D_lower"    (LImpl (LVar "D_Min") pMax)
             ]
         ]
       else [])
@@ -1194,158 +1178,6 @@ mkAxiomSets theory = concat
       -- Inline prop-expr translator (mirrors LeanProps.propExprToLean)
       propExprToLean' = propExprToLean
 
-  -- -------------------------------------------------------------------------
-  -- 43. Implicit merge axioms
-  -- -------------------------------------------------------------------------
-  implicitMergeAxiomSets :: [AxiomSet]
-  implicitMergeAxiomSets = concatMap mkMergeAS implicitMergeFacts
-    where
-      mkMergeAS :: IR.Fact -> [AxiomSet]
-      mkMergeAS fact = 
-        extractMergeAxioms (IR.factPropExpr fact)
-      
-      extractMergeAxioms :: IR.ResolvedPropExpr -> [AxiomSet]
-      extractMergeAxioms (IR.ResolvedPropBicond left []) = 
-        extractFromRightImpl left
-      extractMergeAxioms _ = []
-      
-      extractFromRightImpl :: IR.ResolvedRightImpl -> [AxiomSet]
-      extractFromRightImpl (IR.ResolvedRightImpl leftImpl Nothing) =
-        extractFromLeftImpl leftImpl
-      extractFromRightImpl _ = []
-      
-      extractFromLeftImpl :: IR.ResolvedLeftImpl -> [AxiomSet]
-      extractFromLeftImpl (IR.ResolvedLeftImpl disj []) =
-        extractFromDisj disj
-      extractFromLeftImpl _ = []
-      
-      extractFromDisj :: IR.ResolvedDisj -> [AxiomSet]
-      extractFromDisj (IR.ResolvedDisj conj []) =
-        extractFromConj conj
-      extractFromDisj _ = []
-      
-      extractFromConj :: IR.ResolvedConj -> [AxiomSet]
-      extractFromConj (IR.ResolvedConj neg []) =
-        extractFromNeg neg
-      extractFromConj _ = []
-      
-      extractFromNeg :: IR.ResolvedNeg -> [AxiomSet]
-      extractFromNeg (IR.ResolvedNegChild quant) =
-        extractFromQuantified quant
-      extractFromNeg _ = []
-      
-      extractFromQuantified :: IR.ResolvedQuantified -> [AxiomSet]
-      extractFromQuantified (IR.ResolvedQuantified [] atomic) =
-        extractFromAtomic atomic
-      extractFromQuantified _ = []
-      
-      extractFromAtomic :: IR.ResolvedAtomicProp -> [AxiomSet]
-      extractFromAtomic (IR.ResolvedAtomicTermPair tp) =
-        extractFromTermPair tp
-      extractFromAtomic _ = []
-      
-      extractFromTermPair :: IR.ResolvedTermPair -> [AxiomSet]
-      extractFromTermPair (IR.ResolvedTermPair lhs rights _) =
-        case rights of
-          [IR.ResolvedRelationFollowedByTerm _ op _ rhs] | op == "=" ->
-            case (getEntityFromTerm lhs, getTermName lhs, getTermName rhs) of
-              (Just entity, Just lName, Just rName) ->
-                classifyAndEmit entity lName rName
-              _ -> []
-          _ -> []
-      
-      getEntityFromTerm :: IR.ResolvedTerm -> Maybe IR.Entity
-      getEntityFromTerm (IR.ResolvedTerm (IR.ResolvedFactor (IR.ResolvedBTAtomic ref) [] _) [] _) =
-        Just (IR.resolvedConstEntity ref)
-      getEntityFromTerm _ = Nothing
-      
-      getTermName :: IR.ResolvedTerm -> Maybe String
-      getTermName (IR.ResolvedTerm (IR.ResolvedFactor (IR.ResolvedBTAtomic ref) [] _) [] _) =
-        Just (resolveConstRef ref)
-      getTermName _ = Nothing
-
-      classifyAndEmit :: IR.Entity -> String -> String -> [AxiomSet]
-      classifyAndEmit entity lhsName rhsName =
-        let axName = mergeAxiomName lhsName rhsName
-        in case entity of
-          IR.EntityFunction _ ->
-            -- Function merge: plain equality, no wrapper.
-            [ axiomSet [SGlobal] (tags [TagImplicitMerge])
-                [LeanAxiom axName
-                  (LEq (LVar lhsName) (LVar rhsName))]
-            ]
-          _ ->
-            -- Sort bounds, mereological objects, propositions:
-            -- metafact-wrapped equality.
-            [ axiomSet [SGlobal] (tags [TagImplicitMerge])
-                [LeanAxiom axName
-                  (LMetafactWrapper (LEq (LVar lhsName) (LVar rhsName)))]
-            ]
-
-      -- | Build a unique, Lean-safe axiom name for a merge fact.
-      --
-      -- Form: @<safeLhs>_from_<subtheory>@
-      --
-      -- * @<safeLhs>@  — the LHS name with characters that are not valid in
-      --   Lean 4 identifiers replaced by ASCII spellings (so that operator
-      --   names like @+@, @×@, @⇒@ produce valid names).
-      --
-      -- * @<subtheory>@ — the fully-qualified source subtheory name, derived
-      --   by dropping the last dot-segment from @rhsName@ (the entity name)
-      --   and replacing remaining dots with underscores.
-      --   E.g. @lower_semi_lattice.D_Min@ → subtheory @lower_semi_lattice@;
-      --        @lattice.lower_semi_lattice.D_Min@ → @lattice_lower_semi_lattice@.
-      --
-      -- Using the subtheory name as a suffix guarantees uniqueness when the
-      -- same LHS name is merged from multiple implicit subtheories
-      -- (e.g. @D_Min@ from both @lower_semi_lattice@ and @upper_semi_lattice@
-      -- in @lattice@).
-      mergeAxiomName :: String -> String -> String
-      mergeAxiomName lhsName rhsName =
-        let safeLhs   = concatMap safeMergeChar lhsName
-            subtheory = subtheoryFromRhs rhsName
-        in safeLhs ++ "_from_" ++ subtheory
- 
-      -- | Extract the subtheory portion from a qualified RHS name by
-      -- dropping the last dot-segment and replacing dots with underscores.
-      subtheoryFromRhs :: String -> String
-      subtheoryFromRhs rhsName =
-        let segments = splitOnDot rhsName
-        in case segments of
-             []  -> "unknown"
-             [_] -> "unknown"   -- no qualifier — shouldn't happen in practice
-             _   -> map dotToUnderscore
-                      (concatMap (\(i,s) -> if i == 0 then s else '.' : s)
-                                 (zip [0..] (init segments)))
- 
-      -- | Split a string on '.' characters.
-      splitOnDot :: String -> [String]
-      splitOnDot "" = []
-      splitOnDot s  =
-        let (h, t) = break (== '.') s
-        in h : case t of
-                 []     -> []
-                 (_:rest) -> splitOnDot rest
- 
-      dotToUnderscore :: Char -> Char
-      dotToUnderscore '.' = '_'
-      dotToUnderscore  c  =  c
- 
-      -- | Replace characters that are not safe in Lean 4 identifiers with
-      -- ASCII spellings.  Lean 4 accepts Unicode letters and most Unicode
-      -- symbols in identifiers, but rejects many ASCII operator characters.
-      safeMergeChar :: Char -> String
-      safeMergeChar c = case c of
-        '+'  -> "plus"
-        '-'  -> "minus"
-        '×'  -> "times"
-        '⇒'  -> "impl"
-        '∸'  -> "sub"
-        '/'  -> "div"
-        '#'  -> "_"
-        '.'  -> "_"
-        _    -> [c]
-
 propExprToLean :: IR.ResolvedPropExpr -> LeanExpr
 propExprToLean (IR.ResolvedPropBicond lhs rests) =
   foldl (\acc r -> LBicond acc (rightImplToLean (IR.resolvedPropRestRight r)))
@@ -1426,38 +1258,44 @@ resolveConstRef :: IR.ResolvedConstantRef -> String
 resolveConstRef = resolveName . IR.resolvedConstRefName
 
 resolveName :: String -> String
-resolveName n =
-  let (prefix, leaf) = splitQualified n
-      mappedLeaf = case leaf of
-        "⊤"     -> pMinName
-        "⊥"     -> pMaxName
-        "ℙ#min" -> pMinName
-        "ℙ#max" -> pMaxName
-        "𝕌#min" -> uMinName
-        "𝕌#max" -> uMaxName
-        "𝔻#min" -> "𝔻_Min"
-        "𝔻#max" -> "𝔻_Max"
-        other
-          | Just base <- stripSuffix "#min" other -> sanitizeName base ++ minSuffix
-          | Just base <- stripSuffix "#max" other -> sanitizeName base ++ maxSuffix
-          | otherwise -> sanitizeName other
-  in if null prefix then mappedLeaf else prefix ++ "." ++ mappedLeaf
+resolveName n = case n of
+  "⊤"     -> pMinName
+  "⊥"     -> pMaxName
+  "ℙ#min" -> pMinName
+  "ℙ#max" -> pMaxName
+  "𝕌#min" -> uMinName
+  "𝕌#max" -> uMaxName
+  other
+    | Just base <- stripSuffix "#min" other -> sanitizeName base ++ minSuffix
+    | Just base <- stripSuffix "#max" other -> sanitizeName base ++ maxSuffix
+    | otherwise -> sanitizeName other
   where
-    splitQualified str =
-      case break (== '.') (reverse str) of
-        (revLeaf, "")      -> ("", reverse revLeaf)
-        (revLeaf, revRest) -> (reverse (tail revRest), reverse revLeaf)
-
     stripSuffix suffix str =
       let (front, back) = splitAt (length str - length suffix) str
       in if back == suffix then Just front else Nothing
 
 termPairToLean :: IR.ResolvedTermPair -> LeanExpr
-termPairToLean (IR.ResolvedTermPair lhs rights _) =
-  foldl applyRelOp (termToLean lhs) rights
+termPairToLean (IR.ResolvedTermPair lhs rights ty) =
+  foldl (applyRelOp ty) (termToLean lhs) rights
 
-applyRelOp :: LeanExpr -> IR.ResolvedRelationFollowedByTerm -> LeanExpr
-applyRelOp leftExpr rfbt =
+-- | Render a relational operator applied to two already-rendered expressions.
+--
+-- The 'ExprType' of the LHS (from 'resolvedTPType') is threaded in so that
+-- the @"="@ case can choose the correct Lean 4 encoding:
+--
+--   * For __function-kinded__ and __sort-kinded__ terms (@FOLFunctionClass@,
+--     @SOLFunctionClass@, @SortClass@) equality must be rendered as @LEq@
+--     (@a = b@), because these types are not 'Prop' and @↔@ would be a
+--     type error in Lean 4.
+--
+--   * For __proposition-kinded__ and __mereological__ terms
+--     (@PropositionClass@, @IndividualClass@, @OtherMereologicalClass@,
+--     @RelationClass@) the mereological encoding uses @LBicond@ (@a ↔ b@),
+--     which is the standard Eidos rendering for propositional equality.
+--
+-- All other operators are unaffected by the type.
+applyRelOp :: IR.ExprType -> LeanExpr -> IR.ResolvedRelationFollowedByTerm -> LeanExpr
+applyRelOp lhsTy leftExpr rfbt =
   let op    = IR.resolvedRFTOp rfbt
       right = termToLean (IR.resolvedRFTRight rfbt)
       qual  = IR.resolvedRFTSortQual rfbt
@@ -1472,7 +1310,14 @@ applyRelOp leftExpr rfbt =
                        hi  = LVar (resolveName (IR.mereoName (IR.sortMax s)))
                    in LBicond (LProjectIntoInterval leftExpr lo hi)
                               (LProjectIntoInterval right     lo hi)
-                 _ -> LBicond leftExpr right
+                 _ -> case lhsTy of
+                        -- Functions and sorts are not Prop: use Lean = not ↔
+                        IR.FOLFunctionClass _ -> LEq leftExpr right
+                        IR.SOLFunctionClass _ -> LEq leftExpr right
+                        IR.SortClass          -> LEq leftExpr right
+                        -- Propositions, individuals, sets, mereological objects:
+                        -- use the mereological ↔ encoding
+                        _                     -> LBicond leftExpr right
        "≤"  -> LImpl   leftExpr right
        "∪"  -> LConj   leftExpr right
        "∩"  -> LDisj   leftExpr right
@@ -1601,13 +1446,12 @@ theoryBlocks :: IR.Theory -> [(String, [AxiomSet])]
 theoryBlocks theory =
   childBlocks ++ [rootBlock]
   where
-    rootBlock  = ("__main__", mkAxiomSets theory)
+    rootBlock   = ("__main__", mkAxiomSets theory)
     childBlocks = concatMap subBlocks (IR.theorySubtheories theory)
 
     subBlocks :: IR.Theory -> [(String, [AxiomSet])]
     subBlocks sub
-      | IR.theoryReflection sub = []   -- skip reflection subtheories
+      | IR.theoryReflection sub = []
       | otherwise =
-          -- Recurse into sub's children first (post-order), then emit sub.
           concatMap subBlocks (IR.theorySubtheories sub)
           ++ [(IR.theoryFullyQualifiedName sub, mkAxiomSets sub)]
