@@ -1,0 +1,7 @@
+/* Equational theory that axiomatizes the concept of a magma */
+{
+  signature {
+    sort D; // D is the domain
+    op : D, D → D; // op is a binary operation
+  }
+}

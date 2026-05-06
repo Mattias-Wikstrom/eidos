@@ -1,0 +1,8 @@
+{
+	signature {
+        sort E;
+        A subsort E;
+        C subquotient E;
+        D quotient E;
+    }
+}

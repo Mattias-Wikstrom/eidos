@@ -1,0 +1,22 @@
+/* Equational theory that axiomatizes the concept of a ring without unity */
+{
+  subtheories {
+    named {
+      additive_group: @commutative_group
+    },    
+    implicit {
+      semiring_without_unity: @semiring_without_unity,
+    },
+  },
+  signature {
+    sort D;
+    additive_inv: D → D;
+  },
+  axioms {
+    facts {
+      semiring_without_unity.D = additive_group.D; // There is only a single domain D
+      semiring_without_unity.sum = additive_group.op;
+      additive_inv = additive_group.inv;
+    }
+  }
+}

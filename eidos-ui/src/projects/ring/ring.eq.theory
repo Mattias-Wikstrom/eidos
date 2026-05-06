@@ -1,0 +1,11 @@
+/* Equational theory that axiomatizes the concept of a ring */
+{
+  /* All that is needed here is to combine the theory for a ring without unity with the 
+    theory for a semiring */
+  subtheories {
+    implicit {
+      ring_without_unity: @ring_without_unity, // Provides additive inverses
+      semiring: @semiring // Provides a multiplicative unit
+    }
+  }
+}
