@@ -1270,18 +1270,26 @@ resolveConstRef :: IR.ResolvedConstantRef -> String
 resolveConstRef = resolveName . IR.resolvedConstRefName
 
 resolveName :: String -> String
-resolveName n = case n of
-  "⊤"     -> pMinName
-  "⊥"     -> pMaxName
-  "ℙ#min" -> pMinName
-  "ℙ#max" -> pMaxName
-  "𝕌#min" -> uMinName
-  "𝕌#max" -> uMaxName
-  other
-    | Just base <- stripSuffix "#min" other -> sanitizeName base ++ minSuffix
-    | Just base <- stripSuffix "#max" other -> sanitizeName base ++ maxSuffix
-    | otherwise -> sanitizeName other
+resolveName n =
+  let (prefix, leaf) = splitQualified n
+      mappedLeaf = case leaf of
+        "⊤"     -> pMinName
+        "⊥"     -> pMaxName
+        "ℙ#min" -> pMinName
+        "ℙ#max" -> pMaxName
+        "𝕌#min" -> uMinName
+        "𝕌#max" -> uMaxName
+        other
+          | Just base <- stripSuffix "#min" other -> sanitizeName base ++ minSuffix
+          | Just base <- stripSuffix "#max" other -> sanitizeName base ++ maxSuffix
+          | otherwise -> sanitizeName other
+  in if null prefix then mappedLeaf else prefix ++ "." ++ mappedLeaf
   where
+    splitQualified str =
+      case break (== '.') (reverse str) of
+        (revLeaf, "")      -> ("", reverse revLeaf)
+        (revLeaf, revRest) -> (reverse (tail revRest), reverse revLeaf)
+
     stripSuffix suffix str =
       let (front, back) = splitAt (length str - length suffix) str
       in if back == suffix then Just front else Nothing

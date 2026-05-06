@@ -953,6 +953,30 @@ addMergeEqualityFact th lhsName lhsEntity rhsName rhsEntity =
         , factFreeVars                  = []
         })
 
+addMergeEqualityFacts
+  :: Theory
+  -> String
+  -> Entity
+  -> String
+  -> Entity
+  -> Theory
+addMergeEqualityFacts th lhsName lhsEntity rhsName rhsEntity =
+  foldl (\acc (l, r) -> addMergeEqualityFact acc l lhsEntity r rhsEntity) th mergePairs
+  where
+    rhsWithLeaf :: String -> String
+    rhsWithLeaf leaf =
+      case break (== '.') (reverse rhsName) of
+        (_, "")      -> leaf
+        (_, revRest) -> reverse revRest ++ leaf
+
+    mergePairs = case lhsName of
+      "𝕌" -> [("𝕌#min", rhsWithLeaf "𝕌#min"), ("𝕌#max", rhsWithLeaf "𝕌#max")]
+      "ℙ" -> [("ℙ#min", rhsWithLeaf "ℙ#min"), ("ℙ#max", rhsWithLeaf "ℙ#max")]
+      "𝔻" -> [("𝔻#min", rhsWithLeaf "𝔻#min"), ("𝔻#max", rhsWithLeaf "𝔻#max")]
+      "⊤" -> [("ℙ#min", rhsWithLeaf "ℙ#min")]
+      "⊥" -> [("ℙ#max", rhsWithLeaf "ℙ#max")]
+      _   -> [(lhsName, rhsName)]
+
 -- | Built-in sort/limit names that every theory already owns an unqualified
 -- entry for.  When an implicit subtheory contributes one of these names, the
 -- parent already owns the canonical slot; we only need to emit an equality
@@ -984,7 +1008,7 @@ addUnqualified name qualifiedName th entity
       case ( Map.lookup name      (theoryObjectsByName th)
            , Map.lookup qualifiedName (theoryObjectsByName th) ) of
         (Just (parentEntity:_), Just (subEntity:_)) ->
-          Right $ addMergeEqualityFact th name parentEntity qualifiedName subEntity
+          Right $ addMergeEqualityFacts th name parentEntity qualifiedName subEntity
         _ -> Right th
 
   -- Slot empty: first occurrence of this user-defined name.
@@ -994,14 +1018,14 @@ addUnqualified name qualifiedName th entity
   | Nothing <- Map.lookup name (theoryObjectsByName th) =
       let canonical = createCanonicalEntity th entity
           th1       = addEntityToParent th name canonical
-      in Right $ addMergeEqualityFact th1 name canonical qualifiedName entity
+      in Right $ addMergeEqualityFacts th1 name canonical qualifiedName entity
 
   -- Slot already occupied by a canonical entity from a previous implicit sub.
   -- If compatible, emit another equality fact; leave the single canonical
   -- entry in place (no new entity added to the slot).
   | Just (canonical : _) <- Map.lookup name (theoryObjectsByName th) =
       if entitiesCompatible canonical entity
-        then Right $ addMergeEqualityFact th name canonical qualifiedName entity
+        then Right $ addMergeEqualityFacts th name canonical qualifiedName entity
         else Left $ "Name conflict: '" ++ name
                ++ "' is defined in multiple implicit subtheories with incompatible signatures"
 
