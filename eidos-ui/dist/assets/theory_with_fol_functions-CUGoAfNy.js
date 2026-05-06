@@ -1,0 +1,30 @@
+var e=`{
+  signature {
+    sort S;
+    sort T;
+
+    S1 ⊆ S;
+    S2 ⊆ S;
+
+    T1 ⊆ T;
+    T2 ⊆ T;
+
+    f : S, S → T;
+    g : S → S;
+    h : T → S;
+    k : S, T, T → S;
+
+    idS : S → S;
+  },
+  axioms {
+    assertions {
+      X ⊆ S,  (idS(X) = X);
+      X ⊆ S,  Y ⊆ S,  (f(X, Y) = T1);
+      X ⊆ S,  Y ⊆ S,  (f(X, Y) = f(Y, X));
+      X ⊆ S,  (g(X) = g(g(X)));
+      X ⊆ S,  (h(f(X, X)) = g(g(g(X))));
+
+    }
+  }
+}
+`;export{e as default};

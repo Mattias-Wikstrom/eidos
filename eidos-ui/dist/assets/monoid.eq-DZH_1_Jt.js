@@ -1,0 +1,18 @@
+var e=`/* Equational theory that axiomatizes the concept of a monoid */
+{
+  subtheories {
+    implicit {
+      semigroup: @semigroup
+    }
+  },
+  signature {
+    sort D; // D is the domain
+    n : D; // n will be the neutral element
+  },
+  axioms {
+    facts {
+      x : D,  x = op(n, x); // n is a neutral element for left multiplication
+      x : D,  x = op(x, n); // n is a neutral element for right multiplication
+    }
+  }
+}`;export{e as default};

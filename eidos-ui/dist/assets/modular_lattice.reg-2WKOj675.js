@@ -1,0 +1,13 @@
+var e=`/* Theory in regular logic that axiomatizes the concept of a modular lattice */
+{
+  subtheories {
+    implicit {
+      lattice: @lattice
+    }
+  },
+  axioms {
+    assertions {
+      x : D,  y : D,  z : D,  LessThanOrEq(x, z) → join(x, meet(y, z)) = meet(join(x, y), z);
+    }
+  }
+}`;export{e as default};

@@ -1,0 +1,13 @@
+var e=`/* Equational theory that axiomatizes the concept of a commutative monoid */
+{
+  subtheories {
+    implicit {
+      monoid: @monoid
+    }
+  },
+  axioms {
+    facts {
+      x : D,  y : D,  op(x, y) = op(y, x); // Commutativity
+    }
+  }
+}`;export{e as default};

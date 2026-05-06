@@ -1,0 +1,25 @@
+var e=`/* Theory in coherent logic that describes a Dedekind cut */
+{
+  subtheories {
+    implicit {
+      strict_linear_order: @strict_linear_order
+    }
+  },
+  signature {
+    sort D;
+    L ⊆ D;
+    U ⊆ D;
+  },
+  axioms {
+    assertions {
+      ∃x:D L(x);
+      ∃x:D U(x);
+      x : D,  y : D,  (LessThan(x, y) ∧ L(y)) → L(x);
+      x : D,  y : D,  (U(x) ∧ LessThan(x, y)) → U(y);
+      x : D,  L(x) → ∃y:D (LessThan(x, y) ∧ L(y));
+      y : D,  U(y) → ∃x:D (U(x) ∧ LessThan(x, y));
+      x : D,  y : D,  LessThan(x, y) → (L(x) ∨ U(y));
+      x : D,  y : D,  (L(x) ∧ U(y)) → LessThan(x, y);
+    }
+  }
+}`;export{e as default};

@@ -1,0 +1,7 @@
+var e=`{
+        signature { sort S; a : S; },
+        axioms { assertions {
+          x : S, ιy : S y =_S a ∈ ({z : S | z =_S a});
+        }
+    }
+}`;export{e as default};

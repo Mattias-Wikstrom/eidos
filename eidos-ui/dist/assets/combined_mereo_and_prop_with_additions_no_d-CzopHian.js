@@ -1,0 +1,52 @@
+var e=`{
+  signature {
+    sort S;
+    MySet1 ⊆ S;
+    MySet2 ⊆ S;
+    sort T;
+    MySet3 ⊆ T;
+
+    A : 𝕌;
+    MP1 : 𝕌;
+    MP2 : 𝕌;
+    MQ : 𝕌;
+    MyOtherMereologicalObject : 𝕌;
+    MyMereologicalObject : 𝕌;
+    
+    P1 : ℙ;
+    P2 : ℙ;
+    Q : ℙ;
+    MyOtherProp : ℙ;
+    MyProp : ℙ;
+  },
+  axioms {
+    assertions {
+      MySet1 ∪ <S>(MySet2) = MySet1;
+      MySet1 ∩ MySet2 = MySet2;
+      MySet1 ⊆ MySet2;
+      P1 ∨ Q;
+      P1 ∨ ℙ#min;
+      P1 ∨ P2;
+      P1 ∨ ℙ#max;
+      Q → (MyProp ∧ ¬P1);
+      (P2 → ⊥) ↔ (¬MyProp);
+      X : ℙ,  (X → (¬¬X));
+      Q ← P1;
+      x : S,  x = x;
+    },
+    metafacts {
+      MySet1 - S#min;
+      MySet2 - S#max;
+      MySet3 - T#max;
+
+      MP1 × MQ;
+      𝕌#min - 𝕌#max;
+      MP1 × MP2;
+      (MyMereologicalObject + (A - MP1)) - MQ;
+      (A - MP2) ∸ (A - MyMereologicalObject);
+      X : 𝕌,  ((A - (A - X)) - X);
+      MQ - MP1;
+    }
+  }
+}
+`;export{e as default};

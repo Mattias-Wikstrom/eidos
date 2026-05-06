@@ -1,0 +1,1 @@
+var e=`{ signature { sort S; f : S, S → S; } }`;export{e as default};

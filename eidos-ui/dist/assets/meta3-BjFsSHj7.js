@@ -1,0 +1,40 @@
+var e=`{
+  signature {
+    sort D;
+    sort E;
+    sort F;
+    sort G;
+
+    E subsort D;
+    F quotient D;
+    G subquotient D;
+
+    D_max ⊆ D;
+    D_min ⊆ D;
+    d : D;
+
+    f : D → D;
+    g : D, E → Prop; 
+
+    K : E, E → D;
+
+    P : Prop;
+  },
+  axioms {
+    assertions {
+      D_max = D#max;
+      D_min = D#min;
+      D_max ∪ D_min = D_min ∪ D_max;
+      D_max ∩ D_min = D_min ∩ D_max;
+      D_min ⊆ D_max;
+      d ∈ D_max;
+    },
+    metafacts {
+      (f#1 ∸ <D>(f#1)) ⇒ (f#res ∸ <D>(f#res)) ≤ 𝕌#min;
+      (f#1 ∸ <D#min, D#max>(f#1)) ⇒ (f#res ∸ <D>(f#res)) ≤ 𝕌#min;
+    }
+  },
+  subtheories {
+  }
+}
+`;export{e as default};

@@ -1,0 +1,15 @@
+var e=`/* Theory in coherent logic that axiomatizes the concept of an ordered field */
+{
+  subtheories {
+    implicit {
+      field: @field,
+      strict_linear_order: @strict_linear_order
+    }
+  },
+  axioms {
+    assertions {
+      x : D,  y : D,  z : D,  LessThan(x, y) → LessThan(sum(x, z), sum(y, z));
+      x : D,  y : D,  (LessThan(zero, x) ∧ LessThan(zero, y)) → LessThan(zero, prod(x, y));
+    }
+  }
+}`;export{e as default};

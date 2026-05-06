@@ -1,0 +1,13 @@
+var e=`/* Equational theory that axiomatizes the concept of a semigroup */
+{
+  subtheories {
+    implicit {
+      magma: @magma
+    }
+  },
+  axioms {
+    facts {
+      x : D,  y : D,  z : D,  op(op(x, y), z) = op(x, op(y, z)); // Associativity
+    }
+  }
+}`;export{e as default};

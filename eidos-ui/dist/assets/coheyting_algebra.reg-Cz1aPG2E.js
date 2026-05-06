@@ -1,0 +1,17 @@
+var e=`/* Theory in regular logic that axiomatizes the concept of a co-Heyting algebra */
+{
+  subtheories {
+    implicit {
+      distributive_lattice: @distributive_lattice
+    }    
+  },
+  signature {
+    coheyting_complement : D, D → D;
+  },
+  axioms {
+    assertions {
+      x : D,  y : D,  LessThanOrEq(y, join(x, coheyting_complement(y, x)));
+      x : D,  y : D,  z : D,  LessThanOrEq(y, join(x, z)) → LessThanOrEq(coheyting_complement(y, x), z);
+    }
+  }
+}`;export{e as default};

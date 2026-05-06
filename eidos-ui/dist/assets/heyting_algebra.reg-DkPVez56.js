@@ -1,0 +1,17 @@
+var e=`/* Theory in regular logic that axiomatizes the concept of a Heyting algebra */
+{
+  subtheories {
+    implicit {
+      distributive_lattice: @distributive_lattice
+    }    
+  },
+  signature {
+    heyting_complement : D, D → D;
+  },
+  axioms {
+    assertions {
+      x : D,  y : D,  LessThanOrEq(meet(x, heyting_complement(x, y)), y);
+      x : D,  y : D,  z : D,  LessThanOrEq(meet(x, z), y) → LessThanOrEq(z, heyting_complement(x, y));
+    }
+  }
+}`;export{e as default};
