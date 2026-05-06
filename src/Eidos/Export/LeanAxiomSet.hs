@@ -151,6 +151,12 @@ data Tag = TagSort
   | TagUserFact
     -- ^ A user-written assertion or metafact from the theory source.
     --   E.g. @ax1@, @ax2@.
+  | TagImplicitMerge
+    -- ^ An implicit merge fact connecting entities across subtheories.
+    --   Generated when an implicit subtheory's entities are merged into
+    --   the parent namespace.  The Lean rendering depends on the entity
+    --   type: sort bounds produce U_Min-wrapped pairs, functions produce
+    --   plain equality, and propositions produce U_Min-wrapped equality.
 
   deriving (Eq, Ord, Show, Enum, Bounded)
 

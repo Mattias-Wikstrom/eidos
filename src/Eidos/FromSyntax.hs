@@ -11,7 +11,7 @@ import           Control.Monad        (forM_, when, foldM)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Data.Char            (isUpper)
-import           Data.List            (find, intercalate)
+import Data.List (find, intercalate, isSuffixOf)
 import qualified Data.Map.Strict      as Map
 import           Data.Maybe           (fromMaybe, mapMaybe)
 import           System.FilePath      (takeDirectory)
@@ -895,14 +895,20 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
       let transformed = if isReflection then map reflectEntity entities else entities
           qualifiedName = if null subName then name else subName ++ "." ++ name
 
-          -- Step 1: always register the qualified name.
-          th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
+          -- Only generate unqualified merge facts for entities LOCALLY
+          -- DECLARED in the subtheory. Entities propagated from
+          -- grandchildren (where entityTheory e /= subTh) still get
+          -- qualified registration but NO unqualified merge fact.
+          localToSub = [e | e <- transformed, theoryFullyQualifiedName (entityTheory e) == theoryFullyQualifiedName subTh]
 
-      -- Step 2: for implicit subtheories, also handle the unqualified name —
-      -- but only for plain names (no '#' — those are internal artefacts).
-      if isImplicit && not (isInternalName name)
-        then foldM (addUnqualified name qualifiedName) th1 transformed
+      -- Step 1: always register the qualified name for ALL entities.
+      let th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
+
+      -- Step 2: only generate implicit merge facts for LOCAL entities.
+      if isImplicit && not (isInternalName name) && not (null localToSub)
+        then foldM (addUnqualified name qualifiedName) th1 localToSub
         else Right th1
+
 
 -- | Create a ResolvedTerm from an entity with a custom display name
 termFromEntityWithName :: String -> Entity -> ResolvedTerm
@@ -969,13 +975,18 @@ addMergeEqualityFacts th lhsName lhsEntity rhsName rhsEntity =
         (_, "")      -> leaf
         (_, revRest) -> reverse revRest ++ leaf
 
-    mergePairs = case lhsName of
-      "𝕌" -> [("𝕌#min", rhsWithLeaf "𝕌#min"), ("𝕌#max", rhsWithLeaf "𝕌#max")]
-      "ℙ" -> [("ℙ#min", rhsWithLeaf "ℙ#min"), ("ℙ#max", rhsWithLeaf "ℙ#max")]
-      "𝔻" -> [("𝔻#min", rhsWithLeaf "𝔻#min"), ("𝔻#max", rhsWithLeaf "𝔻#max")]
-      "⊤" -> [("ℙ#min", rhsWithLeaf "ℙ#min")]
-      "⊥" -> [("ℙ#max", rhsWithLeaf "ℙ#max")]
-      _   -> [(lhsName, rhsName)]
+    mergePairs
+      | isSort lhsEntity =
+          [ (lhsName ++ "#min", rhsWithLeaf (lhsName ++ "#min"))
+          , (lhsName ++ "#max", rhsWithLeaf (lhsName ++ "#max"))
+          ]
+      | otherwise = case lhsName of
+          "⊤" -> [("ℙ#min", rhsWithLeaf "ℙ#min")]
+          "⊥" -> [("ℙ#max", rhsWithLeaf "ℙ#max")]
+          _   -> [(lhsName, rhsName)]
+
+    isSort (EntitySort _) = True
+    isSort _ = False
 
 -- | Built-in sort/limit names that every theory already owns an unqualified
 -- entry for.  When an implicit subtheory contributes one of these names, the
@@ -992,6 +1003,12 @@ builtInSortNames = ["𝔻", "ℙ", "𝕌", "⊤", "⊥"]
 isBuiltInSort :: String -> Bool
 isBuiltInSort n = n `elem` builtInSortNames
 
+isSortLimit :: Entity -> Bool
+isSortLimit (EntityMereological m) = case mereoLimitForSort m of
+  Just _  -> True
+  Nothing -> False
+isSortLimit _ = False
+
 -- | Decide what to do when we encounter @entity@ (from the sub) for the
 -- unqualified slot @name@.  @qualifiedName@ is the already-registered
 -- @"sub.entity"@ key used to produce well-formed equality facts.
@@ -1004,6 +1021,10 @@ addUnqualified :: String -> String -> Theory -> Entity -> Either BuildError Theo
 addUnqualified name qualifiedName th entity
   -- Built-in sorts/limits: parent already owns the canonical slot.
   -- Emit "parent_entity = sub.entity" and nothing else.
+  -- Sort limits (S#min, S#max) are already covered by sort merges — skip them.
+  | isSortLimit entity = Right th
+  | name == "⊤" = Right th
+  | name == "⊥" = Right th
   | isBuiltInSort name =
       case ( Map.lookup name      (theoryObjectsByName th)
            , Map.lookup qualifiedName (theoryObjectsByName th) ) of

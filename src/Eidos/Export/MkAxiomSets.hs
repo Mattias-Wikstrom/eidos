@@ -12,6 +12,7 @@
 -- without parsing 'LeanExpr' trees.
 module Eidos.Export.MkAxiomSets
   ( mkAxiomSets
+  , theoryBlocks
   ) where
 
 import qualified Eidos.IR as IR
@@ -31,10 +32,10 @@ sortMinName s = s ++ minSuffix
 sortMaxName s = s ++ maxSuffix
 
 uMinName, uMaxName, pMinName, pMaxName :: String
-uMinName = "U_Min"
-uMaxName = "U_Max"
-pMinName = "P_Min"
-pMaxName = "P_Max"
+uMinName = "𝕌_Min"
+uMaxName = "𝕌_Max"
+pMinName = "ℙ_Min"
+pMaxName = "ℙ_Max"
 
 uMin, uMax, pMin, pMax :: LeanExpr
 uMin = LVar uMinName
@@ -151,6 +152,7 @@ mkAxiomSets theory = concat
   , sortOrderAxiomSets
   , productSortOrderAxiomSets
   , userFactAxiomSets
+  , implicitMergeAxiomSets
   ]
   where
   -- -------------------------------------------------------------------------
@@ -160,10 +162,18 @@ mkAxiomSets theory = concat
 
   userSorts =
     [ s | IR.EntitySort s <- IR.theoryObjects theory
-        , IR.sortKind s == IR.SortKindFromSignature ]
+        , IR.sortKind s == IR.SortKindFromSignature
+        , IR.sortOrigin s == IR.FromSignature ]
 
-  solFunctions = IR.theorySOLFunctions theory
-  folFunctions = IR.theoryFOLFunctions theory
+  solFunctions =
+    [ f | IR.EntityFunction f <- IR.theoryObjects theory
+        , IR.funcKind f == IR.FunctionKindSOLFunctionFromTheory
+        , IR.funcOrigin f == IR.FromSignature ]
+
+  folFunctions =
+    [ f | IR.EntityFunction f <- IR.theoryObjects theory
+        , IR.funcKind f == IR.FunctionKindFOLFunctionFromTheory
+        , IR.funcOrigin f == IR.FromSignature ]
 
   folSingleArgFunctions =
     filter (\f -> length (IR.funcArgSorts f) == 1
@@ -253,18 +263,18 @@ mkAxiomSets theory = concat
   -- -------------------------------------------------------------------------
   headerAxiomSets :: [AxiomSet]
   headerAxiomSets =
-    [ axiomSet [SSort "U"] (tags [TagSort, TagDecl])
+    [ axiomSet [SSort "𝕌"] (tags [TagSort, TagDecl])
         [ LeanAxiom uMinName LProp
         , LeanAxiom uMaxName LProp
         ]
-    , axiomSet [SSort "P"] (tags [TagSort, TagDecl])
+    , axiomSet [SSort "ℙ"] (tags [TagSort, TagDecl])
         [ LeanAxiom pMinName LProp
         , LeanAxiom pMaxName LProp
         ]
     ] ++
-    [ axiomSet [SSort "D"] (tags [TagSort, TagDecl])
-        [ LeanAxiom "D_Min" LProp
-        , LeanAxiom "D_Max" LProp
+    [ axiomSet [SSort "𝔻"] (tags [TagSort, TagDecl])
+        [ LeanAxiom "𝔻_Min" LProp
+        , LeanAxiom "𝔻_Max" LProp
         ]
     | usesDomain
     ]
@@ -1064,20 +1074,20 @@ mkAxiomSets theory = concat
   -- -------------------------------------------------------------------------
   sortOrderAxiomSets :: [AxiomSet]
   sortOrderAxiomSets =
-      [ axiomSet [SSort "U"] (tags [TagSort, TagOrdering])
-          [ LeanAxiom "U_ordering" (LImpl uMax uMin)
+      [ axiomSet [SSort "𝕌"] (tags [TagSort, TagOrdering])
+          [ LeanAxiom "𝕌_ordering" (LImpl uMax uMin)
           ]
-      , axiomSet [SSort "P"] (tags [TagSort, TagOrdering])
-          [ LeanAxiom "P_upper"     (LImpl uMax pMax)
-          , LeanAxiom "P_ordering" (LImpl pMax pMin)
-          , LeanAxiom "P_lower"     (LImpl pMin uMin)
+      , axiomSet [SSort "ℙ"] (tags [TagSort, TagOrdering])
+          [ LeanAxiom "ℙ_upper"     (LImpl uMax pMax)
+          , LeanAxiom "ℙ_ordering" (LImpl pMax pMin)
+          , LeanAxiom "ℙ_lower"     (LImpl pMin uMin)
           ]
       ] ++
       (if usesDomain then
-        [ axiomSet [SSort "D"] (tags [TagSort, TagOrdering])
-            [ LeanAxiom "D_upper"    (LImpl uMax (LVar "D_Max"))
-            , LeanAxiom "D_ordering" (LImpl (LVar "D_Max") (LVar "D_Min"))
-            , LeanAxiom "D_lower"    (LImpl (LVar "D_Min") pMax)
+        [ axiomSet [SSort "𝔻"] (tags [TagSort, TagOrdering])
+            [ LeanAxiom "𝔻_upper"    (LImpl uMax (LVar "𝔻_Max"))
+            , LeanAxiom "𝔻_ordering" (LImpl (LVar "𝔻_Max") (LVar "𝔻_Min"))
+            , LeanAxiom "𝔻_lower"    (LImpl (LVar "𝔻_Min") pMax)
             ]
         ]
       else [])
@@ -1148,9 +1158,8 @@ mkAxiomSets theory = concat
        zipWith mkFactAS [1..] userFacts
     ++ zipWith mkAssertionAS [1 + length userFacts..] userAssertions
     ++ zipWith mkMetafactAS [1 + length userFacts + length userAssertions..] userMetafacts
-    ++ zipWith mkImplicitMergeAS [1 + length userFacts + length userAssertions + length userMetafacts..] implicitMergeFacts
     where
-      totalFacts = length userFacts + length userAssertions + length userMetafacts + length implicitMergeFacts
+      totalFacts = length userFacts + length userAssertions + length userMetafacts
       mkLabel idx = if totalFacts > 1 then "ax" ++ show idx else ""
 
       mkFactAS idx fact =
@@ -1168,11 +1177,6 @@ mkAxiomSets theory = concat
           [LeanAxiom (mkLabel idx)
             (LMetafactWrapper (factBodyExpr fact))]
 
-      mkImplicitMergeAS idx fact =
-        axiomSet [SGlobal] (tags [TagUserFact])
-          [LeanAxiom (mkLabel idx)
-            (LFactWrapper (factBodyExpr fact))]
-
       factBodyExpr fact =
         wrapFreeVars' (IR.factFreeVars fact) (propExprToLean' (IR.factPropExpr fact))
 
@@ -1189,6 +1193,95 @@ mkAxiomSets theory = concat
 
       -- Inline prop-expr translator (mirrors LeanProps.propExprToLean)
       propExprToLean' = propExprToLean
+
+  -- -------------------------------------------------------------------------
+  -- 43. Implicit merge axioms
+  -- -------------------------------------------------------------------------
+  implicitMergeAxiomSets :: [AxiomSet]
+  implicitMergeAxiomSets = concatMap mkMergeAS implicitMergeFacts
+    where
+      mkMergeAS :: IR.Fact -> [AxiomSet]
+      mkMergeAS fact = 
+        extractMergeAxioms (IR.factPropExpr fact)
+      
+      extractMergeAxioms :: IR.ResolvedPropExpr -> [AxiomSet]
+      extractMergeAxioms (IR.ResolvedPropBicond left []) = 
+        extractFromRightImpl left
+      extractMergeAxioms _ = []
+      
+      extractFromRightImpl :: IR.ResolvedRightImpl -> [AxiomSet]
+      extractFromRightImpl (IR.ResolvedRightImpl leftImpl Nothing) =
+        extractFromLeftImpl leftImpl
+      extractFromRightImpl _ = []
+      
+      extractFromLeftImpl :: IR.ResolvedLeftImpl -> [AxiomSet]
+      extractFromLeftImpl (IR.ResolvedLeftImpl disj []) =
+        extractFromDisj disj
+      extractFromLeftImpl _ = []
+      
+      extractFromDisj :: IR.ResolvedDisj -> [AxiomSet]
+      extractFromDisj (IR.ResolvedDisj conj []) =
+        extractFromConj conj
+      extractFromDisj _ = []
+      
+      extractFromConj :: IR.ResolvedConj -> [AxiomSet]
+      extractFromConj (IR.ResolvedConj neg []) =
+        extractFromNeg neg
+      extractFromConj _ = []
+      
+      extractFromNeg :: IR.ResolvedNeg -> [AxiomSet]
+      extractFromNeg (IR.ResolvedNegChild quant) =
+        extractFromQuantified quant
+      extractFromNeg _ = []
+      
+      extractFromQuantified :: IR.ResolvedQuantified -> [AxiomSet]
+      extractFromQuantified (IR.ResolvedQuantified [] atomic) =
+        extractFromAtomic atomic
+      extractFromQuantified _ = []
+      
+      extractFromAtomic :: IR.ResolvedAtomicProp -> [AxiomSet]
+      extractFromAtomic (IR.ResolvedAtomicTermPair tp) =
+        extractFromTermPair tp
+      extractFromAtomic _ = []
+      
+      extractFromTermPair :: IR.ResolvedTermPair -> [AxiomSet]
+      extractFromTermPair (IR.ResolvedTermPair lhs rights _) =
+        case rights of
+          [IR.ResolvedRelationFollowedByTerm _ op _ rhs] | op == "=" ->
+            case (getEntityFromTerm lhs, getTermName lhs, getTermName rhs) of
+              (Just entity, Just lName, Just rName) ->
+                classifyAndEmit entity lName rName
+              _ -> []
+          _ -> []
+      
+      getEntityFromTerm :: IR.ResolvedTerm -> Maybe IR.Entity
+      getEntityFromTerm (IR.ResolvedTerm (IR.ResolvedFactor (IR.ResolvedBTAtomic ref) [] _) [] _) =
+        Just (IR.resolvedConstEntity ref)
+      getEntityFromTerm _ = Nothing
+      
+      getTermName :: IR.ResolvedTerm -> Maybe String
+      getTermName (IR.ResolvedTerm (IR.ResolvedFactor (IR.ResolvedBTAtomic ref) [] _) [] _) =
+        Just (resolveConstRef ref)
+      getTermName _ = Nothing
+
+      classifyAndEmit :: IR.Entity -> String -> String -> [AxiomSet]
+      classifyAndEmit entity lhsName rhsName =
+        case entity of
+          IR.EntityFunction _ ->
+            -- Function merge: plain equality, no wrapper
+            [ axiomSet [SGlobal] (tags [TagImplicitMerge])
+                [LeanAxiom (lhsName ++ "_merge")
+                  (LEq (LVar lhsName) (LVar rhsName))]
+            ]
+          _ ->
+            -- Sort bounds, mereological objects, propositions:
+            -- metafact-wrapped equality. The IR already contains individual
+            -- bound merges (e.g. D_Min = sub.D_Min), so no further
+            -- expansion into pairs is needed here.
+            [ axiomSet [SGlobal] (tags [TagImplicitMerge])
+                [LeanAxiom (lhsName ++ "_merge")
+                  (LMetafactWrapper (LEq (LVar lhsName) (LVar rhsName)))]
+            ]
 
 propExprToLean :: IR.ResolvedPropExpr -> LeanExpr
 propExprToLean (IR.ResolvedPropBicond lhs rests) =
@@ -1279,6 +1372,8 @@ resolveName n =
         "ℙ#max" -> pMaxName
         "𝕌#min" -> uMinName
         "𝕌#max" -> uMaxName
+        "𝔻#min" -> "𝔻_Min"
+        "𝔻#max" -> "𝔻_Max"
         other
           | Just base <- stripSuffix "#min" other -> sanitizeName base ++ minSuffix
           | Just base <- stripSuffix "#max" other -> sanitizeName base ++ maxSuffix
@@ -1421,3 +1516,35 @@ baseTermToLean (IR.ResolvedBTDescription desc) =
       (lo,hi) = sortBounds sn
       phi     = propExprToLean (IR.resolvedDescBody desc)
   in LBoundedForall varN lo hi (LImpl phi (LVar varN))
+
+-- ---------------------------------------------------------------------------
+-- Flat post-order block list
+-- ---------------------------------------------------------------------------
+
+-- | Collect all theories in the tree rooted at @theory@ into a flat,
+-- post-ordered list of @(namespace, axiomSets)@ pairs, suitable for
+-- rendering as a sequence of flat Lean 4 @namespace … end@ blocks.
+--
+-- Post-order (children before parents) ensures that cross-namespace
+-- references from a parent to a child are always forward-declared by the
+-- time the parent block is emitted.
+--
+-- The root theory is assigned the reserved namespace @\"__main__\"@.
+-- All subtheories use their 'IR.theoryFullyQualifiedName'.
+--
+-- Reflection subtheories are skipped; their Lean 4 treatment is not yet
+-- implemented.
+theoryBlocks :: IR.Theory -> [(String, [AxiomSet])]
+theoryBlocks theory =
+  childBlocks ++ [rootBlock]
+  where
+    rootBlock  = ("__main__", mkAxiomSets theory)
+    childBlocks = concatMap subBlocks (IR.theorySubtheories theory)
+
+    subBlocks :: IR.Theory -> [(String, [AxiomSet])]
+    subBlocks sub
+      | IR.theoryReflection sub = []   -- skip reflection subtheories
+      | otherwise =
+          -- Recurse into sub's children first (post-order), then emit sub.
+          concatMap subBlocks (IR.theorySubtheories sub)
+          ++ [(IR.theoryFullyQualifiedName sub, mkAxiomSets sub)]

@@ -3,9 +3,20 @@
 -- This module is imported by both 'Eidos.Export.LeanAxiomSet' and
 -- 'Eidos.Export.LeanProps'.  Keeping it separate avoids a circular
 -- dependency and makes the expression language easy to test in isolation.
+--
+-- == Document model
+--
+-- A 'LeanDoc' is a sequence of 'LeanBlock' values.  Each block corresponds
+-- to exactly one Lean 4 @namespace … end@ region (or the file-level scope
+-- for the root theory, which uses the reserved name @__main__@).  Blocks are
+-- always emitted flat — subtheories are never nested inside their parent's
+-- @namespace@ block.  Blocks must be ordered so that dependencies are
+-- declared before their dependents (post-order over the subtheory tree,
+-- i.e. children before parents).
 module Eidos.Export.LeanExpr
   ( -- * Document structure
     LeanDoc (..)
+  , LeanBlock (..)
   , LeanDecl (..)
     -- * Axioms
   , LeanAxiom (..)
@@ -21,12 +32,28 @@ module Eidos.Export.LeanExpr
 -- ---------------------------------------------------------------------------
 
 -- | A complete Lean 4 document ready to be printed.
+--
+-- 'leanDocBlocks' is ordered: blocks appear in the order they are emitted
+-- (children before parents, so that cross-namespace references are valid).
 data LeanDoc = LeanDoc
   { leanDocTheoryName :: String
-  , leanDocDecls      :: [LeanDecl]
+  , leanDocBlocks     :: [LeanBlock]
   } deriving (Eq, Show)
 
--- | A single top-level item in a Lean 4 file.
+-- | One flat @namespace … end@ region in the output.
+--
+-- 'blockNamespace' is the Lean 4 namespace identifier for this block.
+-- The root theory uses the reserved name @\"__main__\"@, which is rendered
+-- at file scope (no @namespace@\/@end@ wrapper).  All other theories use
+-- their 'IR.theoryFullyQualifiedName', which may contain dots
+-- (e.g. @\"lattice.lower_semi_lattice.preorder\"@); Lean 4 treats a dotted
+-- name as a single flat namespace identifier, not a nested path.
+data LeanBlock = LeanBlock
+  { blockNamespace :: String      -- ^ @\"__main__\"@ or a dotted FQN
+  , blockDecls     :: [LeanDecl]  -- ^ declarations inside this namespace
+  } deriving (Eq, Show)
+
+-- | A single item inside a 'LeanBlock'.
 data LeanDecl
   = DeclComment  String    -- ^ @-- comment@
   | DeclBlankLine           -- ^ empty line
@@ -52,7 +79,9 @@ data LeanExpr
   = LProp
     -- ^ @Prop@
   | LVar String
-    -- ^ Atomic name.
+    -- ^ Atomic name.  May contain dots for cross-namespace references,
+    --   e.g. @\"lattice.lower_semi_lattice.preorder.D_Min\"@.
+    --   Dots pass through 'sanitizeName' unchanged.
   | LApp LeanExpr [LeanExpr]
     -- ^ Function application.
   | LImpl LeanExpr LeanExpr
@@ -76,36 +105,21 @@ data LeanExpr
     --   @(IsWithinBounds lo hi var)@.
     --   All three fields are variable /names/ (not expressions), kept as
     --   'String' because 'IsWithinBounds' is always applied to atomic names
-    --   in our encoding.
+    --   in our encoding.  Names may be dotted cross-namespace references.
   | LIsIndividual String String String
-    -- ^ @LIsIndividual lo var hi@ renders as
-    --   @(IsIndividual lo hi var)@.
-    --   Guards first-order (individual) quantification.  In the current
-    --   version 'IsIndividual' is defined as always true (@\_ _ _ => True@)
-    --   but the hook is in place for future refinement.
+    -- ^ @LIsIndividual lo var hi@ renders as @(IsIndividual lo hi var)@.
+    --   Guards first-order (individual) quantification.
   | LBoundedForall String String String LeanExpr
     -- ^ @LBoundedForall var lo hi body@ renders as
     --   @forall var : Prop, (IsWithinBounds lo hi var) → body@.
-    --   This is the single most common pattern in the output; making it a
-    --   first-class node allows tests to pattern-match on it directly and
-    --   opens the door to alternative renderings (symbol style, future
-    --   macro syntax).
   | LProjectIntoInterval LeanExpr LeanExpr LeanExpr
     -- ^ @ProjectIntoInterval x lo hi@
   | LFactWrapper LeanExpr
-    -- ^ A plain (non-assertion, non-metafact) fact, keyed by @P_Min@.
-    --   Currently renders as @(P_Min ∧ body) ↔ P_Min@.
-    --   Making this a first-class node lets tests pattern-match on the
-    --   semantic intent — "this is a fact" — independently of the exact
-    --   Lean 4 encoding, which may change.
+    -- ^ Plain fact wrapper: @(P_Min ∧ body) ↔ P_Min@.
   | LAssertionWrapper LeanExpr
-    -- ^ A ℙ-sorted assertion, keyed by @P_Min@ and @P_Max@.
-    --   Currently renders as @(P_Min ∧ (P_Max ∨ body)) ↔ P_Min@.
-    --   A future version might use @P_Min → (P_Max ∨ body)@; either way
-    --   the body is preserved for test inspection.
+    -- ^ Assertion wrapper: @(P_Min ∧ (P_Max ∨ body)) ↔ P_Min@.
   | LMetafactWrapper LeanExpr
-    -- ^ A 𝕌-sorted metafact, keyed by @U_Min@.
-    --   Currently renders as @(U_Min ∧ body) ↔ U_Min@.
+    -- ^ Metafact wrapper: @(U_Min ∧ body) ↔ U_Min@.
   deriving (Eq, Show)
 
 -- ---------------------------------------------------------------------------
@@ -113,23 +127,41 @@ data LeanExpr
 -- ---------------------------------------------------------------------------
 
 -- | Render a 'LeanDoc' to Lean 4 source text.
+--
+-- Emits the file-level preamble (helper definitions) followed by each
+-- 'LeanBlock'.  The @__main__@ block is rendered without an explicit
+-- @namespace@\/@end@ wrapper — its declarations appear at file scope.
+-- All other blocks are wrapped in @namespace <name> … end <name>@.
 renderLeanDoc :: LeanDoc -> String
 renderLeanDoc doc =
-  unlines $
-       [ "-- Generated by Eidos compiler"
-       , "-- Theory: " ++ leanDocTheoryName doc
-       , ""
-       , "def IsWithinBounds (lo hi x : Prop) : Prop := (hi → x) ∧ (x → lo)"
-       , "def ProjectIntoInterval (x lo hi : Prop) : Prop := (x ∧ lo) ∨ hi"
-       , "def IsIndividual (lo hi x : Prop) : Prop := True"
-       , ""
-       ]
-    ++ map renderDecl (leanDocDecls doc)
+  unlines
+    [ "-- Generated by Eidos compiler"
+    , "-- Theory: " ++ leanDocTheoryName doc
+    , ""
+    , "def IsWithinBounds (lo hi x : Prop) : Prop := (hi → x) ∧ (x → lo)"
+    , "def ProjectIntoInterval (x lo hi : Prop) : Prop := (x ∧ lo) ∨ hi"
+    , "def IsIndividual (lo hi x : Prop) : Prop := True"
+    , ""
+    ]
+  ++ concatMap renderBlock (leanDocBlocks doc)
+
+renderBlock :: LeanBlock -> String
+renderBlock blk
+  | blockNamespace blk == "__main__" =
+      unlines (map renderDecl (blockDecls blk))
+  | otherwise =
+      unlines
+        (  [ "namespace " ++ blockNamespace blk ]
+        ++ map renderDecl (blockDecls blk)
+        ++ [ "end " ++ blockNamespace blk
+           , ""    -- blank line after each namespace for readability
+           ]
+        )
 
 renderDecl :: LeanDecl -> String
-renderDecl DeclBlankLine   = ""
-renderDecl (DeclComment c) = "-- " ++ c
-renderDecl (DeclAxiom ax)  = renderAxiom ax
+renderDecl DeclBlankLine    = ""
+renderDecl (DeclComment c)  = "-- " ++ c
+renderDecl (DeclAxiom ax)   = renderAxiom ax
 
 renderAxiom :: LeanAxiom -> String
 renderAxiom (LeanAxiom name ty) =
@@ -173,8 +205,8 @@ renderLeanExpr (LProjectIntoInterval x lo hi) =
     ++ renderLeanExpr lo ++ " "
     ++ renderLeanExpr hi ++ ")"
 renderLeanExpr (LFactWrapper body) =
-  renderLeanExpr (LBicond (LConj (LVar "P_Min") body) (LVar "P_Min"))
+  renderLeanExpr (LBicond (LConj (LVar "ℙ_Min") body) (LVar "ℙ_Min"))
 renderLeanExpr (LAssertionWrapper body) =
-  renderLeanExpr (LBicond (LConj (LVar "P_Min") (LDisj (LVar "P_Max") body)) (LVar "P_Min"))
+  renderLeanExpr (LBicond (LConj (LVar "ℙ_Min") (LDisj (LVar "ℙ_Max") body)) (LVar "ℙ_Min"))
 renderLeanExpr (LMetafactWrapper body) =
-  renderLeanExpr (LBicond (LConj (LVar "U_Min") body) (LVar "U_Min"))
+  renderLeanExpr (LBicond (LConj (LVar "𝕌_Min") body) (LVar "𝕌_Min"))

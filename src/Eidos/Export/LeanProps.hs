@@ -22,11 +22,11 @@
 module Eidos.Export.LeanProps
   ( -- * Internal representation (re-exported from Eidos.Export.LeanExpr)
     LeanDoc (..)
+  , LeanBlock (..)
   , LeanDecl (..)
   , LeanAxiom (..)
   , LeanExpr (..)
     -- * Pipeline stages
-  , theoryToLeanDoc
   , renderLeanDoc
   , renderLeanExpr
     -- * Convenience entry point
@@ -40,21 +40,8 @@ import qualified Eidos.IR as IR
 import Eidos.Export.LeanExpr
 import Data.List (intercalate, sortOn)
 import qualified Data.Set as Set
-import Eidos.Export.MkAxiomSets (mkAxiomSets)
+import Eidos.Export.MkAxiomSets (mkAxiomSets, theoryBlocks)
 import Eidos.Export.LeanAxiomSet
-
--- ---------------------------------------------------------------------------
--- Stage 1 – Theory → LeanDoc
--- ---------------------------------------------------------------------------
-
--- | Convert an Eidos 'IR.Theory' into a structured 'LeanDoc'.
-theoryToLeanDoc :: IR.Theory -> LeanDoc
-theoryToLeanDoc theory =
-  let axiomSets = mkAxiomSets theory
-  in LeanDoc
-      { leanDocTheoryName = IR.theoryFullyQualifiedName theory
-      , leanDocDecls = renderAxiomSetsToDecls defaultLeanPropsOptions axiomSets
-      }
 
 -- ---------------------------------------------------------------------------
 -- Convenience entry point
@@ -63,14 +50,14 @@ theoryToLeanDoc theory =
 -- | Convert an Eidos theory directly to Lean 4 source (combines both stages).
 exportToLeanPropsWithOptions :: LeanPropsOptions -> IR.Theory -> String
 exportToLeanPropsWithOptions opts theory =
-  let axiomSets0 = mkAxiomSets theory
-      axiomSets1 = if optUseSortingAxioms opts
-                   then map collapseSortingSet axiomSets0
-                   else axiomSets0
-      axiomSets2 = if optGroupByEntity opts then sortOn asPath axiomSets1 else axiomSets1
+  let render (ns, as_) =
+        let as1 = if optUseSortingAxioms opts then map collapseSortingSet as_ else as_
+            as2 = if optGroupByEntity opts then sortOn asPath as1 else as1
+        in LeanBlock ns (renderAxiomSetsToDecls opts as2)
+      blocks = map render (theoryBlocks theory)
       doc = LeanDoc
         { leanDocTheoryName = IR.theoryFullyQualifiedName theory
-        , leanDocDecls = renderAxiomSetsToDecls opts axiomSets2
+        , leanDocBlocks     = blocks
         }
       header =
         if optUseBoundedForallSyntax opts
@@ -146,6 +133,7 @@ collapseSortingSet as_
     stripSuffix suffix str =
       let n = length str - length suffix
       in if n >= 0 && drop n str == suffix then Just (take n str) else Nothing
+
 data LeanPropsOptions = LeanPropsOptions
   { optGroupByEntity      :: Bool
   , optUseSortingAxioms   :: Bool
@@ -162,7 +150,6 @@ defaultLeanPropsOptions = LeanPropsOptions
   , optUseBoundedForallSyntax = False
   , optAddTagComments = False
   }
-
 
 tagSetComment :: TagSet -> String
 tagSetComment ts = "tags: " ++ intercalate ", " (map show (Set.toAscList ts))
