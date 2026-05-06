@@ -1266,22 +1266,85 @@ mkAxiomSets theory = concat
 
       classifyAndEmit :: IR.Entity -> String -> String -> [AxiomSet]
       classifyAndEmit entity lhsName rhsName =
-        case entity of
+        let axName = mergeAxiomName lhsName rhsName
+        in case entity of
           IR.EntityFunction _ ->
-            -- Function merge: plain equality, no wrapper
+            -- Function merge: plain equality, no wrapper.
             [ axiomSet [SGlobal] (tags [TagImplicitMerge])
-                [LeanAxiom (lhsName ++ "_merge")
+                [LeanAxiom axName
                   (LEq (LVar lhsName) (LVar rhsName))]
             ]
           _ ->
             -- Sort bounds, mereological objects, propositions:
-            -- metafact-wrapped equality. The IR already contains individual
-            -- bound merges (e.g. D_Min = sub.D_Min), so no further
-            -- expansion into pairs is needed here.
+            -- metafact-wrapped equality.
             [ axiomSet [SGlobal] (tags [TagImplicitMerge])
-                [LeanAxiom (lhsName ++ "_merge")
+                [LeanAxiom axName
                   (LMetafactWrapper (LEq (LVar lhsName) (LVar rhsName)))]
             ]
+
+      -- | Build a unique, Lean-safe axiom name for a merge fact.
+      --
+      -- Form: @<safeLhs>_from_<subtheory>@
+      --
+      -- * @<safeLhs>@  — the LHS name with characters that are not valid in
+      --   Lean 4 identifiers replaced by ASCII spellings (so that operator
+      --   names like @+@, @×@, @⇒@ produce valid names).
+      --
+      -- * @<subtheory>@ — the fully-qualified source subtheory name, derived
+      --   by dropping the last dot-segment from @rhsName@ (the entity name)
+      --   and replacing remaining dots with underscores.
+      --   E.g. @lower_semi_lattice.D_Min@ → subtheory @lower_semi_lattice@;
+      --        @lattice.lower_semi_lattice.D_Min@ → @lattice_lower_semi_lattice@.
+      --
+      -- Using the subtheory name as a suffix guarantees uniqueness when the
+      -- same LHS name is merged from multiple implicit subtheories
+      -- (e.g. @D_Min@ from both @lower_semi_lattice@ and @upper_semi_lattice@
+      -- in @lattice@).
+      mergeAxiomName :: String -> String -> String
+      mergeAxiomName lhsName rhsName =
+        let safeLhs   = concatMap safeMergeChar lhsName
+            subtheory = subtheoryFromRhs rhsName
+        in safeLhs ++ "_from_" ++ subtheory
+ 
+      -- | Extract the subtheory portion from a qualified RHS name by
+      -- dropping the last dot-segment and replacing dots with underscores.
+      subtheoryFromRhs :: String -> String
+      subtheoryFromRhs rhsName =
+        let segments = splitOnDot rhsName
+        in case segments of
+             []  -> "unknown"
+             [_] -> "unknown"   -- no qualifier — shouldn't happen in practice
+             _   -> map dotToUnderscore
+                      (concatMap (\(i,s) -> if i == 0 then s else '.' : s)
+                                 (zip [0..] (init segments)))
+ 
+      -- | Split a string on '.' characters.
+      splitOnDot :: String -> [String]
+      splitOnDot "" = []
+      splitOnDot s  =
+        let (h, t) = break (== '.') s
+        in h : case t of
+                 []     -> []
+                 (_:rest) -> splitOnDot rest
+ 
+      dotToUnderscore :: Char -> Char
+      dotToUnderscore '.' = '_'
+      dotToUnderscore  c  =  c
+ 
+      -- | Replace characters that are not safe in Lean 4 identifiers with
+      -- ASCII spellings.  Lean 4 accepts Unicode letters and most Unicode
+      -- symbols in identifiers, but rejects many ASCII operator characters.
+      safeMergeChar :: Char -> String
+      safeMergeChar c = case c of
+        '+'  -> "plus"
+        '-'  -> "minus"
+        '×'  -> "times"
+        '⇒'  -> "impl"
+        '∸'  -> "sub"
+        '/'  -> "div"
+        '#'  -> "_"
+        '.'  -> "_"
+        _    -> [c]
 
 propExprToLean :: IR.ResolvedPropExpr -> LeanExpr
 propExprToLean (IR.ResolvedPropBicond lhs rests) =
