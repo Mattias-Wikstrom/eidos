@@ -241,6 +241,13 @@ mkAxiomSets theory = concat
         , not (IR.factIsMereologicalTranslation f)
         ]
 
+  implicitMergeFacts =
+    [ f | f <- IR.theoryFacts theory
+        , IR.factKind f == IR.FactKindImplicitMerge
+        , not (IR.factIsInherited f)
+        , not (IR.factIsMereologicalTranslation f)
+        ]
+
   -- -------------------------------------------------------------------------
   -- 1. Header: U/P (and optionally D) limit objects
   -- -------------------------------------------------------------------------
@@ -1141,8 +1148,9 @@ mkAxiomSets theory = concat
        zipWith mkFactAS [1..] userFacts
     ++ zipWith mkAssertionAS [1 + length userFacts..] userAssertions
     ++ zipWith mkMetafactAS [1 + length userFacts + length userAssertions..] userMetafacts
+    ++ zipWith mkImplicitMergeAS [1 + length userFacts + length userAssertions + length userMetafacts..] implicitMergeFacts
     where
-      totalFacts = length userFacts + length userAssertions + length userMetafacts
+      totalFacts = length userFacts + length userAssertions + length userMetafacts + length implicitMergeFacts
       mkLabel idx = if totalFacts > 1 then "ax" ++ show idx else ""
 
       mkFactAS idx fact =
@@ -1159,6 +1167,11 @@ mkAxiomSets theory = concat
         axiomSet [SGlobal] (tags [TagUserFact])
           [LeanAxiom (mkLabel idx)
             (LMetafactWrapper (factBodyExpr fact))]
+
+      mkImplicitMergeAS idx fact =
+        axiomSet [SGlobal] (tags [TagUserFact])
+          [LeanAxiom (mkLabel idx)
+            (LFactWrapper (factBodyExpr fact))]
 
       factBodyExpr fact =
         wrapFreeVars' (IR.factFreeVars fact) (propExprToLean' (IR.factPropExpr fact))
