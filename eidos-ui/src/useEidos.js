@@ -14,7 +14,7 @@ export function useEidos() {
       setLoadingWasm(true);
       setWasmError(null);
       try {
-        const instance = await loadEidos('/wasm/eidos.wasm');
+        const instance = await loadEidos(import.meta.env.BASE_URL + '/wasm/eidos.wasm');
         if (!cancelled) {
           setEidos(instance);
         }
