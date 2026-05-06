@@ -950,6 +950,7 @@ addMergeEqualityFact th lhsName lhsEntity rhsName rhsEntity =
         , factIsInherited               = False
         , factKind                      = FactKindImplicitMerge
         , factPropExpr                  = ResolvedPropBicond rightImpl []
+        , factFreeVars                  = []
         })
 
 -- | Built-in sort/limit names that every theory already owns an unqualified
