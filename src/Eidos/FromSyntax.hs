@@ -5,6 +5,7 @@ module Eidos.FromSyntax
   , buildTheoryWithResolver
   , buildTheoryFromFile
   , BuildError
+  , resolveExternalRefs
   ) where
 
 import           Control.Monad        (forM_, when, foldM)
@@ -55,6 +56,70 @@ buildTheoryWithResolver resolverFn baseContext td =
   runReader
     (runBuildM (decorateTheoryBody (AST.theoryBody td) Nothing "" False []) baseContext)
     (FnResolver resolverFn)
+
+-- | Pre-pass: resolve all external subtheory references reachable from a
+-- 'TheoryDecl', without constructing any IR.  Returns a map from reference
+-- identifier to '(TheoryBody, TheoryType)'.
+resolveExternalRefs
+  :: FilePath
+  -> TheoryDecl
+  -> IO (Either BuildError (Map.Map String (TheoryBody, TheoryType)))
+resolveExternalRefs filePath td =
+  runBuildM (collectRefs (AST.theoryBody td)) (Just (takeDirectory filePath))
+
+collectRefs
+  :: (MonadExternalRefResolver m)
+  => TheoryBody
+  -> BuildM m (Map.Map String (TheoryBody, TheoryType))
+collectRefs body = foldM collectRefsSection Map.empty (sections body)
+
+collectRefsSection
+  :: (MonadExternalRefResolver m)
+  => Map.Map String (TheoryBody, TheoryType)
+  -> Section
+  -> BuildM m (Map.Map String (TheoryBody, TheoryType))
+collectRefsSection acc (SectionSubtheories (SubtheoriesSection entries)) =
+  foldM collectRefsEntry acc entries
+collectRefsSection acc _ = return acc
+
+collectRefsEntry
+  :: (MonadExternalRefResolver m)
+  => Map.Map String (TheoryBody, TheoryType)
+  -> SubtheoryEntry
+  -> BuildM m (Map.Map String (TheoryBody, TheoryType))
+collectRefsEntry acc (SubtheoryEntryGroup (SubtheoryGroup _ items)) =
+  foldM collectRefsItem acc items
+collectRefsEntry acc (SubtheoryEntryItem item) =
+  collectRefsItem acc item
+
+collectRefsItem
+  :: (MonadExternalRefResolver m)
+  => Map.Map String (TheoryBody, TheoryType)
+  -> SubtheoryItem
+  -> BuildM m (Map.Map String (TheoryBody, TheoryType))
+collectRefsItem acc item = case itemDef item of
+  SubtheoryBody b -> do
+    -- Inline body: recurse to find any nested external refs within it
+    nested <- collectRefs b
+    return (Map.union acc nested)
+  SubtheoryExternalRef ref -> do
+    baseContext <- ask
+    let refPath = case ref of { ('@':rest) -> rest; _ -> ref }
+    result <- lift $ resolveExternalRef baseContext refPath
+    res <- case result of
+      Left err -> throwError (show err)
+      Right r  -> return r
+    content <- lift $ readExternalContent (extRefSource res)
+    ast <- case parseString content of
+      Left parseErr -> throwError $
+        "Parse error in " ++ extRefIdentifier res ++ ": " ++ show parseErr
+      Right a -> return a
+    let body = AST.theoryBody ast
+        key  = extRefIdentifier res
+        tt   = extRefTheoryType res
+    -- Recurse: the loaded body may itself reference further external theories
+    nested <- collectRefs body
+    return (Map.insert key (body, tt) (Map.union acc nested))
 
 -- ---------------------------------------------------------------------------
 -- Core theory builder (polymorphic in m)

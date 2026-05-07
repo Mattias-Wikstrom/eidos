@@ -5,10 +5,12 @@ import           System.Exit        (exitFailure, exitSuccess)
 import qualified System.IO          as IO
 
 import           Eidos.Parse.Parser       (parseFile)
-import           Eidos.FromSyntax   (buildTheoryFromFile, buildTheoryPure)
+import           Eidos.FromSyntax   (buildTheoryFromFile, buildTheoryPure, resolveExternalRefs)
+
 import           Eidos.BuildMonad   (mkPureResolver)
 
-import           Eidos.Print.Pretty       (prettyTheory, prettyTheoryDecl, prettyFactDebug)
+import           Eidos.Print.Pretty (prettyTheory, prettyTheoryDecl, prettyFactDebug,
+                                     prettyResolvedRefs)
 import           Eidos.Print.DebugIR      (dumpTheoryIR)
 import           Eidos.Print.JSON      (exportTheoryToJSONString)
 
@@ -17,6 +19,8 @@ import           Eidos.IR as IR
 import           Eidos.Backend.LeanProps.LeanProps (exportToLeanProps)
 import qualified Eidos.Backend.LeanProps.LeanProps as LeanProps
 import           Eidos.Backend.Lean.Lean (exportToLean)
+
+import Eidos.ExternalRef (TheoryType)
 
 main :: IO ()
 main = do
@@ -161,6 +165,23 @@ main = do
               putStr $ Eidos.Backend.Lean.Lean.exportToLean theory
               exitSuccess
 
+    ["--resolve", filePath] -> do
+      result <- parseFile filePath
+      case result of
+        Left err -> do
+          IO.hPutStrLn IO.stderr ("Parse error: " ++ show err)
+          exitFailure
+        Right ast -> do
+          resolveResult <- resolveExternalRefs filePath ast
+          case resolveResult of
+            Left buildErr -> do
+              IO.hPutStrLn IO.stderr ("\nResolution error: " ++ buildErr)
+              exitFailure
+            Right refMap -> do
+              putStrLn "\n=== External reference pre-pass ==="
+              putStrLn $ prettyResolvedRefs refMap
+              exitSuccess
+
     _ -> do
       usage
 
@@ -177,6 +198,7 @@ usage = do
       IO.hPutStrLn IO.stderr "  eidos-parser --json <file.theory>             # Export IR as JSON"
       IO.hPutStrLn IO.stderr "  eidos-parser --json --compact <file.theory>   # Export IR as compact JSON"
       IO.hPutStrLn IO.stderr "  eidos-parser --lean <file.theory>                   # Export to Lean 4 using structure-based encoding (sorts → Types)"
+      IO.hPutStrLn IO.stderr "  eidos-parser --resolve <file.theory>    # Resolve external refs only (pre-pass debug)"
       exitFailure
 
 parseLeanPropsOptions :: [String] -> LeanProps.LeanPropsOptions

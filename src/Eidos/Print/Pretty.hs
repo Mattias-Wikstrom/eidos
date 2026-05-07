@@ -14,6 +14,8 @@ module Eidos.Print.Pretty
   , prettyResolvedPropExprWithOpts
   , PrettyOptions(..)
   , defaultPrettyOptions
+  , prettyTheoryBody
+  , prettyResolvedRefs
   ) where
 
 import           Data.List      (intercalate)
@@ -24,6 +26,7 @@ import           Eidos.Parse.AST
 import qualified Eidos.Parse.AST as AST
 import           Eidos.IR as IR
 
+import Eidos.ExternalRef (TheoryType)
 
 -- ---------------------------------------------------------------------------
 -- Pretty-printing options
@@ -583,3 +586,21 @@ prettyFactDebug f =
         FactKindSortLimitation -> "sort limit: "
         FactKindImplicitMerge -> "implicit merge: "
   in kindStr ++ prettyResolvedPropExpr (factPropExpr f)
+  
+-- ---------------------------------------------------------------------------
+-- Pre-pass / resolution debug printing
+-- ---------------------------------------------------------------------------
+
+-- | Pretty-print a 'TheoryBody' (used when printing pre-pass results).
+prettyTheoryBody :: TheoryBody -> Doc
+prettyTheoryBody body =
+  "{\n" ++ prettyTheoryBodyWithOpts defaultPrettyOptions body ++ "\n}"
+
+-- | Pretty-print the result of the external-reference pre-pass.
+prettyResolvedRefs :: Map.Map String (TheoryBody, TheoryType) -> Doc
+prettyResolvedRefs refMap
+  | Map.null refMap = "(no external references)"
+  | otherwise       = intercalate "\n\n" $ map prettyEntry (Map.toAscList refMap)
+  where
+    prettyEntry (name, (body, tt)) =
+      "=== " ++ name ++ " (" ++ show tt ++ ") ===\n" ++ prettyTheoryBody body
