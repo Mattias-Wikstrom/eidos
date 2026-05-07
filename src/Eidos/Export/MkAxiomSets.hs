@@ -79,7 +79,7 @@ sortBounds :: String -> (String, String)
 sortBounds sortN = case sortN of
   "ℙ" -> (pMinName, pMaxName)
   "𝕌" -> (uMinName, uMaxName)
-  "𝔻" -> ("D_Min", "D_Max")
+  "𝔻" -> ("𝔻_Min", "𝔻_Max")
   _   ->
     let n = sanitizeName sortN
     in (n ++ minSuffix, n ++ maxSuffix)
@@ -255,18 +255,18 @@ mkAxiomSets theory = concat
   -- -------------------------------------------------------------------------
   headerAxiomSets :: [AxiomSet]
   headerAxiomSets =
-    [ axiomSet [SSort "U"] (tags [TagSort, TagDecl])
+    [ axiomSet [SSort "𝕌"] (tags [TagSort, TagDecl])
         [ LeanAxiom uMinName LProp
         , LeanAxiom uMaxName LProp
         ]
-    , axiomSet [SSort "P"] (tags [TagSort, TagDecl])
+    , axiomSet [SSort "ℙ"] (tags [TagSort, TagDecl])
         [ LeanAxiom pMinName LProp
         , LeanAxiom pMaxName LProp
         ]
     ] ++
-    [ axiomSet [SSort "D"] (tags [TagSort, TagDecl])
-        [ LeanAxiom "D_Min" LProp
-        , LeanAxiom "D_Max" LProp
+    [ axiomSet [SSort "𝔻"] (tags [TagSort, TagDecl])
+        [ LeanAxiom "𝔻_Min" LProp
+        , LeanAxiom "𝔻_Max" LProp
         ]
     | usesDomain
     ]
@@ -1041,8 +1041,8 @@ mkAxiomSets theory = concat
       mkSetBounds m =
         let n = IR.mereoName m
         in axiomSet [SGlobal] (tags [TagSorting])
-             [ LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) (LVar "D_Min"))
-             , LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl (LVar "D_Max") (LVar n))
+             [ LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) (LVar "𝔻_Min"))
+             , LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl (LVar "𝔻_Min") (LVar n))
              ]
 
   -- -------------------------------------------------------------------------
@@ -1077,9 +1077,9 @@ mkAxiomSets theory = concat
       ] ++
       (if usesDomain then
         [ axiomSet [SSort "D"] (tags [TagSort, TagOrdering])
-            [ LeanAxiom "D_upper"    (LImpl uMax (LVar "D_Max"))
-            , LeanAxiom "D_ordering" (LImpl (LVar "D_Max") (LVar "D_Min"))
-            , LeanAxiom "D_lower"    (LImpl (LVar "D_Min") pMax)
+            [ LeanAxiom "D_upper"    (LImpl uMax (LVar "𝔻_Max"))
+            , LeanAxiom "D_ordering" (LImpl (LVar "𝔻_Max") (LVar "𝔻_Min"))
+            , LeanAxiom "D_lower"    (LImpl (LVar "𝔻_Min") pMax)
             ]
         ]
       else [])
@@ -1280,7 +1280,7 @@ mkAxiomSets theory = concat
       -- dot-segment of @rhsName@ and replacing dots with underscores.
       --
       -- This guarantees uniqueness when the same LHS name is contributed by
-      -- multiple implicit subtheories (e.g. D_Min from both lower_semi_lattice
+      -- multiple implicit subtheories (e.g. 𝔻_Min from both lower_semi_lattice
       -- and upper_semi_lattice).
       mergeAxiomName :: String -> String -> String
       mergeAxiomName lhsName rhsName =

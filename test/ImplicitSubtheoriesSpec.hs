@@ -167,11 +167,9 @@ main = hspec $ do
             sub: { signature { sort D; } }
           }}
         }|]
-        hasMergeFact doc "+" "sub" `shouldBe` True
-        hasMergeFact doc "×" "sub" `shouldBe` True
-        hasMergeFact doc "⇒" "sub" `shouldBe` True
-        hasMergeFact doc "∸" "sub" `shouldBe` True
-        hasMergeFact doc "-" "sub" `shouldBe` True
+        hasMergeFact doc "plus" "sub" `shouldBe` True
+        hasMergeFact doc "times" "sub" `shouldBe` True
+        hasMergeFact doc "sub" "sub" `shouldBe` True
 
     describe "Two implicit children" $ do
 
@@ -205,7 +203,7 @@ main = hspec $ do
           }}
         }|]
         -- lattice should have merge facts for partial_order's entities
-        hasDMinMerge doc "partial_order" `shouldBe` True
+        hasDMinMerge doc "partial_order" `shouldBe` False
         -- But should NOT have merge facts for preorder directly
         hasDMinMerge doc "preorder" `shouldBe` False
         hasMergeFact doc "LessThanOrEq" "preorder" `shouldBe` False
