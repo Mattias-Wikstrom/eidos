@@ -9,7 +9,7 @@ import qualified Data.Map.Strict as Map
 import Text.Megaparsec          (errorBundlePretty)
 import Eidos.Parse.Parser       (parseString)
 import Eidos.Parse.AST          (TheoryDecl(..), TheoryBody)
-import Eidos.ExternalRef        (TheoryType(..))
+import Eidos.Resolution.ExternalRef        (TheoryType(..))
 import Eidos.Backend.LeanProps.LeanProps (exportToLeanProps)
 import Eidos.FromSyntax (buildTheoryPure, buildTheoryFromResolved)
 

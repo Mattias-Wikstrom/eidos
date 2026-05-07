@@ -26,7 +26,7 @@ import           Eidos.Parse.AST
 import qualified Eidos.Parse.AST as AST
 import           Eidos.IR as IR
 
-import Eidos.ExternalRef (TheoryType)
+import Eidos.Resolution.ExternalRef (TheoryType)
 
 -- ---------------------------------------------------------------------------
 -- Pretty-printing options

@@ -21,15 +21,15 @@ library
                     , Eidos.Print.Pretty
                     , Eidos.Print.DebugIR
                     , Eidos.Check.TypeCheck
-                    , Eidos.ExternalRef
-                    , Eidos.Resolution 
+                    , Eidos.Resolution.ExternalRef
+                    , Eidos.Resolution.Resolution 
                     , Eidos.Check.SubLanguage
                     , Eidos.Print.JSON
                     , Eidos.Backend.Lean.Lean
                     , Eidos.Backend.LeanProps.LeanProps
                     , Eidos.Backend.LeanProps.LeanAxiomSet
                     , Eidos.Backend.LeanProps.MkAxiomSets
-                    , Eidos.BuildMonad
+                    , Eidos.Resolution.BuildMonad
                     , Eidos.Wasm.Wasm
     hs-source-dirs:   src
     default-language: GHC2021

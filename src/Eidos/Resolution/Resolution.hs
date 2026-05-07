@@ -3,7 +3,7 @@
 -- This module handles collecting all external subtheory references reachable
 -- from a theory declaration, without constructing any IR. It uses the
 -- 'BuildM' monad and 'MonadExternalRefResolver' to perform file I/O.
-module Eidos.Resolution
+module Eidos.Resolution.Resolution
   ( resolveExternalRefs
   , ResolutionError
   , BuildError
@@ -15,8 +15,8 @@ import           System.FilePath      (takeDirectory)
 
 import           Eidos.Parse.AST
 import qualified Eidos.Parse.AST      as AST
-import           Eidos.BuildMonad
-import           Eidos.ExternalRef
+import           Eidos.Resolution.BuildMonad
+import           Eidos.Resolution.ExternalRef
 import           Eidos.Parse.Parser   (parseString)
 
 -- | Type alias for resolution errors (same as BuildError)

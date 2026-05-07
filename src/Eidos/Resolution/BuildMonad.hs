@@ -6,7 +6,7 @@
 -- 'build monad' abstraction.
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Eidos.BuildMonad
+module Eidos.Resolution.BuildMonad
   ( BuildM
   , BuildError
   , runBuildM
@@ -35,7 +35,7 @@ import System.FilePath ((</>))
 import Data.Maybe (fromMaybe, catMaybes)
 import Control.Monad (forM)
 
-import Eidos.ExternalRef
+import Eidos.Resolution.ExternalRef
 
 type BuildError = String
 

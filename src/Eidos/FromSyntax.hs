@@ -16,13 +16,13 @@ import           System.FilePath      (takeDirectory)
 import           Eidos.Parse.AST            hiding (theoryBody, theoryName, funcName, funcDomain, relName)
 import qualified Eidos.Parse.AST            as AST
 
-import           Eidos.ExternalRef    hiding (mockResolver)
+import           Eidos.Resolution.ExternalRef    hiding (mockResolver)
 import           Eidos.IR
 import           Eidos.Parse.Parser         (parseString)
 import           Eidos.Check.TypeCheck
 import           Eidos.Check.SubLanguage
 
-import           Eidos.Resolution    (resolveExternalRefs, BuildError)
+import           Eidos.Resolution.Resolution    (resolveExternalRefs, BuildError)
 
 -- ---------------------------------------------------------------------------
 -- Public entry points

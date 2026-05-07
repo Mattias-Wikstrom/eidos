@@ -33,7 +33,7 @@ import Data.List       (intercalate, nub)
 import Data.Maybe      (mapMaybe)
 
 import Eidos.Parse.AST
-import Eidos.ExternalRef (TheoryType(..))
+import Eidos.Resolution.ExternalRef (TheoryType(..))
 
 -- ---------------------------------------------------------------------------
 -- Public API

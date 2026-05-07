@@ -1,5 +1,5 @@
 -- | External reference data types - pure data only
-module Eidos.ExternalRef
+module Eidos.Resolution.ExternalRef
   ( -- * Core types
     ExternalRefError(..)
   , ExternalRefResult(..)
