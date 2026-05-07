@@ -16,14 +16,14 @@ import qualified Data.Map.Strict      as Map
 import           Data.Maybe           (fromMaybe, mapMaybe)
 import           System.FilePath      (takeDirectory)
 
-import           Eidos.AST            hiding (theoryBody, theoryName, funcName, funcDomain, relName)
-import qualified Eidos.AST            as AST
+import           Eidos.Parse.AST            hiding (theoryBody, theoryName, funcName, funcDomain, relName)
+import qualified Eidos.Parse.AST            as AST
 import           Eidos.BuildMonad
 import           Eidos.ExternalRef    hiding (mockResolver)
 import           Eidos.IR
-import           Eidos.Parser         (parseString)
-import           Eidos.TypeCheck
-import           Eidos.SubLanguage
+import           Eidos.Parse.Parser         (parseString)
+import           Eidos.Check.TypeCheck
+import           Eidos.Check.SubLanguage
 
 -- ---------------------------------------------------------------------------
 -- Public entry points

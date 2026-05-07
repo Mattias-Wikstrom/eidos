@@ -2,17 +2,12 @@
 Things to Be Done
 =================
 
-* Add syntax for set comprehension + a description operator.
-
-* Individuals need to satisfy IsIndividual. (They are currently treated just like sets.)
-
-* The logic is supposed to be a form of free logic. Only with first-order /quantifiers/ do you get the claim that an individual expression stands for a unique object.
-
 * First-order identity (=_S).
 
 * Functions need to work correctly when applied to things outside their domains.
 
-* Theory-path evaluation, sub-theory resolution, sub-theory infrastructure
+* Theory-path evaluation
+
 * Check that the function code works with implicit and named subtheories.
 
 * Check if the output can be written in a more abstract way on the Lean 4 side.
@@ -29,6 +24,8 @@ Things to Be Done
 * There is currently support for '--pure', '--debug' and '--pretty'. None of these options was planned and they should probably be removed. They can be kept for a bit longer, though, to simplify debugging.
 
 PARTLY IMPLEMENTED:
+* Individuals need to satisfy IsIndividual. (They are currently treated just like sets.)
+
 * Check for language constructs that are ignored at the moment.
 
 * It should be possible to specify 'lean4' or 'mereological' as the target for the compilation. The former means that Lean 4 code is generated. The former means that Eidos code is generated, but with mereological interpretations explicitly included for everything that was in the original theory. my_theory.fol.theory will be compiled into my_theory.fol.lean or my_theory.fol.mereological.theory depending on the option you choose.
@@ -47,12 +44,19 @@ PARTLY IMPLEMENTED:
 
 * Support for non-propositional Lean 4 output.
 
-* A theory should only have 𝔻 ('the domain') if it either uses it or gets it through an implicit import. Same thing for ℙ ('propositions').
-* There is already information in a theory on whether it uses D and/or P. Only include D/P in the output if it is used.
+* Sub-theory resolution, sub-theory infrastructure
 
 POSSIBLY DONE:
 
+* The logic is supposed to be a form of free logic. Only with first-order /quantifiers/ do you get the claim that an individual expression stands for a unique object.
+
 DONE:
+* There is already information in a theory on whether it uses D and/or P. Only include D/P in the output if it is used.
+
+* A theory should only have 𝔻 ('the domain') if it either uses it or gets it through an implicit import. Same thing for ℙ ('propositions').
+
+* Add syntax for set comprehension + a description operator.
+
 * The current Lean 4 output does not work correctly for quotient sorts or subsorts.
 
 * File endings such as ".coh.theory" and ".reg.theory" should impose restrictions on what you are allowed to express in the theory:

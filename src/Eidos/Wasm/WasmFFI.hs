@@ -1,4 +1,4 @@
--- | Eidos.WasmFFI
+-- | Eidos.Wasm.WasmFFI
 --
 -- Foreign exports for the GHC WebAssembly build target.
 --
@@ -36,12 +36,12 @@
 
 {-# LANGUAGE ForeignFunctionInterface #-}
 
-module Eidos.WasmFFI where
+module Eidos.Wasm.WasmFFI where
 
 import Foreign.C.String  (CString, newCString, peekCString)
 import qualified Data.Map.Strict as Map
 
-import Eidos.Wasm (compileBundleWithTypes, compileSingle, mainKey)
+import Eidos.Wasm.Wasm (compileBundleWithTypes, compileSingle, mainKey)
 import Eidos.ExternalRef (TheoryType(..))
 
 -- ---------------------------------------------------------------------------

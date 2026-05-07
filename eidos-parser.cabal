@@ -12,24 +12,24 @@ common deps
 
 library
     import:           warnings, deps
-    exposed-modules:  Eidos.Lexer
-                    , Eidos.AST
-                    , Eidos.Parser
+    exposed-modules:  Eidos.Parse.Lexer
+                    , Eidos.Parse.AST
+                    , Eidos.Parse.Parser
                     , Eidos.FromSyntax
                     , Eidos.IR
-                    , Eidos.Export.LeanExpr
-                    , Eidos.Pretty
-                    , Eidos.DebugIR
-                    , Eidos.TypeCheck
+                    , Eidos.Backend.LeanProps.LeanExpr
+                    , Eidos.Print.Pretty
+                    , Eidos.Print.DebugIR
+                    , Eidos.Check.TypeCheck
                     , Eidos.ExternalRef
-                    , Eidos.SubLanguage
-                    , Eidos.Export.JSON
-                    , Eidos.Export.Lean
-                    , Eidos.Export.LeanProps
-                    , Eidos.Export.LeanAxiomSet
-                    , Eidos.Export.MkAxiomSets
+                    , Eidos.Check.SubLanguage
+                    , Eidos.Print.JSON
+                    , Eidos.Backend.Lean.Lean
+                    , Eidos.Backend.LeanProps.LeanProps
+                    , Eidos.Backend.LeanProps.LeanAxiomSet
+                    , Eidos.Backend.LeanProps.MkAxiomSets
                     , Eidos.BuildMonad
-                    , Eidos.Wasm
+                    , Eidos.Wasm.Wasm
     hs-source-dirs:   src
     default-language: GHC2021
     build-depends:    megaparsec >=9.0

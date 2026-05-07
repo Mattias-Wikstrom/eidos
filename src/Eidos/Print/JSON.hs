@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Eidos.Export.JSON
+module Eidos.Print.JSON
   ( exportTheoryToJSON
   , exportTheoryToJSONString
   , exportTheoryToJSONCompact

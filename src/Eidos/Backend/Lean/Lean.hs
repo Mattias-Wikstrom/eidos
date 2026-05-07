@@ -8,7 +8,7 @@
 --   * Facts become universally quantified fields
 --   * Top-level theory → structure _Main where ...
 --   * Subtheories → nested structures
-module Eidos.Export.Lean
+module Eidos.Backend.Lean.Lean
   ( -- * Internal representation
     LeanTypeDoc (..)
   , LeanTypeDecl (..)

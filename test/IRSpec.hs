@@ -11,7 +11,7 @@ import qualified Data.Map.Strict as Map
 import Text.RawString.QQ    (r)
 import Control.Exception (try, evaluate, SomeException, displayException)
 
-import Eidos.Parser         (parseString)
+import Eidos.Parse.Parser         (parseString)
 import Eidos.FromSyntax     (buildTheoryPure)
 import Eidos.BuildMonad     (emptyPureResolver, mkPureResolver)
 import Eidos.IR

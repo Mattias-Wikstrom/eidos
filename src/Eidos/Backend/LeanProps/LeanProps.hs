@@ -19,7 +19,7 @@
 -- * @A - B@ (mereological difference) renders as @B → A@.
 -- * @+, ×, ∸@ map to @∧, ∨, ↔@.
 -- * Assertions are wrapped with @P_Min@; metafacts with @U_Min@.
-module Eidos.Export.LeanProps
+module Eidos.Backend.LeanProps.LeanProps
   ( -- * Internal representation (re-exported from Eidos.Export.LeanExpr)
     LeanDoc (..)
   , LeanBlock (..)
@@ -37,11 +37,11 @@ module Eidos.Export.LeanProps
   ) where
 
 import qualified Eidos.IR as IR
-import Eidos.Export.LeanExpr
+import Eidos.Backend.LeanProps.LeanExpr
 import Data.List (intercalate, sortOn)
 import qualified Data.Set as Set
-import Eidos.Export.MkAxiomSets (mkAxiomSets, theoryBlocks)
-import Eidos.Export.LeanAxiomSet
+import Eidos.Backend.LeanProps.MkAxiomSets (mkAxiomSets, theoryBlocks)
+import Eidos.Backend.LeanProps.LeanAxiomSet
 
 -- ---------------------------------------------------------------------------
 -- Convenience entry point

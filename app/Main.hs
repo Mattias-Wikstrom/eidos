@@ -4,17 +4,19 @@ import           System.Environment (getArgs)
 import           System.Exit        (exitFailure, exitSuccess)
 import qualified System.IO          as IO
 
-import           Eidos.Parser       (parseFile)
+import           Eidos.Parse.Parser       (parseFile)
 import           Eidos.FromSyntax   (buildTheoryFromFile, buildTheoryPure)
 import           Eidos.BuildMonad   (mkPureResolver)
-import           Eidos.Pretty       (prettyTheory, prettyTheoryDecl, prettyFactDebug)
-import           Eidos.DebugIR      (dumpTheoryIR)
+
+import           Eidos.Print.Pretty       (prettyTheory, prettyTheoryDecl, prettyFactDebug)
+import           Eidos.Print.DebugIR      (dumpTheoryIR)
+import           Eidos.Print.JSON      (exportTheoryToJSONString)
+
 import           Eidos.IR as IR 
 
-import           Eidos.Export.JSON      (exportTheoryToJSONString)
-import           Eidos.Export.LeanProps (exportToLeanProps)
-import qualified Eidos.Export.LeanProps as LeanProps
-import           Eidos.Export.Lean (exportToLean)
+import           Eidos.Backend.LeanProps.LeanProps (exportToLeanProps)
+import qualified Eidos.Backend.LeanProps.LeanProps as LeanProps
+import           Eidos.Backend.Lean.Lean (exportToLean)
 
 main :: IO ()
 main = do
@@ -156,7 +158,7 @@ main = do
               IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
               exitFailure
             Right theory -> do
-              putStr $ Eidos.Export.Lean.exportToLean theory
+              putStr $ Eidos.Backend.Lean.Lean.exportToLean theory
               exitSuccess
 
     _ -> do

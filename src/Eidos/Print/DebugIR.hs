@@ -1,4 +1,4 @@
-module Eidos.DebugIR
+module Eidos.Print.DebugIR
   ( dumpTheoryIR
   ) where
 
@@ -6,7 +6,7 @@ import           Data.List      (intercalate, sortOn)
 import qualified Data.Map.Strict as Map
 
 import           Eidos.IR
-import           Eidos.Pretty   (prettyResolvedPropExpr)
+import           Eidos.Print.Pretty   (prettyResolvedPropExpr)
 
 -- | Produce a deterministic, human-readable dump of a theory's IR.
 --

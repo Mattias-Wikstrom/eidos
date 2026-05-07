@@ -17,7 +17,7 @@
 --
 -- The check is purely structural over the AST; it runs before IR building.
 
-module Eidos.SubLanguage
+module Eidos.Check.SubLanguage
   ( checkTheoryBody
   -- Exported for testing
   , Violation(..)
@@ -32,7 +32,7 @@ module Eidos.SubLanguage
 import Data.List       (intercalate, nub)
 import Data.Maybe      (mapMaybe)
 
-import Eidos.AST
+import Eidos.Parse.AST
 import Eidos.ExternalRef (TheoryType(..))
 
 -- ---------------------------------------------------------------------------

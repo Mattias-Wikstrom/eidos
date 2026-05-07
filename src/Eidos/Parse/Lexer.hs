@@ -6,7 +6,7 @@
 --   * 'sc'  — space consumer (whitespace + block/line comments)
 --   * 'lexeme' / 'symbol' — wrappers that consume trailing whitespace
 --   * Individual token parsers (keywords, operators, punctuation)
-module Eidos.Lexer
+module Eidos.Parse.Lexer
   ( -- * Space consumer
     sc
   , lexeme

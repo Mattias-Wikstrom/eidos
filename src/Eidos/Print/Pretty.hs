@@ -4,7 +4,7 @@
 -- representation ('Theory') and the abstract syntax tree ('TheoryDecl').
 -- The output aims to be readable while preserving the structure of the
 -- original theory.
-module Eidos.Pretty
+module Eidos.Print.Pretty
   ( prettyTheory
   , prettyTheoryDecl
   , prettyTheoryDeclWithOpts
@@ -20,8 +20,8 @@ import           Data.List      (intercalate)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe     (isJust, mapMaybe)
 
-import           Eidos.AST
-import qualified Eidos.AST as AST
+import           Eidos.Parse.AST
+import qualified Eidos.Parse.AST as AST
 import           Eidos.IR as IR
 
 

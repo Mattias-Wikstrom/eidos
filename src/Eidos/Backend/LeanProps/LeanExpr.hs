@@ -13,7 +13,7 @@
 -- @namespace@ block.  Blocks must be ordered so that dependencies are
 -- declared before their dependents (post-order over the subtheory tree,
 -- i.e. children before parents).
-module Eidos.Export.LeanExpr
+module Eidos.Backend.LeanProps.LeanExpr
   ( -- * Document structure
     LeanDoc (..)
   , LeanBlock (..)

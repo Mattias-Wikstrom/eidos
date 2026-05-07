@@ -6,12 +6,12 @@ import Text.Megaparsec (errorBundlePretty)
 import Data.List (isInfixOf)
 import Text.RawString.QQ (r)
 
-import Eidos.Parser (parseString)
+import Eidos.Parse.Parser (parseString)
 import Eidos.FromSyntax (buildTheoryPure)
 import Eidos.BuildMonad (mkPureResolver, emptyPureResolver)
-import Eidos.Pretty (prettyTheoryDecl)
-import Eidos.AST
-import qualified Eidos.AST as AST
+import Eidos.Print.Pretty (prettyTheoryDecl)
+import Eidos.Parse.AST
+import qualified Eidos.Parse.AST as AST
 import Eidos.IR
 import qualified Eidos.IR as IR
 

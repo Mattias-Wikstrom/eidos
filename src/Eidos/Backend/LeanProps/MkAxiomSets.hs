@@ -6,18 +6,18 @@
 -- IR.Theory  →  [AxiomSet]  →  LeanDoc  →  String
 -- @
 --
--- Every axiom that 'Eidos.Export.LeanProps.theoryToLeanDoc' currently emits
+-- Every axiom that 'Eidos.Backend.LeanProps.LeanProps.theoryToLeanDoc' currently emits
 -- has a corresponding 'AxiomSet' here, with the same logical content but
 -- enriched with a 'SubjectPath' and a 'TagSet' that make it introspectable
 -- without parsing 'LeanExpr' trees.
-module Eidos.Export.MkAxiomSets
+module Eidos.Backend.LeanProps.MkAxiomSets
   ( mkAxiomSets
   , theoryBlocks
   ) where
 
 import qualified Eidos.IR as IR
-import Eidos.Export.LeanExpr
-import Eidos.Export.LeanAxiomSet
+import Eidos.Backend.LeanProps.LeanExpr
+import Eidos.Backend.LeanProps.LeanAxiomSet
 
 -- ---------------------------------------------------------------------------
 -- Naming helpers (kept in sync with LeanProps)

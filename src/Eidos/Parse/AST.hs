@@ -7,7 +7,7 @@
 --
 -- Naming conventions follow the Go source.  Every 'Maybe' corresponds to an
 -- optional field; every '[…]' to a repeated one.
-module Eidos.AST where
+module Eidos.Parse.AST where
 
 -- ---------------------------------------------------------------------------
 -- Top-level

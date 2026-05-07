@@ -1,4 +1,9 @@
 -- | BuildMonad.hs
+--
+-- Since Eidos theories can reference external theories, building a theory will
+-- normally involve reading external files. But we want to keep things pure and
+-- will therefore not use the IO monad directly. Instead, Eidos has its own 
+-- 'build monad' abstraction.
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Eidos.BuildMonad

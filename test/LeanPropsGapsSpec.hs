@@ -14,13 +14,13 @@ module Main where
 import Test.Hspec
 import Text.RawString.QQ (r)
 
-import Eidos.Parser            (parseString)
+import Eidos.Parse.Parser            (parseString)
 import Eidos.FromSyntax        (buildTheoryPure)
 import Eidos.BuildMonad        (emptyPureResolver)
-import Eidos.Export.LeanExpr   (LeanDoc(..), LeanDecl(..), LeanAxiom(..),
+import Eidos.Backend.LeanProps.LeanExpr   (LeanDoc(..), LeanDecl(..), LeanAxiom(..),
                                 LeanExpr(..), renderLeanExpr)
-import Eidos.Export.MkAxiomSets (mkAxiomSets)
-import Eidos.Export.LeanAxiomSet (AxiomSet(..))
+import Eidos.Backend.LeanProps.MkAxiomSets (mkAxiomSets)
+import Eidos.Backend.LeanProps.LeanAxiomSet (AxiomSet(..))
 
 -- ---------------------------------------------------------------------------
 -- Shared bound names (mirror LeanPropsSpec conventions)

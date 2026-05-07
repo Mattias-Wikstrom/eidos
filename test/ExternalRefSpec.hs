@@ -8,7 +8,7 @@ import System.FilePath ((</>))
 import System.Directory (createDirectoryIfMissing)
 import Data.List (isInfixOf)
 
-import Eidos.Parser (parseString)
+import Eidos.Parse.Parser (parseString)
 import Eidos.FromSyntax (buildTheoryWithResolver, buildTheoryFromFile)
 import Eidos.ExternalRef (ExternalRefResult(..), ExternalRefSource(..), TheoryType(..), mockResolver)
 import qualified Eidos.IR as IR

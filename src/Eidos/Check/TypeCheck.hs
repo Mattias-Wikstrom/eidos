@@ -11,7 +11,7 @@
 --     - Sets
 --     - Propositions
 --     - Bare mereological objects (explicit any)
-module Eidos.TypeCheck
+module Eidos.Check.TypeCheck
   ( -- * Level 1 classification
     Level1Type(..)
   , classifyLevel1
@@ -43,8 +43,8 @@ import           Data.List       (find)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe      (fromMaybe)
 
-import           Eidos.AST
-import qualified Eidos.AST as AST
+import           Eidos.Parse.AST
+import qualified Eidos.Parse.AST as AST
 import           Eidos.IR
 import qualified Eidos.IR as IR (EntityClass)
 

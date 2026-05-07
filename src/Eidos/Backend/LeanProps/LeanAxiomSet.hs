@@ -34,7 +34,7 @@
 -- * We say /ordering/ for the axioms that record how sorts relate to each
 --   other (e.g. @S_upper@, @S_lower@, @S_ordering@).
 
-module Eidos.Export.LeanAxiomSet
+module Eidos.Backend.LeanProps.LeanAxiomSet
   ( -- * Tags
     Tag (..)
   , TagSet
@@ -58,7 +58,7 @@ module Eidos.Export.LeanAxiomSet
 import Data.Set (Set)
 import qualified Data.Set as Set
 
-import Eidos.Export.LeanExpr (LeanAxiom)
+import Eidos.Backend.LeanProps.LeanExpr (LeanAxiom)
 
 -- ---------------------------------------------------------------------------
 -- Tags

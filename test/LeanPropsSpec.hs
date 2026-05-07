@@ -16,12 +16,12 @@ import Test.Hspec
 import Text.RawString.QQ (r)
 import Data.List (nub, isPrefixOf, isInfixOf)
 
-import Eidos.Parser     (parseString)
+import Eidos.Parse.Parser     (parseString)
 import Eidos.FromSyntax (buildTheoryPure)
 import Eidos.BuildMonad (emptyPureResolver)
-import Eidos.Export.LeanProps
-import Eidos.Export.MkAxiomSets (mkAxiomSets)
-import Eidos.Export.LeanAxiomSet (AxiomSet(..))
+import Eidos.Backend.LeanProps.LeanProps
+import Eidos.Backend.LeanProps.MkAxiomSets (mkAxiomSets)
+import Eidos.Backend.LeanProps.LeanAxiomSet (AxiomSet(..))
 
 -- ---------------------------------------------------------------------------
 -- Naming conventions

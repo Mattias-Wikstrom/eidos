@@ -1,4 +1,4 @@
--- | Eidos.Wasm
+-- | Eidos.Wasm.Wasm
 --
 -- Entry point for the GHC WebAssembly build target.
 --
@@ -34,7 +34,7 @@
 -- CPP conditional from GHC's Wasm toolchain).  In a normal GHC build they
 -- are omitted, so the module is safe to import from tests or other modules.
 
-module Eidos.Wasm
+module Eidos.Wasm.Wasm
   ( compileBundle
   , compileBundleWithTypes
   , compileSingle
@@ -44,11 +44,11 @@ module Eidos.Wasm
 import qualified Data.Map.Strict as Map
 
 import Text.Megaparsec          (errorBundlePretty)
-import Eidos.Parser            (parseString)
+import Eidos.Parse.Parser            (parseString)
 import Eidos.BuildMonad        (mkPureResolverWithTypes, emptyPureResolver)
 import Eidos.ExternalRef       (TheoryType(..))
 import Eidos.FromSyntax        (buildTheoryPure)
-import Eidos.Export.LeanProps  (exportToLeanProps)
+import Eidos.Backend.LeanProps.LeanProps  (exportToLeanProps)
 
 -- ---------------------------------------------------------------------------
 -- Public API

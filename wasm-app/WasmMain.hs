@@ -30,7 +30,7 @@ module Main where
 import System.IO   (hSetEncoding, stdin, stdout, utf8, hFlush)
 import System.Exit (exitWith, ExitCode(..))
 
-import Eidos.Wasm  (compileBundle, mainKey)
+import Eidos.Wasm.Wasm  (compileBundle, mainKey)
 import WasmFFI (compileBundleFromJSON)
 
 main :: IO ()

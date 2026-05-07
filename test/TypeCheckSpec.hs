@@ -21,10 +21,10 @@ import Test.Hspec
 import Data.List (isInfixOf)
 import Text.RawString.QQ (r)
 
-import Eidos.TypeCheck
+import Eidos.Check.TypeCheck
 import Eidos.IR
 import qualified Eidos.IR as IR
-import Eidos.Parser      (parseString)
+import Eidos.Parse.Parser      (parseString)
 import Eidos.FromSyntax  (buildTheoryPure)
 import Eidos.BuildMonad  (emptyPureResolver)
 

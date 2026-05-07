@@ -14,7 +14,7 @@ module WasmFFI
   ) where
 
 import qualified Data.Map.Strict as Map
-import Eidos.Wasm (compileBundle)
+import Eidos.Wasm.Wasm (compileBundle)
 
 -- ---------------------------------------------------------------------------
 -- Top-level entry point

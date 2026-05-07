@@ -8,7 +8,7 @@
 --   * 'parseString'  — parse from a 'String'
 --   * 'parseFile'    — read a file and parse it
 --   * 'theoryParser' — the raw megaparsec 'Parser TheoryDecl'
-module Eidos.Parser
+module Eidos.Parse.Parser
   ( -- * Entry points
     parseString
   , parseFile
@@ -26,8 +26,8 @@ import Data.List (sort, group, intercalate)
 import Data.Maybe (mapMaybe, isNothing)
 import Control.Monad (when)
 
-import           Eidos.AST
-import           Eidos.Lexer
+import           Eidos.Parse.AST
+import           Eidos.Parse.Lexer
 
 type Parser = Parsec Void String
 
