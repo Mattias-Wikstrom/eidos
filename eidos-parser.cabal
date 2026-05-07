@@ -22,6 +22,7 @@ library
                     , Eidos.Print.DebugIR
                     , Eidos.Check.TypeCheck
                     , Eidos.ExternalRef
+                    , Eidos.Resolution 
                     , Eidos.Check.SubLanguage
                     , Eidos.Print.JSON
                     , Eidos.Backend.Lean.Lean

@@ -3,7 +3,6 @@ module Eidos.FromSyntax
   ( buildTheoryFromFile
   , buildTheoryPure
   , buildTheoryFromResolved
-  , resolveExternalRefs
   , BuildError
   ) where
 
@@ -16,16 +15,28 @@ import           System.FilePath      (takeDirectory)
 
 import           Eidos.Parse.AST            hiding (theoryBody, theoryName, funcName, funcDomain, relName)
 import qualified Eidos.Parse.AST            as AST
-import           Eidos.BuildMonad
+
 import           Eidos.ExternalRef    hiding (mockResolver)
 import           Eidos.IR
 import           Eidos.Parse.Parser         (parseString)
 import           Eidos.Check.TypeCheck
 import           Eidos.Check.SubLanguage
 
+import           Eidos.Resolution    (resolveExternalRefs, BuildError)
+
 -- ---------------------------------------------------------------------------
 -- Public entry points
 -- ---------------------------------------------------------------------------
+
+-- | Build a 'Theory' from a pre-resolved reference map and a 'TheoryDecl'.
+buildTheoryFromResolved
+  :: Map.Map String (TheoryBody, TheoryType)
+  -> [TheoryType]         -- ^ sub-language constraints from the top-level file extension
+  -> TheoryDecl
+  -> Either BuildError Theory
+buildTheoryFromResolved refMap constraints td =
+  decorateTheoryBody refMap (AST.theoryBody td) Nothing "" False constraints
+
 
 -- | IO entry point: runs the external-reference pre-pass, then builds the IR.
 buildTheoryFromFile :: FilePath -> TheoryDecl -> IO (Either BuildError Theory)
@@ -39,85 +50,6 @@ buildTheoryFromFile filePath td = do
 -- | Pure entry point with no external references (for @--pure@ mode and testing).
 buildTheoryPure :: TheoryDecl -> Either BuildError Theory
 buildTheoryPure td = buildTheoryFromResolved Map.empty [] td
-
--- | Build a 'Theory' from a pre-resolved reference map and a 'TheoryDecl'.
---
--- This is the main pure IR-construction entry point.  The caller is
--- responsible for supplying a map that contains every external subtheory
--- reachable from @td@; use 'resolveExternalRefs' to produce it.
-buildTheoryFromResolved
-  :: Map.Map String (TheoryBody, TheoryType)
-  -> [TheoryType]         -- ^ sub-language constraints from the top-level file extension
-  -> TheoryDecl
-  -> Either BuildError Theory
-buildTheoryFromResolved refMap constraints td =
-  decorateTheoryBody refMap (AST.theoryBody td) Nothing "" False constraints
-
--- ---------------------------------------------------------------------------
--- External-reference pre-pass (IO)
--- ---------------------------------------------------------------------------
-
--- | Collect all external subtheory sources reachable from a 'TheoryDecl'
--- without constructing any IR.  Returns a map from reference identifier to
--- '(TheoryBody, TheoryType)'.
-resolveExternalRefs
-  :: FilePath
-  -> TheoryDecl
-  -> IO (Either BuildError (Map.Map String (TheoryBody, TheoryType)))
-resolveExternalRefs filePath td =
-  runBuildM (collectRefs (AST.theoryBody td)) (Just (takeDirectory filePath))
-
-collectRefs
-  :: (MonadExternalRefResolver m)
-  => TheoryBody
-  -> BuildM m (Map.Map String (TheoryBody, TheoryType))
-collectRefs body = foldM collectRefsSection Map.empty (sections body)
-
-collectRefsSection
-  :: (MonadExternalRefResolver m)
-  => Map.Map String (TheoryBody, TheoryType)
-  -> Section
-  -> BuildM m (Map.Map String (TheoryBody, TheoryType))
-collectRefsSection acc (SectionSubtheories (SubtheoriesSection entries)) =
-  foldM collectRefsEntry acc entries
-collectRefsSection acc _ = return acc
-
-collectRefsEntry
-  :: (MonadExternalRefResolver m)
-  => Map.Map String (TheoryBody, TheoryType)
-  -> SubtheoryEntry
-  -> BuildM m (Map.Map String (TheoryBody, TheoryType))
-collectRefsEntry acc (SubtheoryEntryGroup (SubtheoryGroup _ items)) =
-  foldM collectRefsItem acc items
-collectRefsEntry acc (SubtheoryEntryItem item) =
-  collectRefsItem acc item
-
-collectRefsItem
-  :: (MonadExternalRefResolver m)
-  => Map.Map String (TheoryBody, TheoryType)
-  -> SubtheoryItem
-  -> BuildM m (Map.Map String (TheoryBody, TheoryType))
-collectRefsItem acc item = case itemDef item of
-  SubtheoryBody b -> do
-    nested <- collectRefs b
-    return (Map.union acc nested)
-  SubtheoryExternalRef ref -> do
-    baseContext <- ask
-    let refPath = case ref of { ('@':rest) -> rest; _ -> ref }
-    result <- lift $ resolveExternalRef baseContext refPath
-    res <- case result of
-      Left err -> throwError (show err)
-      Right r  -> return r
-    content <- lift $ readExternalContent (extRefSource res)
-    ast <- case parseString content of
-      Left parseErr -> throwError $
-        "Parse error in " ++ extRefIdentifier res ++ ": " ++ show parseErr
-      Right a -> return a
-    let body = AST.theoryBody ast
-        key  = extRefIdentifier res
-        tt   = extRefTheoryType res
-    nested <- collectRefs body
-    return (Map.insert key (body, tt) (Map.union acc nested))
 
 -- ---------------------------------------------------------------------------
 -- Core theory builder (pure)
@@ -396,7 +328,7 @@ addPropFact th0 fk th prop = do
       (PropExprInclVars _ _ vars _) = prop
   (resolvedExpr, _ctx') <- resolvePropExprInclVars th0 ctx prop
 
-  let freeVars = map (toResolvedVarDecl th0) vars
+  freeVars <- mapM (toResolvedVarDecl th0) vars
 
   case typeCheckResolvedExpr resolvedExpr of
     Left typeErr -> Left (sourceCtx ++ "Type error in " ++ show fk ++ ": " ++ typeErr)
@@ -421,12 +353,10 @@ addPropFact th0 fk th prop = do
   return (th' { theoryFacts = theoryFacts th' ++ [fact] })
 
 -- Helper to convert AST VarDecl to ResolvedVarDecl
-toResolvedVarDecl :: Theory -> VarDecl -> ResolvedVarDecl
-toResolvedVarDecl th (VarDecl name op sortExpr) =
-  let s = case lookupSortByExpr th sortExpr of
-            Right sort -> sort
-            Left _ -> error $ "Failed to resolve sort for variable: " ++ name
-  in ResolvedVarDecl name (op == "⊆") s
+toResolvedVarDecl :: Theory -> VarDecl -> Either BuildError ResolvedVarDecl
+toResolvedVarDecl th (VarDecl name op sortExpr) = do
+  s <- lookupSortByExpr th sortExpr
+  return $ ResolvedVarDecl name (op == "⊆") s
 
 propSourceContext :: PropExprInclVars -> String
 propSourceContext (PropExprInclVars line col _ _) =

@@ -6,7 +6,8 @@ import qualified System.IO          as IO
 
 import           Eidos.Parse.Parser       (parseFile)
 import           Eidos.FromSyntax   (buildTheoryFromFile, buildTheoryPure,
-                                     buildTheoryFromResolved, resolveExternalRefs)
+                                     buildTheoryFromResolved)
+import           Eidos.Resolution   (resolveExternalRefs)
 
 import           Eidos.Print.Pretty       (prettyTheory, prettyTheoryDecl, prettyFactDebug,
                                            prettyResolvedRefs)
