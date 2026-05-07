@@ -5,22 +5,19 @@ import           System.Exit        (exitFailure, exitSuccess)
 import qualified System.IO          as IO
 
 import           Eidos.Parse.Parser       (parseFile)
-import           Eidos.FromSyntax   (buildTheoryFromFile, buildTheoryPure, resolveExternalRefs)
+import           Eidos.FromSyntax   (buildTheoryFromFile, buildTheoryPure,
+                                     buildTheoryFromResolved, resolveExternalRefs)
 
-import           Eidos.BuildMonad   (mkPureResolver)
-
-import           Eidos.Print.Pretty (prettyTheory, prettyTheoryDecl, prettyFactDebug,
-                                     prettyResolvedRefs)
+import           Eidos.Print.Pretty       (prettyTheory, prettyTheoryDecl, prettyFactDebug,
+                                           prettyResolvedRefs)
 import           Eidos.Print.DebugIR      (dumpTheoryIR)
-import           Eidos.Print.JSON      (exportTheoryToJSONString)
+import           Eidos.Print.JSON         (exportTheoryToJSONString)
 
-import           Eidos.IR as IR 
+import           Eidos.IR as IR
 
 import           Eidos.Backend.LeanProps.LeanProps (exportToLeanProps)
 import qualified Eidos.Backend.LeanProps.LeanProps as LeanProps
 import           Eidos.Backend.Lean.Lean (exportToLean)
-
-import Eidos.ExternalRef (TheoryType)
 
 main :: IO ()
 main = do
@@ -43,7 +40,7 @@ main = do
               putStrLn "\n=== Pretty-printed IR theory ==="
               putStrLn $ prettyTheory theory
               exitSuccess
-    
+
     ["--debug", filePath] -> do
       result <- parseFile filePath
       case result of
@@ -82,7 +79,7 @@ main = do
               putStrLn "\n=== IR dump (resolved, deterministic) ==="
               putStrLn $ dumpTheoryIR theory
               exitSuccess
-    
+
     ["--json", filePath] -> do
       result <- parseFile filePath
       case result of
@@ -105,9 +102,8 @@ main = do
         Left err -> do
           IO.hPutStrLn IO.stderr ("Parse error: " ++ show err)
           exitFailure
-        Right ast -> do
-          let pureResolver = mkPureResolver []
-          case buildTheoryPure pureResolver Nothing ast of
+        Right ast ->
+          case buildTheoryPure ast of
             Left buildErr -> do
               IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
               exitFailure
@@ -116,7 +112,7 @@ main = do
               putStrLn "\n=== Pretty-printed IR theory ==="
               putStrLn $ prettyTheory theory
               exitSuccess
-    
+
     ["--pretty", filePath] -> do
       result <- parseFile filePath
       case result of
@@ -127,7 +123,24 @@ main = do
           putStrLn "\n=== Pretty-printed AST ==="
           putStrLn $ prettyTheoryDecl ast
           exitSuccess
-    
+
+    ["--resolve", filePath] -> do
+      result <- parseFile filePath
+      case result of
+        Left err -> do
+          IO.hPutStrLn IO.stderr ("Parse error: " ++ show err)
+          exitFailure
+        Right ast -> do
+          resolveResult <- resolveExternalRefs filePath ast
+          case resolveResult of
+            Left buildErr -> do
+              IO.hPutStrLn IO.stderr ("\nResolution error: " ++ buildErr)
+              exitFailure
+            Right refMap -> do
+              putStrLn "\n=== External reference pre-pass ==="
+              putStrLn $ prettyResolvedRefs refMap
+              exitSuccess
+
     ("--lean_using_props":rest) -> do
       case reverse rest of
         [] -> usage
@@ -148,7 +161,7 @@ main = do
                 Right theory -> do
                   putStr $ LeanProps.exportToLeanPropsWithOptions opts theory
                   exitSuccess
-    
+
     ["--lean", filePath] -> do
       result <- parseFile filePath
       case result of
@@ -165,23 +178,6 @@ main = do
               putStr $ Eidos.Backend.Lean.Lean.exportToLean theory
               exitSuccess
 
-    ["--resolve", filePath] -> do
-      result <- parseFile filePath
-      case result of
-        Left err -> do
-          IO.hPutStrLn IO.stderr ("Parse error: " ++ show err)
-          exitFailure
-        Right ast -> do
-          resolveResult <- resolveExternalRefs filePath ast
-          case resolveResult of
-            Left buildErr -> do
-              IO.hPutStrLn IO.stderr ("\nResolution error: " ++ buildErr)
-              exitFailure
-            Right refMap -> do
-              putStrLn "\n=== External reference pre-pass ==="
-              putStrLn $ prettyResolvedRefs refMap
-              exitSuccess
-
     _ -> do
       usage
 
@@ -193,21 +189,21 @@ usage = do
       IO.hPutStrLn IO.stderr "  eidos-parser --dump-ir <file.theory>    # Parse and print AST + deterministic IR dump"
       IO.hPutStrLn IO.stderr "  eidos-parser --pure <file.theory>       # Parse and build IR (pure mode, no external files)"
       IO.hPutStrLn IO.stderr "  eidos-parser --pretty <file.theory>     # Parse and pretty-print AST"
+      IO.hPutStrLn IO.stderr "  eidos-parser --resolve <file.theory>    # Resolve external refs only (pre-pass debug)"
       IO.hPutStrLn IO.stderr "  eidos-parser --lean_using_props <file.theory>  # Export to Lean 4 (handles ℙ, 𝕌, and mixed theories)"
       IO.hPutStrLn IO.stderr "    Optional flags before file: --group-by-entity --sorting-axioms --comment-groups --comment-tags --bounded-forall-syntax"
       IO.hPutStrLn IO.stderr "  eidos-parser --json <file.theory>             # Export IR as JSON"
       IO.hPutStrLn IO.stderr "  eidos-parser --json --compact <file.theory>   # Export IR as compact JSON"
-      IO.hPutStrLn IO.stderr "  eidos-parser --lean <file.theory>                   # Export to Lean 4 using structure-based encoding (sorts → Types)"
-      IO.hPutStrLn IO.stderr "  eidos-parser --resolve <file.theory>    # Resolve external refs only (pre-pass debug)"
+      IO.hPutStrLn IO.stderr "  eidos-parser --lean <file.theory>             # Export to Lean 4 using structure-based encoding (sorts → Types)"
       exitFailure
 
 parseLeanPropsOptions :: [String] -> LeanProps.LeanPropsOptions
 parseLeanPropsOptions flags =
   foldl apply LeanProps.defaultLeanPropsOptions flags
   where
-    apply o "--group-by-entity" = o { LeanProps.optGroupByEntity = True }
-    apply o "--sorting-axioms" = o { LeanProps.optUseSortingAxioms = True }
-    apply o "--comment-groups" = o { LeanProps.optAddGroupComments = True }
+    apply o "--group-by-entity"       = o { LeanProps.optGroupByEntity = True }
+    apply o "--sorting-axioms"        = o { LeanProps.optUseSortingAxioms = True }
+    apply o "--comment-groups"        = o { LeanProps.optAddGroupComments = True }
     apply o "--bounded-forall-syntax" = o { LeanProps.optUseBoundedForallSyntax = True }
-    apply o "--comment-tags" = o { LeanProps.optAddTagComments = True }
-    apply o _ = o
+    apply o "--comment-tags"          = o { LeanProps.optAddTagComments = True }
+    apply o _                         = o
