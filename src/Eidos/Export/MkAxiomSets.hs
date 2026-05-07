@@ -32,10 +32,10 @@ sortMinName s = s ++ minSuffix
 sortMaxName s = s ++ maxSuffix
 
 uMinName, uMaxName, pMinName, pMaxName :: String
-uMinName = "U_Min"
-uMaxName = "U_Max"
-pMinName = "P_Min"
-pMaxName = "P_Max"
+uMinName = "𝕌_Min"
+uMaxName = "𝕌_Max"
+pMinName = "ℙ_Min"
+pMaxName = "ℙ_Max"
 
 uMin, uMax, pMin, pMax :: LeanExpr
 uMin = LVar uMinName
@@ -152,6 +152,7 @@ mkAxiomSets theory = concat
   , sortOrderAxiomSets
   , productSortOrderAxiomSets
   , userFactAxiomSets
+  , implicitMergeAxiomSets
   ]
   where
   -- -------------------------------------------------------------------------
@@ -238,6 +239,13 @@ mkAxiomSets theory = concat
   userMetafacts =
     [ f | f <- IR.theoryFacts theory
         , IR.factKind f == IR.FactKindMetafactsFact
+        , not (IR.factIsInherited f)
+        , not (IR.factIsMereologicalTranslation f)
+        ]
+
+  implicitMergeFacts =
+    [ f | f <- IR.theoryFacts theory
+        , IR.factKind f == IR.FactKindImplicitMerge
         , not (IR.factIsInherited f)
         , not (IR.factIsMereologicalTranslation f)
         ]
@@ -1177,6 +1185,129 @@ mkAxiomSets theory = concat
 
       -- Inline prop-expr translator (mirrors LeanProps.propExprToLean)
       propExprToLean' = propExprToLean
+
+  -- -------------------------------------------------------------------------
+  -- 43. Implicit merge axioms
+  -- -------------------------------------------------------------------------
+  implicitMergeAxiomSets :: [AxiomSet]
+  implicitMergeAxiomSets = concatMap mkMergeAS implicitMergeFacts
+    where
+      mkMergeAS :: IR.Fact -> [AxiomSet]
+      mkMergeAS fact = extractMergeAxioms (IR.factPropExpr fact)
+
+      -- Walk the IR expression tree to find the LHS entity and the RHS name.
+      -- Merge facts have the shape  lhs = rhs  at the top level, with no
+      -- quantifiers and no connectives beyond what wraps the equality.
+      extractMergeAxioms :: IR.ResolvedPropExpr -> [AxiomSet]
+      extractMergeAxioms (IR.ResolvedPropBicond left []) =
+        extractFromRightImpl left
+      extractMergeAxioms _ = []
+
+      extractFromRightImpl :: IR.ResolvedRightImpl -> [AxiomSet]
+      extractFromRightImpl (IR.ResolvedRightImpl leftImpl Nothing) =
+        extractFromLeftImpl leftImpl
+      extractFromRightImpl _ = []
+
+      extractFromLeftImpl :: IR.ResolvedLeftImpl -> [AxiomSet]
+      extractFromLeftImpl (IR.ResolvedLeftImpl disj []) =
+        extractFromDisj disj
+      extractFromLeftImpl _ = []
+
+      extractFromDisj :: IR.ResolvedDisj -> [AxiomSet]
+      extractFromDisj (IR.ResolvedDisj conj []) =
+        extractFromConj conj
+      extractFromDisj _ = []
+
+      extractFromConj :: IR.ResolvedConj -> [AxiomSet]
+      extractFromConj (IR.ResolvedConj neg []) =
+        extractFromNeg neg
+      extractFromConj _ = []
+
+      extractFromNeg :: IR.ResolvedNeg -> [AxiomSet]
+      extractFromNeg (IR.ResolvedNegChild quant) =
+        extractFromQuantified quant
+      extractFromNeg _ = []
+
+      extractFromQuantified :: IR.ResolvedQuantified -> [AxiomSet]
+      extractFromQuantified (IR.ResolvedQuantified [] atomic) =
+        extractFromAtomic atomic
+      extractFromQuantified _ = []
+
+      extractFromAtomic :: IR.ResolvedAtomicProp -> [AxiomSet]
+      extractFromAtomic (IR.ResolvedAtomicTermPair tp) =
+        extractFromTermPair tp
+      extractFromAtomic _ = []
+
+      extractFromTermPair :: IR.ResolvedTermPair -> [AxiomSet]
+      extractFromTermPair (IR.ResolvedTermPair lhs rights _) =
+        case rights of
+          [rfbt] | IR.resolvedRFTOp rfbt == "=" ->
+            case (getEntityFromTerm lhs, getTermName lhs, getTermName (IR.resolvedRFTRight rfbt)) of
+              (Just entity, Just lName, Just rName) ->
+                classifyAndEmit entity lName rName
+              _ -> []
+          _ -> []
+
+      getEntityFromTerm :: IR.ResolvedTerm -> Maybe IR.Entity
+      getEntityFromTerm (IR.ResolvedTerm (IR.ResolvedFactor (IR.ResolvedBTAtomic ref) [] _) [] _) =
+        Just (IR.resolvedConstEntity ref)
+      getEntityFromTerm _ = Nothing
+
+      getTermName :: IR.ResolvedTerm -> Maybe String
+      getTermName (IR.ResolvedTerm (IR.ResolvedFactor (IR.ResolvedBTAtomic ref) [] _) [] _) =
+        Just (resolveConstRef ref)
+      getTermName _ = Nothing
+
+      classifyAndEmit :: IR.Entity -> String -> String -> [AxiomSet]
+      classifyAndEmit entity lhsName rhsName =
+        let axName = mergeAxiomName lhsName rhsName
+        in case entity of
+          IR.EntityFunction _ ->
+            -- Functions: plain equality, no wrapper (↔ would be a type error)
+            [ axiomSet [SGlobal] (tags [TagImplicitMerge])
+                [LeanAxiom axName (LEq (LVar lhsName) (LVar rhsName))]
+            ]
+          _ ->
+            -- Sort bounds, individuals, propositions, mereological objects:
+            -- 𝕌-sorted metafact wrapper.
+            [ axiomSet [SGlobal] (tags [TagImplicitMerge])
+                [LeanAxiom axName (LMetafactWrapper (LEq (LVar lhsName) (LVar rhsName)))]
+            ]
+
+      -- | Build a unique Lean-safe axiom name from the LHS entity name and the
+      -- RHS qualified name.  Form: @<safeLhs>_from_<subtheory>@, where
+      -- @<subtheory>@ is the source path derived by dropping the last
+      -- dot-segment of @rhsName@ and replacing dots with underscores.
+      --
+      -- This guarantees uniqueness when the same LHS name is contributed by
+      -- multiple implicit subtheories (e.g. D_Min from both lower_semi_lattice
+      -- and upper_semi_lattice).
+      mergeAxiomName :: String -> String -> String
+      mergeAxiomName lhsName rhsName =
+        concatMap safeMergeChar lhsName ++ "_from_" ++ subtheoryFromRhs rhsName
+
+      subtheoryFromRhs :: String -> String
+      subtheoryFromRhs rhsName =
+        case reverse (splitOnDot rhsName) of
+          (_entity : revPath) -> map dotToUnderscore
+                                    (concatMap (\(i,s) -> if i==0 then s else '.':s)
+                                               (zip [0..] (reverse revPath)))
+          []                  -> "unknown"
+
+      splitOnDot :: String -> [String]
+      splitOnDot "" = []
+      splitOnDot s  = let (h, t) = break (== '.') s
+                      in h : case t of { [] -> []; (_:rest) -> splitOnDot rest }
+
+      dotToUnderscore :: Char -> Char
+      dotToUnderscore '.' = '_'
+      dotToUnderscore c   = c
+
+      safeMergeChar :: Char -> String
+      safeMergeChar c = case c of
+        '+' -> "plus"; '-' -> "minus"; '×' -> "times"
+        '⇒' -> "impl"; '∸' -> "sub";  '/' -> "div"
+        '#' -> "_";    '.' -> "_";    _   -> [c]
 
 propExprToLean :: IR.ResolvedPropExpr -> LeanExpr
 propExprToLean (IR.ResolvedPropBicond lhs rests) =
