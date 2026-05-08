@@ -17,6 +17,7 @@ module Eidos.Backend.LeanProps.MkAxiomSets
 
 import           Data.Maybe (fromJust)
 import qualified Eidos.IR as IR
+import qualified Eidos.Pipeline as PL
 import qualified Eidos.SortBounds as SB
 import Eidos.Backend.LeanProps.LeanExpr
 import Eidos.Backend.LeanProps.LeanAxiomSet
@@ -117,8 +118,8 @@ tSOL  = [TagFunction, TagSOLFunction, TagDecl]
 -- | Build the complete list of 'AxiomSet' values for a theory.
 -- The order matches the current 'theoryToLeanDoc' output exactly, so that
 -- 'axiomSetsToLeanDoc' can reproduce the same Lean 4 text.
-mkAxiomSets :: SB.SortBoundOptions -> IR.Theory -> [AxiomSet]
-mkAxiomSets sbOpts theory = concat
+mkAxiomSets :: PL.PreparedTheory -> [AxiomSet]
+mkAxiomSets pt = concat
   [ headerAxiomSets
   , userSortLimitAxiomSets
   , productSortLimitAxiomSets
@@ -165,6 +166,7 @@ mkAxiomSets sbOpts theory = concat
   , implicitMergeAxiomSets
   ]
   where
+  theory = PL.ptTheory pt
   -- -------------------------------------------------------------------------
   -- Derived function lists (mirrors LeanProps)
   -- -------------------------------------------------------------------------
@@ -523,7 +525,7 @@ mkAxiomSets sbOpts theory = concat
   -- separate _min/_max axioms.
   -- -------------------------------------------------------------------------
   sortBoundAxiomSets :: [AxiomSet]
-  sortBoundAxiomSets = map sortBoundToAxiomSet (SB.theorySortBoundEntries sbOpts theory)
+  sortBoundAxiomSets = map sortBoundToAxiomSet (PL.ptSortBounds pt)
 
   sortBoundToAxiomSet :: SB.SortBoundEntry -> AxiomSet
   sortBoundToAxiomSet entry =
@@ -1517,11 +1519,12 @@ baseTermToLean (IR.ResolvedBTDescription desc) =
 --
 -- Reflection subtheories are skipped; their Lean 4 treatment is not yet
 -- implemented.
-theoryBlocks :: SB.SortBoundOptions -> IR.Theory -> [(String, [AxiomSet])]
-theoryBlocks sbOpts theory =
+theoryBlocks :: PL.PreparedTheory -> [(String, [AxiomSet])]
+theoryBlocks pt =
   childBlocks ++ [rootBlock]
   where
-    rootBlock   = ("__main__", mkAxiomSets sbOpts theory)
+    theory      = PL.ptTheory pt
+    rootBlock   = ("__main__", mkAxiomSets pt)
     childBlocks = concatMap subBlocks (IR.theorySubtheories theory)
 
     subBlocks :: IR.Theory -> [(String, [AxiomSet])]
@@ -1529,4 +1532,4 @@ theoryBlocks sbOpts theory =
       | IR.theoryReflection sub = []
       | otherwise =
           concatMap subBlocks (IR.theorySubtheories sub)
-          ++ [(IR.theoryFullyQualifiedName sub, mkAxiomSets sbOpts sub)]
+          ++ [(IR.theoryFullyQualifiedName sub, mkAxiomSets (PL.prepareTheory (PL.ptOptions pt) sub))]

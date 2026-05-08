@@ -37,7 +37,7 @@ module Eidos.Backend.LeanProps.LeanProps
   ) where
 
 import qualified Eidos.IR as IR
-import qualified Eidos.SortBounds as SB
+import qualified Eidos.Pipeline as PL
 import Eidos.Backend.LeanProps.LeanExpr
 import Data.List (intercalate, sortOn)
 import qualified Data.Set as Set
@@ -51,11 +51,12 @@ import Eidos.Backend.LeanProps.LeanAxiomSet
 -- | Convert an Eidos theory directly to Lean 4 source (combines both stages).
 exportToLeanPropsWithOptions :: LeanPropsOptions -> IR.Theory -> String
 exportToLeanPropsWithOptions opts theory =
-  let sbOpts = SB.SortBoundOptions { SB.sboCollapse = optUseSortingAxioms opts }
+  let pipeOpts = PL.PipelineOptions { PL.pipeCollapseSortBounds = optUseSortingAxioms opts }
+      prepared = PL.prepareTheory pipeOpts theory
       render (ns, as_) =
         let as1 = if optGroupByEntity opts then sortOn asPath as_ else as_
         in LeanBlock ns (renderAxiomSetsToDecls opts as1)
-      blocks = map render (theoryBlocks sbOpts theory)
+      blocks = map render (theoryBlocks prepared)
       doc = LeanDoc
         { leanDocTheoryName = IR.theoryFullyQualifiedName theory
         , leanDocBlocks     = blocks
