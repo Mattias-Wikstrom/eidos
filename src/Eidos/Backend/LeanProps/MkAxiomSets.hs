@@ -49,13 +49,8 @@ pMaxName = sortMaxName pSortName   -- "ℙ_Max"
 dMinName = sortMinName dSortName   -- "𝔻_Min"
 dMaxName = sortMaxName dSortName   -- "𝔻_Max"
 
-uMin, uMax, pMin, pMax, dMin, dMax :: LeanExpr
-uMin = LVar uMinName
-uMax = LVar uMaxName
+pMin :: LeanExpr
 pMin = LVar pMinName
-pMax = LVar pMaxName
-dMin = LVar dMinName
-dMax = LVar dMaxName
 
 sanitizeName :: String -> String
 sanitizeName = map (\c -> if c == '#' then '_' else c)
@@ -160,8 +155,6 @@ mkAxiomSets pt = concat
   , sortBoundAxiomSets
   , relBoundsAxiomSets
   , sortOrderAxiomSets
-  , productSortOrderAxiomSets
-  , relProductSortOrderAxiomSets
   , userFactAxiomSets
   , implicitMergeAxiomSets
   ]
@@ -916,85 +909,27 @@ mkAxiomSets pt = concat
   -- now handled by sortBoundAxiomSets above via Eidos.SortBounds.
 
   -- -------------------------------------------------------------------------
-  -- 40. Sort ordering axioms
+  -- 40-41 + R7. Sort ordering axioms.
+  -- Delegates entirely to Eidos.SortBounds which owns all the semantic logic:
+  -- builtin sort orderings (𝕌, ℙ, 𝔻), user sort orderings (subsort /
+  -- quotient / subquotient / regular), product sort orderings, and relation
+  -- product sort orderings.  MSymDiff renders as ↔, substituting for LEq.
   -- -------------------------------------------------------------------------
   sortOrderAxiomSets :: [AxiomSet]
-  sortOrderAxiomSets =
-      [ axiomSet [SSort uSortName] (tags [TagSort, TagOrdering])
-          [ LeanAxiom (uSortName ++ "_ordering") (LImpl uMax uMin)
-          ]
-      , axiomSet [SSort pSortName] (tags [TagSort, TagOrdering])
-          [ LeanAxiom (pSortName ++ "_upper")    (LImpl uMax pMax)
-          , LeanAxiom (pSortName ++ "_ordering") (LImpl pMax pMin)
-          , LeanAxiom (pSortName ++ "_lower")    (LImpl pMin uMin)
-          ]
-      ] ++
-      (if usesDomain then
-        [ axiomSet [SSort dSortName] (tags [TagSort, TagOrdering])
-            [ LeanAxiom (dSortName ++ "_upper")    (LImpl uMax dMax)
-            , LeanAxiom (dSortName ++ "_ordering") (LImpl dMax dMin)
-            , LeanAxiom (dSortName ++ "_lower")    (LImpl dMin pMax)
-            ]
-        ]
-      else [])
-      ++ map mkSortOrder userSorts
-      where
-        mkSortOrder :: IR.Sort -> AxiomSet
-        mkSortOrder s =
-          let sN   = IR.sortName s
-              sMax = sortMaxName sN
-              sMin = sortMinName sN
-          in case (IR.sortRelationship s, IR.sortParent s) of
-            (IR.SubSort, Just parent) ->
-              let parentN  = IR.sortName parent
-                  parentMin = sortMinName parentN
-                  parentMax = sortMaxName parentN
-              in axiomSet [SSort sN] (tags [TagSort, TagOrdering])
-                  [ LeanAxiom (sN ++ "_lower")    (LEq (LVar sMin) (LVar parentMin))
-                  , LeanAxiom (sN ++ "_upper")    (LImpl (LVar parentMax) (LVar sMax))
-                  , LeanAxiom (sN ++ "_ordering")  (LImpl (LVar sMax) (LVar sMin))
-                  ]
-            (IR.Quotient, Just parent) ->
-              let parentN  = IR.sortName parent
-                  parentMin = sortMinName parentN
-                  parentMax = sortMaxName parentN
-              in axiomSet [SSort sN] (tags [TagSort, TagOrdering])
-                  [ LeanAxiom (sN ++ "_lower")    (LImpl (LVar parentMin) (LVar sMin))
-                  , LeanAxiom (sN ++ "_upper")    (LEq (LVar sMax) (LVar parentMax))
-                  , LeanAxiom (sN ++ "_ordering")  (LImpl (LVar sMax) (LVar sMin))
-                  ]
-            (IR.SubQuotient, Just parent) ->
-              let parentN  = IR.sortName parent
-                  parentMin = sortMinName parentN
-                  parentMax = sortMaxName parentN
-              in axiomSet [SSort sN] (tags [TagSort, TagOrdering])
-                  [ LeanAxiom (sN ++ "_lower")    (LImpl (LVar parentMin) (LVar sMin))
-                  , LeanAxiom (sN ++ "_upper")    (LImpl (LVar parentMax) (LVar sMax))
-                  , LeanAxiom (sN ++ "_ordering")  (LImpl (LVar sMax) (LVar sMin))
-                  ]
-            _ ->
-              -- Regular sort: use universal bounds
-              axiomSet [SSort sN] (tags [TagSort, TagOrdering])
-                [ LeanAxiom (sN ++ "_upper")    (LImpl uMax (LVar sMax))
-                , LeanAxiom (sN ++ "_ordering") (LImpl (LVar sMax) (LVar sMin))
-                , LeanAxiom (sN ++ "_lower")    (LImpl (LVar sMin) pMax)
-                ]
+  sortOrderAxiomSets = map sortOrderToAxiomSet (PL.ptSortOrder pt)
 
-  -- -------------------------------------------------------------------------
-  -- 41. Product sort ordering axioms
-  -- -------------------------------------------------------------------------
-  productSortOrderAxiomSets :: [AxiomSet]
-  productSortOrderAxiomSets = map mkOrder multiArgFolFunctions
-    where
-      mkOrder f =
-        let fN  = IR.funcName f
-            dMx = domMaxName f
-            dMn = domMinName f
-        in axiomSet [SFunction fN, STuple] (tags [TagSort, TagFunction, TagFOLFunction, TagTuple, TagOrdering])
-             [ LeanAxiom (fN ++ "_dom_upper")   (LImpl uMax (LVar dMx))
-             , LeanAxiom (fN ++ "_dom_ordering") (LImpl (LVar dMx) (LVar dMn))
-             , LeanAxiom (fN ++ "_dom_lower")   (LImpl (LVar dMn) pMax)
-             ]
+  sortOrderToAxiomSet :: SB.SortOrderEntry -> AxiomSet
+  sortOrderToAxiomSet entry =
+    let (path, tgs) = orderContextToPathAndTags (SB.soeContext entry)
+    in axiomSet path (tags tgs)
+         (map (\(nm, expr) -> LeanAxiom nm (mereoExprToLean expr)) (SB.soeAxioms entry))
+
+  orderContextToPathAndTags :: SB.SortOrderContext -> ([SubjectNode], [Tag])
+  orderContextToPathAndTags ctx = case ctx of
+    SB.SOCBuiltinSort n           -> ([SSort n],            [TagSort, TagOrdering])
+    SB.SOCUserSort    n           -> ([SSort n],            [TagSort, TagOrdering])
+    SB.SOCProductSort fn          -> ([SFunction fn, STuple], [TagSort, TagFunction, TagFOLFunction, TagTuple, TagOrdering])
+    SB.SOCRelationProductSort rn  -> ([SSet rn],            [TagSort, TagSet, TagOrdering])
 
   -- -------------------------------------------------------------------------
   -- R1. Relation product-sort limit declarations: R_dom_Min, R_dom_Max
@@ -1080,23 +1015,6 @@ mkAxiomSets pt = concat
         in axiomSet [SSet n] (tags [TagSet, TagSorting])
              [ LeanAxiom (n ++ minSuffixForAxiomNames) (quantify (LImpl app dMin))
              , LeanAxiom (n ++ maxSuffixForAxiomNames) (quantify (LImpl dMax app))
-             ]
-
-  -- -------------------------------------------------------------------------
-  -- R7. Relation product-sort ordering axioms
-  -- (Analogous to productSortOrderAxiomSets.)
-  -- -------------------------------------------------------------------------
-  relProductSortOrderAxiomSets :: [AxiomSet]
-  relProductSortOrderAxiomSets = map mkOrder userRelations
-    where
-      mkOrder r =
-        let rN  = IR.relName r
-            dMx = LVar (relDomMaxName r)
-            dMn = LVar (relDomMinName r)
-        in axiomSet [SSet rN] (tags [TagSort, TagSet, TagOrdering])
-             [ LeanAxiom (rN ++ "_dom_upper")    (LImpl uMax dMx)
-             , LeanAxiom (rN ++ "_dom_ordering") (LImpl dMx dMn)
-             , LeanAxiom (rN ++ "_dom_lower")    (LImpl dMn pMax)
              ]
 
   -- -------------------------------------------------------------------------

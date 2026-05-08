@@ -1,20 +1,24 @@
--- | IR-level sort bound facts.
+-- | IR-level sort bound and sort ordering facts.
 --
--- Every mereological object has bounds derived from its sort.  This module
--- is the single source of truth for:
+-- This module is the single source of truth for:
 --
---   * Which entities get sort-bound axioms and what their lo/hi limits are.
---   * Whether to emit two separate axioms (default) or one collapsed
---     @IsWithinBounds@ axiom (--sorting-axioms).
+--   * Sort bounds: which entities get bound axioms, what their lo/hi limits
+--     are, and whether to collapse to @IsWithinBounds@ (--sorting-axioms).
+--   * Sort ordering: the partial order among sort extrema (e.g. U_Max → U_Min,
+--     subsort/quotient/subquotient ordering axioms, product-sort and
+--     relation-product ordering axioms).
 --
--- The backend renders each 'SortBoundEntry' without any collapse logic of its
--- own: it just calls 'mereoExprToLean' on the pre-built 'MereoExpr' values.
+-- Backends render the pre-built 'MereoExpr' values without any semantic logic
+-- of their own.
 module Eidos.SortBounds
   ( SortBoundOptions (..)
   , defaultSortBoundOptions
   , SortBoundContext (..)
   , SortBoundEntry (..)
   , theorySortBoundEntries
+  , SortOrderContext (..)
+  , SortOrderEntry (..)
+  , theorySortOrderEntries
   ) where
 
 import qualified Eidos.IR as IR
@@ -296,3 +300,166 @@ theorySortBoundEntries opts theory = concat
             in mkEntry opts n lo hi (SBCRelationObj (IR.relName r))
           | obj <- IR.relArgObjects r
           ]
+
+-- ---------------------------------------------------------------------------
+-- Sort ordering context / entry types
+-- ---------------------------------------------------------------------------
+
+-- | Organizational context of a sort ordering entry — used by the backend to
+-- assign 'SubjectPath' and tag sets.
+data SortOrderContext
+  = SOCBuiltinSort String          -- [SSort n], tags [TagSort, TagOrdering]
+  | SOCUserSort    String          -- [SSort n], tags [TagSort, TagOrdering]
+  | SOCProductSort String          -- fn; [SFunction fn, STuple], tags [TagSort, TagFunction, TagFOLFunction, TagTuple, TagOrdering]
+  | SOCRelationProductSort String  -- rn; [SSet rn], tags [TagSort, TagSet, TagOrdering]
+  deriving (Show, Eq)
+
+-- | A sort ordering entry for a single sort or product sort.
+-- 'soeAxioms' is a list of @(lean axiom name, mereological expression)@ pairs.
+data SortOrderEntry = SortOrderEntry
+  { soeContext :: SortOrderContext
+  , soeAxioms  :: [(String, IR.MereoExpr)]
+  } deriving (Show)
+
+-- ---------------------------------------------------------------------------
+-- Main entry point for sort ordering
+-- ---------------------------------------------------------------------------
+
+-- | Derive all sort ordering entries for a theory.
+-- Covers sections 40 (builtin + user sort orderings), 41 (product sort
+-- orderings), and R7 (relation product sort orderings) from MkAxiomSets.
+theorySortOrderEntries :: IR.Theory -> [SortOrderEntry]
+theorySortOrderEntries theory = concat
+  [ builtinSortOrders
+  , userSortOrders
+  , productSortOrders
+  , relProductSortOrders
+  ]
+  where
+    usesDomain = IR.theoryUsesDomain theory
+
+    uSort = IR.theoryUniverse theory
+    pSort = IR.theoryProp    theory
+    dSort = IR.theoryDomain  theory
+
+    uSortN = IR.sortName uSort
+    pSortN = IR.sortName pSort
+    dSortN = IR.sortName dSort
+
+    uMaxN = IR.mereoName (IR.sortMax uSort)
+    uMinN = IR.mereoName (IR.sortMin uSort)
+    pMaxN = IR.mereoName (IR.sortMax pSort)
+    pMinN = IR.mereoName (IR.sortMin pSort)
+
+    userSortsList =
+      [ s | IR.EntitySort s <- IR.theoryObjects theory
+          , IR.sortKind s == IR.SortKindFromSignature ]
+
+    multiArgFols =
+      filter (\f -> length (IR.funcArgSorts f) > 1
+                 && IR.funcOrigin f == IR.FromSignature)
+             (IR.theoryFOLFunctions theory)
+
+    userRelations =
+      [ r | IR.EntityRelation r <- IR.theoryObjects theory
+          , IR.relOrigin r == IR.FromSignature ]
+
+    impl a b   = IR.MRevDiff a b
+    bicond a b = IR.MSymDiff a b
+    var        = IR.MVar
+
+    -- -----------------------------------------------------------------------
+    -- 40a. Built-in sort orderings: 𝕌, ℙ, and optionally 𝔻
+    -- -----------------------------------------------------------------------
+    builtinSortOrders =
+      [ SortOrderEntry (SOCBuiltinSort uSortN)
+          [ (uSortN ++ "_ordering", impl (var uMaxN) (var uMinN)) ]
+      , SortOrderEntry (SOCBuiltinSort pSortN)
+          [ (pSortN ++ "_upper",    impl (var uMaxN) (var pMaxN))
+          , (pSortN ++ "_ordering", impl (var pMaxN) (var pMinN))
+          , (pSortN ++ "_lower",    impl (var pMinN) (var uMinN))
+          ]
+      ] ++
+      if usesDomain
+        then let dMaxN = IR.mereoName (IR.sortMax dSort)
+                 dMinN = IR.mereoName (IR.sortMin dSort)
+             in [ SortOrderEntry (SOCBuiltinSort dSortN)
+                    [ (dSortN ++ "_upper",    impl (var uMaxN) (var dMaxN))
+                    , (dSortN ++ "_ordering", impl (var dMaxN) (var dMinN))
+                    , (dSortN ++ "_lower",    impl (var dMinN) (var pMaxN))
+                    ]
+                ]
+        else []
+
+    -- -----------------------------------------------------------------------
+    -- 40b. User sort orderings (subsort / quotient / subquotient / regular)
+    -- -----------------------------------------------------------------------
+    userSortOrders = map mkOrder userSortsList
+      where
+        mkOrder s =
+          let sN    = IR.sortName s
+              sMinN = IR.mereoName (IR.sortMin s)
+              sMaxN = IR.mereoName (IR.sortMax s)
+          in case (IR.sortRelationship s, IR.sortParent s) of
+            (IR.SubSort, Just parent) ->
+              let pMinN' = IR.mereoName (IR.sortMin parent)
+                  pMaxN' = IR.mereoName (IR.sortMax parent)
+              in SortOrderEntry (SOCUserSort sN)
+                   [ (sN ++ "_lower",    bicond (var sMinN) (var pMinN'))
+                   , (sN ++ "_upper",    impl   (var pMaxN') (var sMaxN))
+                   , (sN ++ "_ordering", impl   (var sMaxN) (var sMinN))
+                   ]
+            (IR.Quotient, Just parent) ->
+              let pMinN' = IR.mereoName (IR.sortMin parent)
+                  pMaxN' = IR.mereoName (IR.sortMax parent)
+              in SortOrderEntry (SOCUserSort sN)
+                   [ (sN ++ "_lower",    impl   (var pMinN') (var sMinN))
+                   , (sN ++ "_upper",    bicond (var sMaxN) (var pMaxN'))
+                   , (sN ++ "_ordering", impl   (var sMaxN) (var sMinN))
+                   ]
+            (IR.SubQuotient, Just parent) ->
+              let pMinN' = IR.mereoName (IR.sortMin parent)
+                  pMaxN' = IR.mereoName (IR.sortMax parent)
+              in SortOrderEntry (SOCUserSort sN)
+                   [ (sN ++ "_lower",    impl (var pMinN') (var sMinN))
+                   , (sN ++ "_upper",    impl (var pMaxN') (var sMaxN))
+                   , (sN ++ "_ordering", impl (var sMaxN) (var sMinN))
+                   ]
+            _ ->
+              SortOrderEntry (SOCUserSort sN)
+                [ (sN ++ "_upper",    impl (var uMaxN) (var sMaxN))
+                , (sN ++ "_ordering", impl (var sMaxN) (var sMinN))
+                , (sN ++ "_lower",    impl (var sMinN) (var pMaxN))
+                ]
+
+    -- -----------------------------------------------------------------------
+    -- 41. Product sort orderings (multi-arg FOL functions)
+    -- -----------------------------------------------------------------------
+    productSortOrders = map mkOrder multiArgFols
+      where
+        mkOrder f =
+          let fN    = IR.funcName f
+              dom   = maybe (error "SortBounds: no domain sort") id (IR.funcDomain f)
+              dMinN = IR.mereoName (IR.sortMin dom)
+              dMaxN = IR.mereoName (IR.sortMax dom)
+          in SortOrderEntry (SOCProductSort fN)
+               [ (fN ++ "_dom_upper",    impl (var uMaxN) (var dMaxN))
+               , (fN ++ "_dom_ordering", impl (var dMaxN) (var dMinN))
+               , (fN ++ "_dom_lower",    impl (var dMinN) (var pMaxN))
+               ]
+
+    -- -----------------------------------------------------------------------
+    -- R7. Relation product sort orderings
+    -- -----------------------------------------------------------------------
+    relProductSortOrders = map mkOrder userRelations
+      where
+        mkOrder r =
+          let rN    = IR.relName r
+              dom   = IR.relDomain r
+              dMinN = IR.mereoName (IR.sortMin dom)
+              dMaxN = IR.mereoName (IR.sortMax dom)
+          in SortOrderEntry (SOCRelationProductSort rN)
+               [ (rN ++ "_dom_upper",    impl (var uMaxN) (var dMaxN))
+               , (rN ++ "_dom_ordering", impl (var dMaxN) (var dMinN))
+               , (rN ++ "_dom_lower",    impl (var dMinN) (var pMaxN))
+               ]

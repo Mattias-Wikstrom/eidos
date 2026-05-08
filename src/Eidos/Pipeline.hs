@@ -46,6 +46,7 @@ data PreparedTheory = PreparedTheory
   { ptOptions    :: PipelineOptions
   , ptTheory     :: IR.Theory
   , ptSortBounds :: [SB.SortBoundEntry]
+  , ptSortOrder  :: [SB.SortOrderEntry]
   } deriving (Show)
 
 -- | Run all pipeline-level passes for one theory.
@@ -55,6 +56,7 @@ prepareTheory opts theory = PreparedTheory
   { ptOptions    = opts
   , ptTheory     = theory
   , ptSortBounds = SB.theorySortBoundEntries sbOpts theory
+  , ptSortOrder  = SB.theorySortOrderEntries theory
   }
   where
     sbOpts = SB.SortBoundOptions { SB.sboCollapse = pipeCollapseSortBounds opts }
