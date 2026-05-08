@@ -153,31 +153,36 @@ extractRelations th =
   ]
 
 extractAxioms :: IR.Theory -> [String]
-extractAxioms th = 
+extractAxioms th =
   [ prettyFact f
   | f <- IR.theoryFacts th
-  , IR.factKind f == IR.FactKindAssertion
-  , not (IR.factIsMereologicalTranslation f)
+  , IR.factCategory (IR.factKind f) == IR.FCUserInput
+  , IR.factSubkind  (IR.factKind f) == IR.FSAssertion
   ]
 
 extractFacts :: IR.Theory -> [String]
 extractFacts th =
   [ prettyFact f
   | f <- IR.theoryFacts th
-  , IR.factKind f == IR.FactKindFact
-  , not (IR.factIsMereologicalTranslation f)
+  , IR.factCategory (IR.factKind f) == IR.FCUserInput
+  , IR.factSubkind  (IR.factKind f) == IR.FSFact
   ]
 
 extractMetafacts :: IR.Theory -> [String]
 extractMetafacts th =
   [ prettyFact f
   | f <- IR.theoryFacts th
-  , IR.factKind f == IR.FactKindMetafactsFact
+  , IR.factCategory (IR.factKind f) == IR.FCUserInput
+  , IR.factSubkind  (IR.factKind f) == IR.FSMetafactsFact
   ]
 
 -- | Better fact pretty-printer that extracts actual formulas
 prettyFact :: IR.Fact -> String
-prettyFact f = renderPropExpr (IR.factPropExpr f)
+prettyFact f = case IR.factPropExpr f of
+  Just pe -> renderPropExpr pe
+  Nothing -> case IR.factMereoExpr f of
+    Just me -> show me
+    Nothing -> "<no expression>"
 
 renderPropExpr :: IR.ResolvedPropExpr -> String
 renderPropExpr (IR.ResolvedPropBicond left rests) =

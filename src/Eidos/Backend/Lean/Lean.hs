@@ -138,13 +138,12 @@ theoryToLeanTypeDoc theory =
     
     -- User facts (assertions and metafacts)
     userFacts = [ f | f <- IR.theoryFacts theory
-                    , not (IR.factIsInherited f)
-                    , not (IR.factIsMereologicalTranslation f)
-                    , IR.factKind f `elem` [IR.FactKindAssertion, IR.FactKindMetafactsFact] ]
-    
+                    , IR.factCategory (IR.factKind f) == IR.FCUserInput
+                    , IR.factSubkind  (IR.factKind f) `elem` [IR.FSAssertion, IR.FSMetafactsFact] ]
+
     factToField (idx, fact) =
       let fieldName = "fact" ++ show idx
-          body = propExprToLeanType (IR.factPropExpr fact)
+          body = propExprToLeanType (maybe (error "factToField: no propExpr") id (IR.factPropExpr fact))
           foralls = wrapFreeVars (IR.factFreeVars fact)
           expr = foralls body
       in LTDField fieldName expr

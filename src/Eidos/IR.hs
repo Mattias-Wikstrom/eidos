@@ -56,6 +56,7 @@ data EntityKind
 
 data FactCategory
   = FCUserInput
+  | FCMereologicalTranslation
   | FCSortStructure
   | FCImplicitMerge
   deriving (Show, Eq)
@@ -64,6 +65,9 @@ data FactSubkind
   = FSFact
   | FSAssertion
   | FSMetafactsFact
+  | FSTranslationOfFact
+  | FSTranslationOfAssertion
+  | FSTranslationOfMetafact
   | FSSortLimitation
   | FSImplicitMerge
   deriving (Show, Eq)
@@ -74,13 +78,24 @@ data FactKind = FactKind
   }
   deriving (Show, Eq)
 
-factKindFact, factKindAssertion, factKindMetafactsFact, factKindSortLimitation, factKindImplicitMerge :: FactKind
-factKindFact = FactKind FCUserInput FSFact
-factKindAssertion = FactKind FCUserInput FSAssertion
+-- Smart constructors for user-input facts
+factKindFact, factKindAssertion, factKindMetafactsFact :: FactKind
+factKindFact          = FactKind FCUserInput FSFact
+factKindAssertion     = FactKind FCUserInput FSAssertion
 factKindMetafactsFact = FactKind FCUserInput FSMetafactsFact
-factKindSortLimitation = FactKind FCSortStructure FSSortLimitation
-factKindImplicitMerge = FactKind FCImplicitMerge FSImplicitMerge
 
+-- Smart constructors for mereological translation facts
+factKindMereoOfFact, factKindMereoOfAssertion, factKindMereoOfMetafact :: FactKind
+factKindMereoOfFact      = FactKind FCMereologicalTranslation FSTranslationOfFact
+factKindMereoOfAssertion = FactKind FCMereologicalTranslation FSTranslationOfAssertion
+factKindMereoOfMetafact  = FactKind FCMereologicalTranslation FSTranslationOfMetafact
+
+-- Smart constructors for structural facts
+factKindSortLimitation, factKindImplicitMerge :: FactKind
+factKindSortLimitation = FactKind FCSortStructure FSSortLimitation
+factKindImplicitMerge  = FactKind FCImplicitMerge FSImplicitMerge
+
+-- Pattern synonyms for backward compatibility and exhaustive matching
 pattern FactKindFact :: FactKind
 pattern FactKindFact = FactKind FCUserInput FSFact
 
@@ -90,13 +105,57 @@ pattern FactKindAssertion = FactKind FCUserInput FSAssertion
 pattern FactKindMetafactsFact :: FactKind
 pattern FactKindMetafactsFact = FactKind FCUserInput FSMetafactsFact
 
+pattern FactKindMereoOfFact :: FactKind
+pattern FactKindMereoOfFact = FactKind FCMereologicalTranslation FSTranslationOfFact
+
+pattern FactKindMereoOfAssertion :: FactKind
+pattern FactKindMereoOfAssertion = FactKind FCMereologicalTranslation FSTranslationOfAssertion
+
+pattern FactKindMereoOfMetafact :: FactKind
+pattern FactKindMereoOfMetafact = FactKind FCMereologicalTranslation FSTranslationOfMetafact
+
 pattern FactKindSortLimitation :: FactKind
 pattern FactKindSortLimitation = FactKind FCSortStructure FSSortLimitation
 
 pattern FactKindImplicitMerge :: FactKind
 pattern FactKindImplicitMerge = FactKind FCImplicitMerge FSImplicitMerge
 
-{-# COMPLETE FactKindFact, FactKindAssertion, FactKindMetafactsFact, FactKindSortLimitation, FactKindImplicitMerge #-}
+{-# COMPLETE FactKindFact, FactKindAssertion, FactKindMetafactsFact,
+             FactKindMereoOfFact, FactKindMereoOfAssertion, FactKindMereoOfMetafact,
+             FactKindSortLimitation, FactKindImplicitMerge #-}
+
+-- ---------------------------------------------------------------------------
+-- Mereological expression type
+-- ---------------------------------------------------------------------------
+
+-- | Abstract syntax tree for mereological expressions.
+--
+-- This is the semantic representation used by the mereological translation
+-- pass and consumed by backends (Lean, Coq, etc.).  Backends translate
+-- 'MereoExpr' to their target language without needing to re-derive
+-- mereological structure from 'ResolvedPropExpr'.
+data MereoExpr
+  = MSum     MereoExpr MereoExpr
+    -- ^ Binary mereological sum: x + y  (→ conjunction ∧ in logic)
+  | MProd    MereoExpr MereoExpr
+    -- ^ Binary mereological product: x × y  (→ disjunction ∨)
+  | MDiff    MereoExpr MereoExpr
+    -- ^ Mereological difference: x - y  (→ reverse implication ←)
+  | MRevDiff MereoExpr MereoExpr
+    -- ^ Reverse difference: x ⇒ y  (→ implication →)
+  | MSymDiff MereoExpr MereoExpr
+    -- ^ Symmetric difference: x ∸ y  (→ biconditional ↔)
+  | MVar     String
+    -- ^ Named object: a sort bound (𝕌#min), proposition (⊤), variable, etc.
+  | MZero
+    -- ^ Mereological zero 0  (→ True in _Props backends)
+  | MAbbrevApp String [MereoExpr]
+    -- ^ Application of a compiler-internal abbreviation:
+    --   IsWithinBounds(lo, hi, x), WrapFact(x, y), etc.
+  | MBoundedSum String MereoExpr MereoExpr MereoExpr
+    -- ^ Bounded mereological sum: ∀ varName ∈ [lo, hi]. body
+    --   Corresponds to bounded universal quantification in logic.
+  deriving (Show, Eq)
 
 -- ---------------------------------------------------------------------------
 -- Entity sum type
@@ -286,11 +345,16 @@ instance Show Theory where
   show t = "Theory{" ++ theoryFullyQualifiedName t ++ "}"
 
 data Fact = Fact
-  { factIsMereologicalTranslation :: Bool
-  , factIsInherited               :: Bool
-  , factKind                      :: FactKind
-  , factPropExpr                  :: ResolvedPropExpr
-  , factFreeVars                  :: [ResolvedVarDecl]  -- free variables declared before the expression
+  { factKind      :: FactKind
+  , factPropExpr  :: Maybe ResolvedPropExpr
+    -- ^ The logical expression for this fact.
+    --   'Just' for 'FCUserInput', 'FCSortStructure', and 'FCImplicitMerge' facts.
+    --   'Nothing' for 'FCMereologicalTranslation' facts (use 'factMereoExpr').
+  , factMereoExpr :: Maybe MereoExpr
+    -- ^ The mereological expression for this fact.
+    --   'Just' for 'FCMereologicalTranslation' facts.
+    --   'Nothing' for facts that have no mereological representation yet.
+  , factFreeVars  :: [ResolvedVarDecl]
   }
   deriving (Show)
 

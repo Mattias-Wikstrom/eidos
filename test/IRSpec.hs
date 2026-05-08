@@ -36,7 +36,7 @@ sortLimitFacts th = filter (\f -> factKind f == FactKindSortLimitation) (theoryF
 limitTriples :: Theory -> [(String, String, String)]
 limitTriples th =
   [ (lname, op, rname)
-  | Fact { factPropExpr = ResolvedPropBicond
+  | Fact { factPropExpr = Just (ResolvedPropBicond
               (ResolvedRightImpl
                 (ResolvedLeftImpl
                   (ResolvedDisj
@@ -52,7 +52,7 @@ limitTriples th =
                   [])
                 [])
               Nothing)
-            [] } <- sortLimitFacts th
+            []) } <- sortLimitFacts th
   , let lname = resolvedConstRefName lref
         rname = resolvedConstRefName rref
   ]
@@ -191,19 +191,19 @@ main = hspec $ do
 
     it "produces a translated fact for each assertion" $ do
       th <- buildStr "{ signature { sort S; }, axioms { assertions { ⊤; } } }"
-      let translated = filter factIsMereologicalTranslation (theoryFacts th)
+      let translated = filter (\f -> factCategory (factKind f) == FCMereologicalTranslation) (theoryFacts th)
       length translated `shouldSatisfy` (>= 1)
 
-    it "translated facts have the same FactKind as the original" $ do
+    it "translated facts have FCMereologicalTranslation category, one per original assertion" $ do
       th <- buildStr "{ signature { sort S; }, axioms { assertions { ⊤; } } }"
-      let translated = filter factIsMereologicalTranslation (theoryFacts th)
-          original   = filter (\f -> not (factIsMereologicalTranslation f)
-                                  && factKind f == FactKindAssertion) (theoryFacts th)
+      let translated = filter (\f -> factCategory (factKind f) == FCMereologicalTranslation) (theoryFacts th)
+          original   = filter (\f -> factCategory (factKind f) == FCUserInput
+                                  && factSubkind  (factKind f) == FSAssertion) (theoryFacts th)
       length translated `shouldBe` length original
 
     it "does NOT produce a translated fact for SortLimitation facts" $ do
       th <- buildStr "{ signature { sort S; } }"
-      let translated = filter factIsMereologicalTranslation (theoryFacts th)
+      let translated = filter (\f -> factCategory (factKind f) == FCMereologicalTranslation) (theoryFacts th)
       all ((/= FactKindSortLimitation) . factKind) translated `shouldBe` True
 
   -- ── Gap 7: entity propagation ───────────────────────────────────────────
@@ -817,7 +817,7 @@ main = hspec $ do
 -- Returns Nothing for any other shape.
 mergeFactNames :: Fact -> Maybe (String, String)
 mergeFactNames fact = case factPropExpr fact of
-  ResolvedPropBicond rImpl [] -> case rImpl of
+  Just (ResolvedPropBicond rImpl []) -> case rImpl of
     ResolvedRightImpl lImpl Nothing -> case lImpl of
       ResolvedLeftImpl disj [] -> case disj of
         ResolvedDisj conj [] -> case conj of

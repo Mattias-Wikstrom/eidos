@@ -15,6 +15,7 @@ module Eidos.Backend.LeanProps.MkAxiomSets
   , theoryBlocks
   ) where
 
+import           Data.Maybe (fromJust)
 import qualified Eidos.IR as IR
 import Eidos.Backend.LeanProps.LeanExpr
 import Eidos.Backend.LeanProps.LeanAxiomSet
@@ -233,30 +234,25 @@ mkAxiomSets theory = concat
 
   userFacts =
     [ f | f <- IR.theoryFacts theory
-        , IR.factKind f == IR.FactKindFact
-        , not (IR.factIsInherited f)
-        , not (IR.factIsMereologicalTranslation f)
+        , IR.factCategory (IR.factKind f) == IR.FCUserInput
+        , IR.factSubkind  (IR.factKind f) == IR.FSFact
         ]
 
   userAssertions =
     [ f | f <- IR.theoryFacts theory
-        , IR.factKind f == IR.FactKindAssertion
-        , not (IR.factIsInherited f)
-        , not (IR.factIsMereologicalTranslation f)
+        , IR.factCategory (IR.factKind f) == IR.FCUserInput
+        , IR.factSubkind  (IR.factKind f) == IR.FSAssertion
         ]
 
   userMetafacts =
     [ f | f <- IR.theoryFacts theory
-        , IR.factKind f == IR.FactKindMetafactsFact
-        , not (IR.factIsInherited f)
-        , not (IR.factIsMereologicalTranslation f)
+        , IR.factCategory (IR.factKind f) == IR.FCUserInput
+        , IR.factSubkind  (IR.factKind f) == IR.FSMetafactsFact
         ]
 
   implicitMergeFacts =
     [ f | f <- IR.theoryFacts theory
         , IR.factKind f == IR.FactKindImplicitMerge
-        , not (IR.factIsInherited f)
-        , not (IR.factIsMereologicalTranslation f)
         ]
 
   -- -------------------------------------------------------------------------
@@ -1179,7 +1175,7 @@ mkAxiomSets theory = concat
             (LMetafactWrapper (factBodyExpr fact))]
 
       factBodyExpr fact =
-        wrapFreeVars' (IR.factFreeVars fact) (propExprToLean' (IR.factPropExpr fact))
+        wrapFreeVars' (IR.factFreeVars fact) (propExprToLean' (fromJust (IR.factPropExpr fact)))
 
       -- Inline free-var wrapper (mirrors LeanProps.wrapFreeVars)
       wrapFreeVars' [] body = body
@@ -1202,7 +1198,7 @@ mkAxiomSets theory = concat
   implicitMergeAxiomSets = concatMap mkMergeAS implicitMergeFacts
     where
       mkMergeAS :: IR.Fact -> [AxiomSet]
-      mkMergeAS fact = extractMergeAxioms (IR.factPropExpr fact)
+      mkMergeAS fact = extractMergeAxioms (fromJust (IR.factPropExpr fact))
 
       -- Walk the IR expression tree to find the LHS entity and the RHS name.
       -- Merge facts have the shape  lhs = rhs  at the top level, with no

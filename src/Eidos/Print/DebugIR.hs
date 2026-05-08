@@ -119,10 +119,11 @@ renderEntity level e =
 
 renderFact :: Int -> Int -> Fact -> String
 renderFact level i f =
-  ind level ++ show i ++ ": " ++ show (factKind f) ++ details ++ " => " ++ prettyResolvedPropExpr (factPropExpr f)
+  ind level ++ show i ++ ": " ++ show (factKind f) ++ " => " ++ renderFactExpr f
   where
-    details =
-      " {inherited=" ++ show (factIsInherited f) ++
-      ", mereological-translation=" ++ show (factIsMereologicalTranslation f) ++
-      "}"
+    renderFactExpr fact = case factMereoExpr fact of
+      Just me -> "[mereo] " ++ show me
+      Nothing -> case factPropExpr fact of
+        Just pe -> prettyResolvedPropExpr pe
+        Nothing -> "<no expression>"
     ind n = replicate (n * 2) ' '

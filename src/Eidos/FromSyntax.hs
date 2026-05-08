@@ -10,7 +10,7 @@ import           Control.Monad        (forM_, when, foldM)
 import           Data.Char            (isUpper)
 import           Data.List            (find, intercalate, isSuffixOf)
 import qualified Data.Map.Strict      as Map
-import           Data.Maybe           (fromMaybe, mapMaybe)
+import           Data.Maybe           (fromJust, fromMaybe, mapMaybe)
 import           System.FilePath      (takeDirectory)
 
 import           Eidos.Parse.AST            hiding (theoryBody, theoryName, funcName, funcDomain, relName)
@@ -343,11 +343,10 @@ addPropFact th0 fk th prop = do
     Right _ -> Right ()
 
   let fact = Fact
-        { factIsMereologicalTranslation = False
-        , factIsInherited               = False
-        , factKind                      = fk
-        , factPropExpr                  = resolvedExpr
-        , factFreeVars                  = freeVars
+        { factKind      = fk
+        , factPropExpr  = Just resolvedExpr
+        , factMereoExpr = Nothing
+        , factFreeVars  = freeVars
         }
   let th' = markTheoryPropExprUsage th prop
   return (th' { theoryFacts = theoryFacts th' ++ [fact] })
@@ -589,10 +588,10 @@ mkFOLFunction th nm argSorts resSort orig =
 
 mkSortLimitFact :: MereologicalObject -> String -> MereologicalObject -> Fact
 mkSortLimitFact l op r = Fact
-  { factIsMereologicalTranslation = False
-  , factIsInherited               = False
-  , factKind                      = FactKindSortLimitation
-  , factPropExpr                  = twoTermPropExpr l op r
+  { factKind      = FactKindSortLimitation
+  , factPropExpr  = Just (twoTermPropExpr l op r)
+  , factMereoExpr = Nothing
+  , factFreeVars  = []
   }
 
 twoTermPropExpr :: MereologicalObject -> String -> MereologicalObject -> ResolvedPropExpr
@@ -798,11 +797,10 @@ addMergeEqualityFact th lhsName lhsEntity rhsName rhsEntity =
       leftImpl  = ResolvedLeftImpl disj []
       rightImpl = ResolvedRightImpl leftImpl Nothing
   in addFactToTh th (Fact
-        { factIsMereologicalTranslation = False
-        , factIsInherited               = False
-        , factKind                      = FactKindImplicitMerge
-        , factPropExpr                  = ResolvedPropBicond rightImpl []
-        , factFreeVars                  = []
+        { factKind      = FactKindImplicitMerge
+        , factPropExpr  = Just (ResolvedPropBicond rightImpl [])
+        , factMereoExpr = Nothing
+        , factFreeVars  = []
         })
 
 addMergeEqualityFacts
@@ -924,13 +922,214 @@ mereoOpPrefix th = case theoryClosestReflectionAncestor th of
 
 mereologicalTranslation :: Theory -> Fact -> [Fact]
 mereologicalTranslation th fact = case factKind fact of
-  FactKindAssertion ->
-    [ fact { factIsMereologicalTranslation = True
-           , factPropExpr = translatePropExpr th (factPropExpr fact) } ]
   FactKindFact ->
-    [ fact { factIsMereologicalTranslation = True
-           , factPropExpr = translatePropExpr th (factPropExpr fact) } ]
+    let origExpr = fromJust (factPropExpr fact)
+    in [ Fact { factKind      = factKindMereoOfFact
+              , factPropExpr  = Nothing
+              , factMereoExpr = Just (wrapAsFact th (factFreeVars fact) origExpr)
+              , factFreeVars  = factFreeVars fact
+              } ]
+  FactKindAssertion ->
+    let origExpr = fromJust (factPropExpr fact)
+    in [ Fact { factKind      = factKindMereoOfAssertion
+              , factPropExpr  = Nothing
+              , factMereoExpr = Just (wrapAsAssertion th (factFreeVars fact) origExpr)
+              , factFreeVars  = factFreeVars fact
+              } ]
+  FactKindMetafactsFact ->
+    let origExpr = fromJust (factPropExpr fact)
+    in [ Fact { factKind      = factKindMereoOfMetafact
+              , factPropExpr  = Nothing
+              , factMereoExpr = Just (wrapAsMetafact th (factFreeVars fact) origExpr)
+              , factFreeVars  = factFreeVars fact
+              } ]
   _ -> []
+
+-- ---------------------------------------------------------------------------
+-- Mereological wrappers
+-- ---------------------------------------------------------------------------
+
+wrapFreeVarsMereo :: [ResolvedVarDecl] -> MereoExpr -> MereoExpr
+wrapFreeVarsMereo [] body = body
+wrapFreeVarsMereo (vd:rest) body =
+  let varN = resolvedVarName vd
+      sn   = sortName (resolvedVarSort vd)
+      lo   = MVar (sn ++ "#min")
+      hi   = MVar (sn ++ "#max")
+  in MBoundedSum varN lo hi (wrapFreeVarsMereo rest body)
+
+wrapAsFact :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
+wrapAsFact th freeVars expr =
+  let body = wrapFreeVarsMereo freeVars (propExprToMereo (translatePropExpr th expr))
+      pMin = MVar (sortName (theoryProp th) ++ "#min")
+  in MSymDiff (MSum pMin body) pMin
+
+wrapAsAssertion :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
+wrapAsAssertion th freeVars expr =
+  let body = wrapFreeVarsMereo freeVars (propExprToMereo (translatePropExpr th expr))
+      pMin = MVar (sortName (theoryProp th) ++ "#min")
+      pMax = MVar (sortName (theoryProp th) ++ "#max")
+  in MSymDiff (MSum pMin (MProd pMax body)) pMin
+
+wrapAsMetafact :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
+wrapAsMetafact th freeVars expr =
+  let body = wrapFreeVarsMereo freeVars (propExprToMereo (translatePropExpr th expr))
+      uMin = MVar (sortName (theoryUniverse th) ++ "#min")
+  in MSymDiff (MSum uMin body) uMin
+
+-- ---------------------------------------------------------------------------
+-- ResolvedPropExpr → MereoExpr conversion
+--
+-- Expects a ResolvedPropExpr whose operators have already been swapped to
+-- their mereological equivalents by translatePropExpr (i.e. + × - ⇒ ∸).
+-- ---------------------------------------------------------------------------
+
+propExprToMereo :: ResolvedPropExpr -> MereoExpr
+propExprToMereo (ResolvedPropBicond left rests) =
+  foldl MSymDiff (rightImplToMereo left) (map (rightImplToMereo . resolvedPropRestRight) rests)
+
+rightImplToMereo :: ResolvedRightImpl -> MereoExpr
+rightImplToMereo (ResolvedRightImpl left Nothing) = leftImplToMereo left
+rightImplToMereo (ResolvedRightImpl left (Just (_, right))) =
+  MRevDiff (leftImplToMereo left) (rightImplToMereo right)
+
+leftImplToMereo :: ResolvedLeftImpl -> MereoExpr
+leftImplToMereo (ResolvedLeftImpl left []) = disjToMereo left
+leftImplToMereo (ResolvedLeftImpl left rests) =
+  foldl MDiff (disjToMereo left) (map (disjToMereo . resolvedLirRight) rests)
+
+disjToMereo :: ResolvedDisj -> MereoExpr
+disjToMereo (ResolvedDisj left []) = conjToMereo left
+disjToMereo (ResolvedDisj left rests) =
+  foldl MProd (conjToMereo left) (map (conjToMereo . resolvedDisjRestRight) rests)
+
+conjToMereo :: ResolvedConj -> MereoExpr
+conjToMereo (ResolvedConj left []) = negToMereo left
+conjToMereo (ResolvedConj left rests) =
+  foldl MSum (negToMereo left) (map (negToMereo . resolvedConjRestRight) rests)
+
+negToMereo :: ResolvedNeg -> MereoExpr
+negToMereo (ResolvedNegNot _)   = MZero  -- negation is invalid in facts; MZero as safe default
+negToMereo (ResolvedNegChild q) = quantifiedToMereo q
+
+quantifiedToMereo :: ResolvedQuantified -> MereoExpr
+quantifiedToMereo (ResolvedQuantified [] atomic) = atomicToMereo atomic
+quantifiedToMereo (ResolvedQuantified qs atomic) =
+  foldr quantifierToMereo (atomicToMereo atomic) qs
+
+quantifierToMereo :: ResolvedQuantifier -> MereoExpr -> MereoExpr
+quantifierToMereo q body =
+  let (vd, _isExists) = case q of
+        ResolvedQForall vd' -> (vd', False)
+        ResolvedQExists vd' -> (vd', True)
+      varN = resolvedVarName vd
+      sn   = sortName (resolvedVarSort vd)
+      lo   = MVar (sn ++ "#min")
+      hi   = MVar (sn ++ "#max")
+  in MBoundedSum varN lo hi body
+
+atomicToMereo :: ResolvedAtomicProp -> MereoExpr
+atomicToMereo (ResolvedAtomicConstant ref) = MVar (resolvedConstRefName ref)
+atomicToMereo (ResolvedAtomicTermPair tp)  = termPairToMereo tp
+
+termPairToMereo :: ResolvedTermPair -> MereoExpr
+termPairToMereo (ResolvedTermPair left rights _) =
+  foldl applyRelOpToMereo (termToMereo left) rights
+
+applyRelOpToMereo :: MereoExpr -> ResolvedRelationFollowedByTerm -> MereoExpr
+applyRelOpToMereo leftExpr rfbt =
+  let right = termToMereo (resolvedRFTRight rfbt)
+  in case resolvedRFTOp rfbt of
+       "+"  -> MSum     leftExpr right
+       "×"  -> MProd    leftExpr right
+       "-"  -> MDiff    right    leftExpr   -- note: diff is right-asymmetric
+       "∸"  -> MSymDiff leftExpr right
+       "⇒"  -> MRevDiff leftExpr right
+       "="  -> MSymDiff leftExpr right      -- = in sort-limit facts translates to ∸
+       "≤"  -> MRevDiff leftExpr right      -- ≤ translates to ⇒
+       _    -> MVar ("unknown:" ++ resolvedRFTOp rfbt)
+
+termToMereo :: ResolvedTerm -> MereoExpr
+termToMereo (ResolvedTerm left rests _) =
+  foldl applyArithToMereo (factorToMereo left) rests
+
+applyArithToMereo :: MereoExpr -> ResolvedOperationFollowedByFactor -> MereoExpr
+applyArithToMereo leftExpr off =
+  let right = factorToMereo (resolvedOFFRight off)
+  in case resolvedOFFOp off of
+       "+"  -> MSum     leftExpr right
+       "×"  -> MProd    leftExpr right
+       "-"  -> MDiff    right    leftExpr
+       "∸"  -> MSymDiff leftExpr right
+       "⇒"  -> MRevDiff leftExpr right
+       _    -> MVar ("unknown:" ++ resolvedOFFOp off)
+
+factorToMereo :: ResolvedFactor -> MereoExpr
+factorToMereo (ResolvedFactor base suffixes _) =
+  foldl applySuffixToMereo (baseTermToMereo base) suffixes
+
+applySuffixToMereo :: MereoExpr -> ResolvedTermSuffix -> MereoExpr
+applySuffixToMereo expr suffix = case suffix of
+  ResolvedSuffixDotAttr attr ->
+    MVar (flattenMereoName expr ++ "." ++ attr)
+  ResolvedSuffixCall args ->
+    MAbbrevApp (flattenMereoName expr) (map termToMereo args)
+  ResolvedSuffixSpecialOp op ->
+    MVar (flattenMereoName expr ++ "#" ++ op)
+
+flattenMereoName :: MereoExpr -> String
+flattenMereoName (MVar n) = n
+flattenMereoName _        = "_"
+
+baseTermToMereo :: ResolvedBaseTerm -> MereoExpr
+baseTermToMereo bt = case bt of
+  ResolvedBTAtomic ref ->
+    MVar (resolvedConstRefName ref)
+  ResolvedBTPropParen expr ->
+    propExprToMereo expr
+  ResolvedBTTermParen term ->
+    termToMereo term
+  ResolvedBTSingleton t ->
+    termToMereo t
+  ResolvedBTEvaluationInTheory eit ->
+    propExprToMereo (resolvedEITOperand eit)
+  ResolvedBTProjectionToSort pts ->
+    MAbbrevApp "ProjectIntoInterval"
+      [ termToMereo (resolvedPTOperand pts)
+      , MVar (sortName (resolvedPTSort pts) ++ "#min")
+      , MVar (sortName (resolvedPTSort pts) ++ "#max")
+      ]
+  ResolvedBTProjectionToInterval pti ->
+    MAbbrevApp "ProjectIntoInterval"
+      [ termToMereo (resolvedPTIOperand pti)
+      , termToMereo (resolvedPTILo pti)
+      , termToMereo (resolvedPTIHi pti)
+      ]
+  ResolvedBTGeneralizedSumOrProduct gsp ->
+    let operand = termToMereo (resolvedGSPOperand gsp)
+    in case resolvedGSPVar gsp of
+         Left vd ->
+           let varN = resolvedVarName vd
+               sn   = sortName (resolvedVarSort vd)
+               lo   = MVar (sn ++ "#min")
+               hi   = MVar (sn ++ "#max")
+           in MBoundedSum varN lo hi operand
+         Right bareVar ->
+           MBoundedSum bareVar MZero MZero operand
+  ResolvedBTSetComprehension sc ->
+    let vd   = resolvedSCVar sc
+        varN = resolvedVarName vd
+        sn   = sortName (resolvedVarSort vd)
+        lo   = MVar (sn ++ "#min")
+        hi   = MVar (sn ++ "#max")
+    in MBoundedSum varN lo hi (propExprToMereo (resolvedSCBody sc))
+  ResolvedBTDescription desc ->
+    let vd   = resolvedDescVar desc
+        varN = resolvedVarName vd
+        sn   = sortName (resolvedVarSort vd)
+        lo   = MVar (sn ++ "#min")
+        hi   = MVar (sn ++ "#max")
+    in MBoundedSum varN lo hi (propExprToMereo (resolvedDescBody desc))
 
 translatePropExpr :: Theory -> ResolvedPropExpr -> ResolvedPropExpr
 translatePropExpr th (ResolvedPropBicond left rests) =

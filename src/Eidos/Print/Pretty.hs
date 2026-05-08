@@ -119,17 +119,20 @@ mkAxiomsWrapper :: Theory -> AxiomsWrapper
 mkAxiomsWrapper th = AxiomsWrapper $
   filter (not . isEmptyAxiomsSection) $
   [ AxAssertions $ AssertionsSection
-      [ PropExprInclVars 0 0 [] (stringToPropExpr (prettyResolvedPropExpr (factPropExpr f)))
+      [ PropExprInclVars 0 0 [] (stringToPropExpr (prettyResolvedPropExpr pe))
       | f <- IR.theoryFacts th
-      , IR.factKind f == FactKindAssertion ]
+      , IR.factKind f == FactKindAssertion
+      , Just pe <- [IR.factPropExpr f] ]
   , AxFacts $ FactsSection
-      [ PropExprInclVars 0 0 [] (stringToPropExpr (prettyResolvedPropExpr (factPropExpr f)))
+      [ PropExprInclVars 0 0 [] (stringToPropExpr (prettyResolvedPropExpr pe))
       | f <- IR.theoryFacts th
-      , IR.factKind f == FactKindFact ]
+      , IR.factKind f == FactKindFact
+      , Just pe <- [IR.factPropExpr f] ]
   , AxMetafacts $ MetafactsSection
-      [ PropExprInclVars 0 0 [] (stringToPropExpr (prettyResolvedPropExpr (factPropExpr f)))
+      [ PropExprInclVars 0 0 [] (stringToPropExpr (prettyResolvedPropExpr pe))
       | f <- IR.theoryFacts th
-      , IR.factKind f == FactKindMetafactsFact ]
+      , IR.factKind f == FactKindMetafactsFact
+      , Just pe <- [IR.factPropExpr f] ]
   ]
   where
     stringToPropExpr s = 
@@ -447,11 +450,14 @@ prettyTheoryName (TheoryName nm) = nm
 prettyFact :: Fact -> Doc
 prettyFact f =
   (case IR.factKind f of
-     FactKindAssertion     -> "assertion: "
-     FactKindFact          -> "fact: "
-     FactKindMetafactsFact -> "metafact: "
-     FactKindSortLimitation -> "sort limit: "
-     FactKindImplicitMerge -> "implicit merge: ") ++
+     FactKindAssertion        -> "assertion: "
+     FactKindFact             -> "fact: "
+     FactKindMetafactsFact    -> "metafact: "
+     FactKindMereoOfFact      -> "mereo-fact: "
+     FactKindMereoOfAssertion -> "mereo-assertion: "
+     FactKindMereoOfMetafact  -> "mereo-metafact: "
+     FactKindSortLimitation   -> "sort limit: "
+     FactKindImplicitMerge    -> "implicit merge: ") ++
   "<resolved expression>"
 
 -- ---------------------------------------------------------------------------
@@ -580,12 +586,20 @@ prettyResolvedPropExpr = prettyResolvedPropExprWithOpts defaultPrettyOptions { p
 prettyFactDebug :: Fact -> Doc
 prettyFactDebug f =
   let kindStr = case IR.factKind f of
-        FactKindAssertion     -> "assertion: "
-        FactKindFact          -> "fact: "
-        FactKindMetafactsFact -> "metafact: "
-        FactKindSortLimitation -> "sort limit: "
-        FactKindImplicitMerge -> "implicit merge: "
-  in kindStr ++ prettyResolvedPropExpr (factPropExpr f)
+        FactKindAssertion        -> "assertion: "
+        FactKindFact             -> "fact: "
+        FactKindMetafactsFact    -> "metafact: "
+        FactKindMereoOfFact      -> "mereo-fact: "
+        FactKindMereoOfAssertion -> "mereo-assertion: "
+        FactKindMereoOfMetafact  -> "mereo-metafact: "
+        FactKindSortLimitation   -> "sort limit: "
+        FactKindImplicitMerge    -> "implicit merge: "
+      exprStr = case factMereoExpr f of
+        Just me -> show me
+        Nothing -> case factPropExpr f of
+          Just pe -> prettyResolvedPropExpr pe
+          Nothing -> "<no expression>"
+  in kindStr ++ exprStr
   
 -- ---------------------------------------------------------------------------
 -- Pre-pass / resolution debug printing
