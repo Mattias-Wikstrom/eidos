@@ -232,22 +232,22 @@ mkAxiomSets theory = concat
         , IR.sortKind  (IR.mereoSort m) == IR.SortKindFromSignature
         ]
 
-  userFacts =
+  translationOfFacts =
     [ f | f <- IR.theoryFacts theory
-        , IR.factCategory (IR.factKind f) == IR.FCUserInput
-        , IR.factSubkind  (IR.factKind f) == IR.FSFact
+        , IR.factCategory (IR.factKind f) == IR.FCMereologicalTranslation
+        , IR.factSubkind  (IR.factKind f) == IR.FSTranslationOfFact
         ]
 
-  userAssertions =
+  translationOfAssertions =
     [ f | f <- IR.theoryFacts theory
-        , IR.factCategory (IR.factKind f) == IR.FCUserInput
-        , IR.factSubkind  (IR.factKind f) == IR.FSAssertion
+        , IR.factCategory (IR.factKind f) == IR.FCMereologicalTranslation
+        , IR.factSubkind  (IR.factKind f) == IR.FSTranslationOfAssertion
         ]
 
-  userMetafacts =
+  translationOfMetafacts =
     [ f | f <- IR.theoryFacts theory
-        , IR.factCategory (IR.factKind f) == IR.FCUserInput
-        , IR.factSubkind  (IR.factKind f) == IR.FSMetafactsFact
+        , IR.factCategory (IR.factKind f) == IR.FCMereologicalTranslation
+        , IR.factSubkind  (IR.factKind f) == IR.FSTranslationOfMetafact
         ]
 
   implicitMergeFacts =
@@ -1148,48 +1148,20 @@ mkAxiomSets theory = concat
              ]
 
   -- -------------------------------------------------------------------------
-  -- 42. User fact axioms
+  -- 42. User fact axioms (rendered from FCMereologicalTranslation facts)
   -- -------------------------------------------------------------------------
   userFactAxiomSets :: [AxiomSet]
   userFactAxiomSets =
-       zipWith mkFactAS [1..] userFacts
-    ++ zipWith mkAssertionAS [1 + length userFacts..] userAssertions
-    ++ zipWith mkMetafactAS [1 + length userFacts + length userAssertions..] userMetafacts
+    zipWith mkTranslationAS [1..] allTranslationFacts
     where
-      totalFacts = length userFacts + length userAssertions + length userMetafacts
+      allTranslationFacts = translationOfFacts ++ translationOfAssertions ++ translationOfMetafacts
+      totalFacts = length allTranslationFacts
       mkLabel idx = if totalFacts > 1 then "ax" ++ show idx else ""
 
-      mkFactAS idx fact =
+      mkTranslationAS idx fact =
         axiomSet [SGlobal] (tags [TagUserFact])
           [LeanAxiom (mkLabel idx)
-            (LFactWrapper (factBodyExpr fact))]
-
-      mkAssertionAS idx fact =
-        axiomSet [SGlobal] (tags [TagUserFact])
-          [LeanAxiom (mkLabel idx)
-            (LAssertionWrapper (factBodyExpr fact))]
-
-      mkMetafactAS idx fact =
-        axiomSet [SGlobal] (tags [TagUserFact])
-          [LeanAxiom (mkLabel idx)
-            (LMetafactWrapper (factBodyExpr fact))]
-
-      factBodyExpr fact =
-        wrapFreeVars' (IR.factFreeVars fact) (propExprToLean' (fromJust (IR.factPropExpr fact)))
-
-      -- Inline free-var wrapper (mirrors LeanProps.wrapFreeVars)
-      wrapFreeVars' [] body = body
-      wrapFreeVars' (vd:rest) body =
-        let varN     = IR.resolvedVarName vd
-            sn       = IR.sortName (IR.resolvedVarSort vd)
-            (lo, hi) = sortBounds sn
-        -- Free variables use bounds only — no IsIndividual guard.
-        -- Eidos uses free logic: free variables and constants lack
-        -- existential import, so asserting IsIndividual here would be wrong.
-        in LBoundedForall varN lo hi (wrapFreeVars' rest body)
-
-      -- Inline prop-expr translator (mirrors LeanProps.propExprToLean)
-      propExprToLean' = propExprToLean
+            (mereoExprToLean (fromJust (IR.factMereoExpr fact)))]
 
   -- -------------------------------------------------------------------------
   -- 43. Implicit merge axioms
@@ -1313,6 +1285,36 @@ mkAxiomSets theory = concat
         '+' -> "plus"; '-' -> "minus"; '×' -> "times"
         '⇒' -> "impl"; '∸' -> "sub";  '/' -> "div"
         '#' -> "_";    '.' -> "_";    _   -> [c]
+
+-- ---------------------------------------------------------------------------
+-- MereoExpr → LeanExpr renderer
+-- ---------------------------------------------------------------------------
+
+-- | Translate a 'IR.MereoExpr' to a 'LeanExpr'.
+--
+-- Mereological operations map to propositional connectives:
+--   MSum     → LConj   (+ = ∧)
+--   MProd    → LDisj   (× = ∨)
+--   MDiff    → LImpl   (a - b = b → a)
+--   MRevDiff → LImpl   (a ⇒ b = a → b)
+--   MSymDiff → LBicond (a ∸ b = a ↔ b)
+--   MZero    → pMin    (least element = True = ℙ_Min)
+--   MAbbrevApp → LApp  (abbreviation call)
+--   MBoundedSum → LForallKw with IsWithinBounds guard
+mereoExprToLean :: IR.MereoExpr -> LeanExpr
+mereoExprToLean (IR.MSum a b)     = LConj   (mereoExprToLean a) (mereoExprToLean b)
+mereoExprToLean (IR.MProd a b)    = LDisj   (mereoExprToLean a) (mereoExprToLean b)
+mereoExprToLean (IR.MDiff a b)    = LImpl   (mereoExprToLean b) (mereoExprToLean a)
+mereoExprToLean (IR.MRevDiff a b) = LImpl   (mereoExprToLean a) (mereoExprToLean b)
+mereoExprToLean (IR.MSymDiff a b) = LBicond (mereoExprToLean a) (mereoExprToLean b)
+mereoExprToLean (IR.MVar n)       = LVar (resolveName n)
+mereoExprToLean IR.MZero          = LVar pMinName
+mereoExprToLean (IR.MAbbrevApp name args) =
+  LApp (LVar name) (map mereoExprToLean args)
+mereoExprToLean (IR.MBoundedSum var lo hi body) =
+  LForallKw var LProp
+    (LImpl (LApp (LVar "IsWithinBounds") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
+           (mereoExprToLean body))
 
 propExprToLean :: IR.ResolvedPropExpr -> LeanExpr
 propExprToLean (IR.ResolvedPropBicond lhs rests) =

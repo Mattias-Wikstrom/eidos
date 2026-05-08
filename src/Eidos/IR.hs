@@ -158,6 +158,49 @@ data MereoExpr
   deriving (Show, Eq)
 
 -- ---------------------------------------------------------------------------
+-- Abbreviation definitions (compiler-internal)
+-- ---------------------------------------------------------------------------
+
+-- | A compiler-internal abbreviation: a named definition with typed parameters
+-- and a body expressed as a 'MereoExpr'.  Backends use the registry to decide
+-- which abbreviations to emit and how to render them.
+data AbbrevDef = AbbrevDef
+  { abbrevName   :: String
+  , abbrevParams :: [String]
+  , abbrevBody   :: MereoExpr
+  } deriving (Show, Eq)
+
+-- | Registry of all compiler-internal abbreviation definitions.
+-- Backends should use 'collectUsedAbbrevNames' to find the subset actually
+-- needed and emit only those.
+allAbbrevDefs :: [AbbrevDef]
+allAbbrevDefs =
+  [ AbbrevDef "IsWithinBounds" ["lo", "hi", "x"]
+      -- (hi⇒x) + (x⇒lo)
+      (MSum (MRevDiff (MVar "hi") (MVar "x")) (MRevDiff (MVar "x") (MVar "lo")))
+  , AbbrevDef "ProjectIntoInterval" ["x", "lo", "hi"]
+      -- (x+lo) × hi
+      (MProd (MSum (MVar "x") (MVar "lo")) (MVar "hi"))
+  , AbbrevDef "IsIndividual" ["lo", "hi", "x"]
+      -- 0  (vacuously true in the _Props backend)
+      MZero
+  ]
+
+-- | Collect all 'MAbbrevApp' names reachable from a 'MereoExpr'.
+collectUsedAbbrevNames :: MereoExpr -> [String]
+collectUsedAbbrevNames = go
+  where
+    go (MSum a b)            = go a ++ go b
+    go (MProd a b)           = go a ++ go b
+    go (MDiff a b)           = go a ++ go b
+    go (MRevDiff a b)        = go a ++ go b
+    go (MSymDiff a b)        = go a ++ go b
+    go (MVar _)              = []
+    go MZero                 = []
+    go (MAbbrevApp n args)   = n : concatMap go args
+    go (MBoundedSum _ lo hi body) = go lo ++ go hi ++ go body
+
+-- ---------------------------------------------------------------------------
 -- Entity sum type
 -- ---------------------------------------------------------------------------
 
