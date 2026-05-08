@@ -121,7 +121,9 @@ mkAxiomSets theory = concat
   [ headerAxiomSets
   , userSortLimitAxiomSets
   , productSortLimitAxiomSets
+  , relProductSortLimitAxiomSets
   , functionDeclAxiomSets
+  , relDeclAxiomSets
   , imageFunctionDeclAxiomSets
   , projectionFunctionDeclAxiomSets
   , projectionInverseDeclAxiomSets
@@ -129,14 +131,17 @@ mkAxiomSets theory = concat
   , folInverseDeclAxiomSets
   , irPredicateDeclAxiomSets
   , functionArgResultDeclAxiomSets
+  , relArgObjectDeclAxiomSets
   , folInverseArgResDeclAxiomSets
   , productArgDeclAxiomSets
+  , relArgumentDeclAxiomSets
   , projectionWitnessDeclAxiomSets
   , invImgWitnessDeclAxiomSets
   , mereoDeclAxiomSets
   , propDeclAxiomSets
   , setDeclAxiomSets
   , functionArgResultSortingAxiomSets
+  , relArgObjectSortingAxiomSets
   , folInverseArgResSortingAxiomSets
   , projectionWitnessSortingAxiomSets
   , functionConnectionAxiomSets
@@ -158,9 +163,11 @@ mkAxiomSets theory = concat
   , individualBoundsAxiomSets
   , propBoundsAxiomSets
   , setBoundsAxiomSets
+  , relBoundsAxiomSets
   , userSortSetBoundsAxiomSets
   , sortOrderAxiomSets
   , productSortOrderAxiomSets
+  , relProductSortOrderAxiomSets
   , userFactAxiomSets
   , implicitMergeAxiomSets
   ]
@@ -231,6 +238,14 @@ mkAxiomSets theory = concat
         , IR.mereoOrigin m == IR.FromSignature
         , IR.sortKind  (IR.mereoSort m) == IR.SortKindFromSignature
         ]
+
+  userRelations =
+    [ r | IR.EntityRelation r <- IR.theoryObjects theory
+        , IR.relOrigin r == IR.FromSignature
+        ]
+
+  relDomMinName r = sanitizeName (IR.sortName (IR.relDomain r)) ++ minSuffix
+  relDomMaxName r = sanitizeName (IR.sortName (IR.relDomain r)) ++ maxSuffix
 
   translationOfFacts =
     [ f | f <- IR.theoryFacts theory
@@ -1145,6 +1160,124 @@ mkAxiomSets theory = concat
              [ LeanAxiom (fN ++ "_dom_upper")   (LImpl uMax (LVar dMx))
              , LeanAxiom (fN ++ "_dom_ordering") (LImpl (LVar dMx) (LVar dMn))
              , LeanAxiom (fN ++ "_dom_lower")   (LImpl (LVar dMn) pMax)
+             ]
+
+  -- -------------------------------------------------------------------------
+  -- R1. Relation product-sort limit declarations: R_dom_Min, R_dom_Max
+  -- (Analogous to productSortLimitAxiomSets for multi-arg FOL functions.)
+  -- -------------------------------------------------------------------------
+  relProductSortLimitAxiomSets :: [AxiomSet]
+  relProductSortLimitAxiomSets = map mkLimits userRelations
+    where
+      mkLimits r =
+        axiomSet [SSet (IR.relName r)] (tags [TagSet, TagDecl])
+          [ LeanAxiom (relDomMinName r) LProp
+          , LeanAxiom (relDomMaxName r) LProp
+          ]
+
+  -- -------------------------------------------------------------------------
+  -- R2. Relation declarations: R : Prop → … → Prop (one arrow per arg sort)
+  -- (Analogous to functionDeclAxiomSets for SOL functions.)
+  -- -------------------------------------------------------------------------
+  relDeclAxiomSets :: [AxiomSet]
+  relDeclAxiomSets = map mkRelDecl userRelations
+    where
+      mkRelDecl r =
+        let arity   = length (IR.relArgSorts r)
+            relType = foldr (\_ acc -> LImpl LProp acc) LProp [1..arity]
+        in axiomSet [SSet (IR.relName r)] (tags [TagSet, TagDecl])
+             [LeanAxiom (IR.relName r) relType]
+
+  -- -------------------------------------------------------------------------
+  -- R3. Relation arg-object declarations: R_1 : Prop, R_2 : Prop, …
+  -- (Analogous to functionArgResultDeclAxiomSets.)
+  -- -------------------------------------------------------------------------
+  relArgObjectDeclAxiomSets :: [AxiomSet]
+  relArgObjectDeclAxiomSets = concatMap mkArgDecls userRelations
+    where
+      mkArgDecls r =
+        [ axiomSet [SSet (IR.relName r), SArgObject k] (tags [TagSet, TagDecl])
+            [LeanAxiom (sanitizeName (IR.mereoName obj)) LProp]
+        | (k, obj) <- zip [1..] (IR.relArgObjects r)
+        ]
+
+  -- -------------------------------------------------------------------------
+  -- R4. Relation argument-object declaration: R_arg : Prop  (product element)
+  -- (Analogous to productArgDeclAxiomSets.)
+  -- -------------------------------------------------------------------------
+  relArgumentDeclAxiomSets :: [AxiomSet]
+  relArgumentDeclAxiomSets = map mkArgDecl userRelations
+    where
+      mkArgDecl r =
+        let argN = sanitizeName (IR.mereoName (IR.relArgument r))
+            dMn  = relDomMinName r
+            dMx  = relDomMaxName r
+        in axiomSet [SSet (IR.relName r)] (tags [TagSet, TagDecl])
+             [ LeanAxiom argN LProp
+             , LeanAxiom (argN ++ minSuffixForAxiomNames)
+                 (LImpl pMin (LImpl (LVar argN) (LVar dMn)))
+             , LeanAxiom (argN ++ maxSuffixForAxiomNames)
+                 (LImpl pMin (LImpl (LVar dMx) (LVar argN)))
+             ]
+
+  -- -------------------------------------------------------------------------
+  -- R5. Relation arg-object sorting axioms: R_k bounded within its sort
+  -- (Analogous to functionArgResultSortingAxiomSets.)
+  -- -------------------------------------------------------------------------
+  relArgObjectSortingAxiomSets :: [AxiomSet]
+  relArgObjectSortingAxiomSets = concatMap mkSorting userRelations
+    where
+      mkSorting r =
+        [ let n       = sanitizeName (IR.mereoName obj)
+              sN      = IR.sortName (IR.mereoSort obj)
+              (lo,hi) = sortBounds sN
+          in axiomSet [SSet (IR.relName r), SArgObject k] (tags [TagSet, TagSorting])
+               [ LeanAxiom (n ++ minSuffixForAxiomNames)
+                   (LImpl pMin (LImpl (LVar n) (LVar lo)))
+               , LeanAxiom (n ++ maxSuffixForAxiomNames)
+                   (LImpl pMin (LImpl (LVar hi) (LVar n)))
+               ]
+        | (k, obj) <- zip [1..] (IR.relArgObjects r)
+        ]
+
+  -- -------------------------------------------------------------------------
+  -- R6. Relation bounds: for all args in range, R(args) is within [ℙ_Min, ℙ_Max].
+  -- A relation R : Prop → … → Prop encodes a subset of the product sort, so its
+  -- values are propositions.  We express this with one bounded-forall per arg.
+  -- -------------------------------------------------------------------------
+  relBoundsAxiomSets :: [AxiomSet]
+  relBoundsAxiomSets = map mkRelBounds userRelations
+    where
+      mkRelBounds r =
+        let n    = IR.relName r
+            args = zip [1..] (IR.relArgSorts r)
+            varNs = [ "X" ++ show k | (k, _) <- args ]
+            app  = LApp (LVar n) (map LVar varNs)
+            body = LBicond (LImpl app pMin) (LImpl pMax app)
+            quantified =
+              foldr (\(varN, srt) acc ->
+                        let sN = IR.sortName srt
+                            (lo, hi) = sortBounds sN
+                        in LBoundedForall varN lo hi acc)
+                    body (zip varNs (map snd args))
+        in axiomSet [SSet n] (tags [TagSet, TagSorting])
+             [LeanAxiom (n ++ "_prop_bounds") quantified]
+
+  -- -------------------------------------------------------------------------
+  -- R7. Relation product-sort ordering axioms
+  -- (Analogous to productSortOrderAxiomSets.)
+  -- -------------------------------------------------------------------------
+  relProductSortOrderAxiomSets :: [AxiomSet]
+  relProductSortOrderAxiomSets = map mkOrder userRelations
+    where
+      mkOrder r =
+        let rN  = IR.relName r
+            dMx = LVar (relDomMaxName r)
+            dMn = LVar (relDomMinName r)
+        in axiomSet [SSet rN] (tags [TagSort, TagSet, TagOrdering])
+             [ LeanAxiom (rN ++ "_dom_upper")    (LImpl uMax dMx)
+             , LeanAxiom (rN ++ "_dom_ordering") (LImpl dMx dMn)
+             , LeanAxiom (rN ++ "_dom_lower")    (LImpl dMn pMax)
              ]
 
   -- -------------------------------------------------------------------------
