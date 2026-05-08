@@ -456,8 +456,9 @@ prettyFact f =
      FactKindMereoOfFact      -> "mereo-fact: "
      FactKindMereoOfAssertion -> "mereo-assertion: "
      FactKindMereoOfMetafact  -> "mereo-metafact: "
-     FactKindSortLimitation   -> "sort limit: "
-     FactKindImplicitMerge    -> "implicit merge: ") ++
+     FactKindSortLimitation        -> "sort limit: "
+     FactKindImplicitMerge         -> "implicit merge: "
+     FactKindImplicitMergeFunction -> "implicit merge (function): ") ++
   "<resolved expression>"
 
 -- ---------------------------------------------------------------------------
@@ -592,8 +593,9 @@ prettyFactDebug f =
         FactKindMereoOfFact      -> "mereo-fact: "
         FactKindMereoOfAssertion -> "mereo-assertion: "
         FactKindMereoOfMetafact  -> "mereo-metafact: "
-        FactKindSortLimitation   -> "sort limit: "
-        FactKindImplicitMerge    -> "implicit merge: "
+        FactKindSortLimitation        -> "sort limit: "
+        FactKindImplicitMerge         -> "implicit merge: "
+        FactKindImplicitMergeFunction -> "implicit merge (function): "
       exprStr = case factMereoExpr f of
         Just me -> show me
         Nothing -> case factPropExpr f of

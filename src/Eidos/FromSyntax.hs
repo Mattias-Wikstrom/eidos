@@ -796,10 +796,18 @@ addMergeEqualityFact th lhsName lhsEntity rhsName rhsEntity =
       disj      = ResolvedDisj conj []
       leftImpl  = ResolvedLeftImpl disj []
       rightImpl = ResolvedRightImpl leftImpl Nothing
+      (kind, mereo) = case lhsEntity of
+        EntityFunction _ ->
+          (factKindImplicitMergeFunction, Nothing)
+        _ ->
+          (factKindImplicitMerge, Just (MAbbrevApp "WrapMetafact"
+            [ MVar "𝕌#min"
+            , MSymDiff (MVar lhsName) (MVar rhsName)
+            ]))
   in addFactToTh th (Fact
-        { factKind      = FactKindImplicitMerge
+        { factKind      = kind
         , factPropExpr  = Just (ResolvedPropBicond rightImpl [])
-        , factMereoExpr = Nothing
+        , factMereoExpr = mereo
         , factFreeVars  = []
         })
 

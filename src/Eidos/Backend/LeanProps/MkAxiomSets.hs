@@ -267,7 +267,7 @@ mkAxiomSets theory = concat
 
   implicitMergeFacts =
     [ f | f <- IR.theoryFacts theory
-        , IR.factKind f == IR.FactKindImplicitMerge
+        , IR.factCategory (IR.factKind f) == IR.FCImplicitMerge
         ]
 
   -- -------------------------------------------------------------------------
@@ -1307,89 +1307,72 @@ mkAxiomSets theory = concat
     where
       mkMergeAS :: IR.Fact -> [AxiomSet]
       mkMergeAS fact = extractMergeAxioms (fromJust (IR.factPropExpr fact))
+        where
+          -- Walk the IR expression tree to extract lhsName and rhsName (for
+          -- the axiom name), then emit the axiom using the pre-built
+          -- factMereoExpr (non-functions) or a plain LEq (functions).
+          -- The function/non-function distinction is encoded in factSubkind,
+          -- which was set at fact-creation time.
+          extractMergeAxioms :: IR.ResolvedPropExpr -> [AxiomSet]
+          extractMergeAxioms (IR.ResolvedPropBicond left []) = extractFromRightImpl left
+          extractMergeAxioms _ = []
 
-      -- Walk the IR expression tree to find the LHS entity and the RHS name.
-      -- Merge facts have the shape  lhs = rhs  at the top level, with no
-      -- quantifiers and no connectives beyond what wraps the equality.
-      extractMergeAxioms :: IR.ResolvedPropExpr -> [AxiomSet]
-      extractMergeAxioms (IR.ResolvedPropBicond left []) =
-        extractFromRightImpl left
-      extractMergeAxioms _ = []
+          extractFromRightImpl :: IR.ResolvedRightImpl -> [AxiomSet]
+          extractFromRightImpl (IR.ResolvedRightImpl leftImpl Nothing) = extractFromLeftImpl leftImpl
+          extractFromRightImpl _ = []
 
-      extractFromRightImpl :: IR.ResolvedRightImpl -> [AxiomSet]
-      extractFromRightImpl (IR.ResolvedRightImpl leftImpl Nothing) =
-        extractFromLeftImpl leftImpl
-      extractFromRightImpl _ = []
+          extractFromLeftImpl :: IR.ResolvedLeftImpl -> [AxiomSet]
+          extractFromLeftImpl (IR.ResolvedLeftImpl disj []) = extractFromDisj disj
+          extractFromLeftImpl _ = []
 
-      extractFromLeftImpl :: IR.ResolvedLeftImpl -> [AxiomSet]
-      extractFromLeftImpl (IR.ResolvedLeftImpl disj []) =
-        extractFromDisj disj
-      extractFromLeftImpl _ = []
+          extractFromDisj :: IR.ResolvedDisj -> [AxiomSet]
+          extractFromDisj (IR.ResolvedDisj conj []) = extractFromConj conj
+          extractFromDisj _ = []
 
-      extractFromDisj :: IR.ResolvedDisj -> [AxiomSet]
-      extractFromDisj (IR.ResolvedDisj conj []) =
-        extractFromConj conj
-      extractFromDisj _ = []
+          extractFromConj :: IR.ResolvedConj -> [AxiomSet]
+          extractFromConj (IR.ResolvedConj neg []) = extractFromNeg neg
+          extractFromConj _ = []
 
-      extractFromConj :: IR.ResolvedConj -> [AxiomSet]
-      extractFromConj (IR.ResolvedConj neg []) =
-        extractFromNeg neg
-      extractFromConj _ = []
+          extractFromNeg :: IR.ResolvedNeg -> [AxiomSet]
+          extractFromNeg (IR.ResolvedNegChild quant) = extractFromQuantified quant
+          extractFromNeg _ = []
 
-      extractFromNeg :: IR.ResolvedNeg -> [AxiomSet]
-      extractFromNeg (IR.ResolvedNegChild quant) =
-        extractFromQuantified quant
-      extractFromNeg _ = []
+          extractFromQuantified :: IR.ResolvedQuantified -> [AxiomSet]
+          extractFromQuantified (IR.ResolvedQuantified [] atomic) = extractFromAtomic atomic
+          extractFromQuantified _ = []
 
-      extractFromQuantified :: IR.ResolvedQuantified -> [AxiomSet]
-      extractFromQuantified (IR.ResolvedQuantified [] atomic) =
-        extractFromAtomic atomic
-      extractFromQuantified _ = []
+          extractFromAtomic :: IR.ResolvedAtomicProp -> [AxiomSet]
+          extractFromAtomic (IR.ResolvedAtomicTermPair tp) = extractFromTermPair tp
+          extractFromAtomic _ = []
 
-      extractFromAtomic :: IR.ResolvedAtomicProp -> [AxiomSet]
-      extractFromAtomic (IR.ResolvedAtomicTermPair tp) =
-        extractFromTermPair tp
-      extractFromAtomic _ = []
-
-      extractFromTermPair :: IR.ResolvedTermPair -> [AxiomSet]
-      extractFromTermPair (IR.ResolvedTermPair lhs rights _) =
-        case rights of
-          [rfbt] | IR.resolvedRFTOp rfbt == "=" ->
-            case (getEntityFromTerm lhs, getTermName lhs, getTermName (IR.resolvedRFTRight rfbt)) of
-              (Just entity, Just lName, Just rName) ->
-                classifyAndEmit entity lName rName
+          extractFromTermPair :: IR.ResolvedTermPair -> [AxiomSet]
+          extractFromTermPair (IR.ResolvedTermPair lhs rights _) =
+            case rights of
+              [rfbt] | IR.resolvedRFTOp rfbt == "=" ->
+                case (getTermName lhs, getTermName (IR.resolvedRFTRight rfbt)) of
+                  (Just lName, Just rName) -> emitMergeAxiom lName rName
+                  _ -> []
               _ -> []
-          _ -> []
 
-      getEntityFromTerm :: IR.ResolvedTerm -> Maybe IR.Entity
-      getEntityFromTerm (IR.ResolvedTerm (IR.ResolvedFactor (IR.ResolvedBTAtomic ref) [] _) [] _) =
-        Just (IR.resolvedConstEntity ref)
-      getEntityFromTerm _ = Nothing
+          getTermName :: IR.ResolvedTerm -> Maybe String
+          getTermName (IR.ResolvedTerm (IR.ResolvedFactor (IR.ResolvedBTAtomic ref) [] _) [] _) =
+            Just (resolveConstRef ref)
+          getTermName _ = Nothing
 
-      getTermName :: IR.ResolvedTerm -> Maybe String
-      getTermName (IR.ResolvedTerm (IR.ResolvedFactor (IR.ResolvedBTAtomic ref) [] _) [] _) =
-        Just (resolveConstRef ref)
-      getTermName _ = Nothing
-
-      classifyAndEmit :: IR.Entity -> String -> String -> [AxiomSet]
-      classifyAndEmit entity lhsName rhsName =
-        let axName = mergeAxiomName lhsName rhsName
-        in case entity of
-          IR.EntityFunction _ ->
-            -- Functions: plain equality, no wrapper (↔ would be a type error)
-            [ axiomSet [SGlobal] (tags [TagImplicitMerge])
-                [LeanAxiom axName (LEq (LVar lhsName) (LVar rhsName))]
-            ]
-          _ ->
-            -- Sort bounds, individuals, propositions, mereological objects:
-            -- build a WrapMetafact MereoExpr and translate via the central renderer.
-            let mereoExpr = IR.MAbbrevApp "WrapMetafact"
-                              [ IR.MVar "𝕌#min"
-                              , IR.MSymDiff (IR.MVar lhsName) (IR.MVar rhsName)
-                              ]
-            in [ axiomSet [SGlobal] (tags [TagImplicitMerge])
-                   [LeanAxiom axName (mereoExprToLean mereoExpr)]
-               ]
+          emitMergeAxiom :: String -> String -> [AxiomSet]
+          emitMergeAxiom lhsName rhsName =
+            let axName = mergeAxiomName lhsName rhsName
+            in case IR.factSubkind (IR.factKind fact) of
+              IR.FSImplicitMergeFunction ->
+                -- Functions: plain equality (↔ would be a type error for non-Prop types)
+                [ axiomSet [SGlobal] (tags [TagImplicitMerge])
+                    [LeanAxiom axName (LEq (LVar lhsName) (LVar rhsName))]
+                ]
+              _ ->
+                -- Non-functions: translate the pre-built WrapMetafact MereoExpr
+                [ axiomSet [SGlobal] (tags [TagImplicitMerge])
+                    [LeanAxiom axName (mereoExprToLean (fromJust (IR.factMereoExpr fact)))]
+                ]
 
       -- | Build a unique Lean-safe axiom name from the LHS entity name and the
       -- RHS qualified name.  Form: @<safeLhs>_from_<subtheory>@, where

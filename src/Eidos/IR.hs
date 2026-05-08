@@ -70,6 +70,7 @@ data FactSubkind
   | FSTranslationOfMetafact
   | FSSortLimitation
   | FSImplicitMerge
+  | FSImplicitMergeFunction
   deriving (Show, Eq)
 
 data FactKind = FactKind
@@ -91,9 +92,10 @@ factKindMereoOfAssertion = FactKind FCMereologicalTranslation FSTranslationOfAss
 factKindMereoOfMetafact  = FactKind FCMereologicalTranslation FSTranslationOfMetafact
 
 -- Smart constructors for structural facts
-factKindSortLimitation, factKindImplicitMerge :: FactKind
-factKindSortLimitation = FactKind FCSortStructure FSSortLimitation
-factKindImplicitMerge  = FactKind FCImplicitMerge FSImplicitMerge
+factKindSortLimitation, factKindImplicitMerge, factKindImplicitMergeFunction :: FactKind
+factKindSortLimitation        = FactKind FCSortStructure FSSortLimitation
+factKindImplicitMerge         = FactKind FCImplicitMerge FSImplicitMerge
+factKindImplicitMergeFunction = FactKind FCImplicitMerge FSImplicitMergeFunction
 
 -- Pattern synonyms for backward compatibility and exhaustive matching
 pattern FactKindFact :: FactKind
@@ -120,9 +122,12 @@ pattern FactKindSortLimitation = FactKind FCSortStructure FSSortLimitation
 pattern FactKindImplicitMerge :: FactKind
 pattern FactKindImplicitMerge = FactKind FCImplicitMerge FSImplicitMerge
 
+pattern FactKindImplicitMergeFunction :: FactKind
+pattern FactKindImplicitMergeFunction = FactKind FCImplicitMerge FSImplicitMergeFunction
+
 {-# COMPLETE FactKindFact, FactKindAssertion, FactKindMetafactsFact,
              FactKindMereoOfFact, FactKindMereoOfAssertion, FactKindMereoOfMetafact,
-             FactKindSortLimitation, FactKindImplicitMerge #-}
+             FactKindSortLimitation, FactKindImplicitMerge, FactKindImplicitMergeFunction #-}
 
 -- ---------------------------------------------------------------------------
 -- Mereological expression type
