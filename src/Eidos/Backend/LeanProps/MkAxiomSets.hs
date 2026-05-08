@@ -1241,27 +1241,30 @@ mkAxiomSets theory = concat
         ]
 
   -- -------------------------------------------------------------------------
-  -- R6. Relation bounds: for all args in range, R(args) is within [ℙ_Min, ℙ_Max].
-  -- A relation R : Prop → … → Prop encodes a subset of the product sort, so its
-  -- values are propositions.  We express this with one bounded-forall per arg.
+  -- R6. Relation bounds: for all args in range, R(args) lies within
+  --     [dom_Max, dom_Min] — mirroring the unary-set bound pattern.
+  --   R_min : ∀ xs ∈ range, R(xs) → dom_Min
+  --   R_max : ∀ xs ∈ range, dom_Max → R(xs)
   -- -------------------------------------------------------------------------
   relBoundsAxiomSets :: [AxiomSet]
   relBoundsAxiomSets = map mkRelBounds userRelations
     where
       mkRelBounds r =
-        let n    = IR.relName r
-            args = zip [1..] (IR.relArgSorts r)
+        let n     = IR.relName r
+            args  = zip [1..] (IR.relArgSorts r)
             varNs = [ "X" ++ show k | (k, _) <- args ]
-            app  = LApp (LVar n) (map LVar varNs)
-            body = LBicond (LImpl app pMin) (LImpl pMax app)
-            quantified =
+            app   = LApp (LVar n) (map LVar varNs)
+            dMin  = LVar (relDomMinName r)
+            dMax  = LVar (relDomMaxName r)
+            quantify body =
               foldr (\(varN, srt) acc ->
-                        let sN = IR.sortName srt
-                            (lo, hi) = sortBounds sN
+                        let (lo, hi) = sortBounds (IR.sortName srt)
                         in LBoundedForall varN lo hi acc)
                     body (zip varNs (map snd args))
         in axiomSet [SSet n] (tags [TagSet, TagSorting])
-             [LeanAxiom (n ++ "_prop_bounds") quantified]
+             [ LeanAxiom (n ++ minSuffixForAxiomNames) (quantify (LImpl app dMin))
+             , LeanAxiom (n ++ maxSuffixForAxiomNames) (quantify (LImpl dMax app))
+             ]
 
   -- -------------------------------------------------------------------------
   -- R7. Relation product-sort ordering axioms
