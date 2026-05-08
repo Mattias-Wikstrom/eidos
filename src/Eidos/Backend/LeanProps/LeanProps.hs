@@ -92,8 +92,8 @@ renderAxiomSetsToDecls opts = concatMap renderOne
                     else rewritten
       in ax { axiomType = wrapped }
 
-    -- NOTE: temporary backend-side policy: sorting axioms are emitted as
-    -- WrapMetafact applications whenever they are parameterized by ℙ_Min.
+    -- NOTE: temporary backend-side policy: for sorting axioms of the form
+    -- (ℙ_Min → body), emit WrapMetafact ℙ_Min body.
     wrapSortingAsMetafact (LImpl (LVar p) body)
       | p == pMinName = LApp (LVar "WrapMetafact") [LVar pMinName, body]
     wrapSortingAsMetafact x = x
