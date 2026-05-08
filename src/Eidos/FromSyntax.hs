@@ -928,7 +928,8 @@ mereologicalTranslation th fact = case factKind fact of
     [ fact { factIsMereologicalTranslation = True
            , factPropExpr = translatePropExpr th (factPropExpr fact) } ]
   FactKindFact ->
-    [ fact { factIsMereologicalTranslation = True } ]
+    [ fact { factIsMereologicalTranslation = True
+           , factPropExpr = translatePropExpr th (factPropExpr fact) } ]
   _ -> []
 
 translatePropExpr :: Theory -> ResolvedPropExpr -> ResolvedPropExpr
