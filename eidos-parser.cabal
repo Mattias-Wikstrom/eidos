@@ -31,7 +31,7 @@ library
                     , Eidos.Backend.LeanProps.MkAxiomSets
                     , Eidos.SortBounds
                     , Eidos.Pipeline
-    , Eidos.FunctionFacts
+                    , Eidos.FunctionFacts
                     , Eidos.Resolution.BuildMonad
                     , Eidos.Wasm.Wasm
     hs-source-dirs:   src
