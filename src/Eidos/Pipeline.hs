@@ -15,6 +15,7 @@ module Eidos.Pipeline
 
 import qualified Eidos.IR as IR
 import qualified Eidos.SortBounds as SB
+import qualified Eidos.FunctionFacts as FF
 
 -- ---------------------------------------------------------------------------
 -- Options
@@ -43,20 +44,22 @@ defaultPipelineOptions = PipelineOptions
 -- the pipeline-level transformations (sort-bound computation, future passes)
 -- are performed exactly once, outside the backend.
 data PreparedTheory = PreparedTheory
-  { ptOptions    :: PipelineOptions
-  , ptTheory     :: IR.Theory
-  , ptSortBounds :: [SB.SortBoundEntry]
-  , ptSortOrder  :: [SB.SortOrderEntry]
+  { ptOptions       :: PipelineOptions
+  , ptTheory        :: IR.Theory
+  , ptSortBounds    :: [SB.SortBoundEntry]
+  , ptSortOrder     :: [SB.SortOrderEntry]
+  , ptFunctionFacts :: [FF.FunctionFactEntry]
   } deriving (Show)
 
 -- | Run all pipeline-level passes for one theory.
 -- Call this once per theory (including each subtheory).
 prepareTheory :: PipelineOptions -> IR.Theory -> PreparedTheory
 prepareTheory opts theory = PreparedTheory
-  { ptOptions    = opts
-  , ptTheory     = theory
-  , ptSortBounds = SB.theorySortBoundEntries sbOpts theory
-  , ptSortOrder  = SB.theorySortOrderEntries theory
+  { ptOptions       = opts
+  , ptTheory        = theory
+  , ptSortBounds    = SB.theorySortBoundEntries sbOpts theory
+  , ptSortOrder     = SB.theorySortOrderEntries theory
+  , ptFunctionFacts = FF.theoryFunctionFactEntries theory
   }
   where
     sbOpts = SB.SortBoundOptions { SB.sboCollapse = pipeCollapseSortBounds opts }

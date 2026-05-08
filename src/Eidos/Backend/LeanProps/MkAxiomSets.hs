@@ -19,6 +19,7 @@ import           Data.Maybe (fromJust)
 import qualified Eidos.IR as IR
 import qualified Eidos.Pipeline as PL
 import qualified Eidos.SortBounds as SB
+import qualified Eidos.FunctionFacts as FF
 import Eidos.Backend.LeanProps.LeanExpr
 import Eidos.Backend.LeanProps.LeanAxiomSet
 
@@ -137,23 +138,9 @@ mkAxiomSets pt = concat
   , mereoDeclAxiomSets
   , propDeclAxiomSets
   , setDeclAxiomSets
-  , functionConnectionAxiomSets
-  , folInverseConnectionAxiomSets
-  , dirImgConnectionAxiomSets
-  , invImgConnectionAxiomSets
-  , folAdjunctionAxiomSets
-  , imageAdjunctionAxiomSets
-  , decompositionAxiomSets
-  , tupleFact_AxiomSets
-  , projectionConnectionAxiomSets
-  , projectionAdjunctionAxiomSets
-  , tupleInvDecompAxiomSets
-  , irTupleProjAxiomSets
-  , irProjFromTupleAxiomSets
-  , irSeparatesAxiomSets
+  , functionFactAxiomSets
   , individualDeclAxiomSets
   , sortBoundAxiomSets
-  , relBoundsAxiomSets
   , sortOrderAxiomSets
   , userFactAxiomSets
   , implicitMergeAxiomSets
@@ -542,359 +529,42 @@ mkAxiomSets pt = concat
     SB.SBCRelationObj rn               -> ([SSet rn], [TagSet, TagSorting])
 
   -- -------------------------------------------------------------------------
-  -- 22. Function connection axioms (f_fact, g_fact, etc.)
+  -- 22-35 + R6. Function connection, adjunction, decomposition, IR, and
+  -- relation-bound axioms.
+  -- Delegates entirely to Eidos.FunctionFacts which owns all the semantic
+  -- logic.  MAbbrevApp covers function application; MBoundedSum provides
+  -- bounded quantification (renders as IsWithinBounds-guarded ∀).
   -- -------------------------------------------------------------------------
-  functionConnectionAxiomSets :: [AxiomSet]
-  functionConnectionAxiomSets =
-    concatMap mkConn (solFunctions ++ userDeclaredFolFunctions)
-    where
-      mkConn f =
-        [ axiomSet [SFunction (IR.funcName f)]
-                   (tags [TagFunction, TagConnection])
-            [mkConnectionAxiom f]
-        ]
-      mkConnectionAxiom f =
-        let fName    = IR.funcName f
-            argObjs  = IR.funcArgObjects f
-            resObj   = IR.funcResObject f
-            argCount = length argObjs
-            argVarNames = ["X" ++ show i | i <- [1..argCount]]
-            resVarName  = "X" ++ show (argCount + 1)
-            argEqs = [ LEq (LVar varN) (LVar (sanitizeName (IR.mereoName obj)))
-                     | (varN, obj) <- zip argVarNames argObjs ]
-            resEq  = LEq (LVar resVarName)
-                         (LVar (sanitizeName (IR.mereoName resObj)))
-            lhsConj = case argEqs of
-              []     -> resEq
-              (e:es) -> foldl LConj e (es ++ [resEq])
-            funcApp = LApp (LVar fName) (map LVar argVarNames)
-            rhsEq   = LEq (LVar resVarName) funcApp
-            body    = LBicond lhsConj rhsEq
-            sortOf obj = IR.sortName (IR.mereoSort obj)
-            mkBQ varN sN = bForall varN (fst (sortBounds sN)) (snd (sortBounds sN))
-            quantified  =
-              foldr (\(varN, obj) acc -> mkBQ varN (sortOf obj) acc)
-                    (mkBQ resVarName (sortOf resObj) body)
-                    (zip argVarNames argObjs)
-        in LeanAxiom (fName ++ "_fact") quantified
+  functionFactAxiomSets :: [AxiomSet]
+  functionFactAxiomSets = map functionFactToAxiomSet (PL.ptFunctionFacts pt)
+
+  functionFactToAxiomSet :: FF.FunctionFactEntry -> AxiomSet
+  functionFactToAxiomSet entry =
+    let (path, tgs) = factContextToPathAndTags (FF.ffeContext entry)
+    in axiomSet path (tags tgs)
+         (map (\(nm, expr) -> LeanAxiom nm (mereoExprToLean expr)) (FF.ffeAxioms entry))
+
+  factContextToPathAndTags :: FF.FunctionFactContext -> ([SubjectNode], [Tag])
+  factContextToPathAndTags ctx = case ctx of
+    FF.FFCFunctionConnection fn        -> ([SFunction fn],                      [TagFunction, TagConnection])
+    FF.FFCInverseConnection  fn        -> ([SFunction fn, SInverse],            [TagFunction, TagFOLFunction, TagInverse, TagConnection])
+    FF.FFCDirImageConnection fn        -> ([SFunction fn, SImage],              [TagFunction, TagFOLFunction, TagImage,   TagConnection])
+    FF.FFCInvImageConnection fn        -> ([SFunction fn, SImage],              [TagFunction, TagFOLFunction, TagImage,   TagConnection])
+    FF.FFCInverseAdjunction  fn        -> ([SFunction fn, SInverse],            [TagFunction, TagFOLFunction, TagInverse, TagAdjunction])
+    FF.FFCImageAdjunction    fn        -> ([SFunction fn, SImage],              [TagFunction, TagFOLFunction, TagImage,   TagAdjunction])
+    FF.FFCDecomposition      fn        -> ([SFunction fn],                      [TagFunction, TagFOLFunction, TagDecomposition])
+    FF.FFCTupleConnection    fn        -> ([SFunction fn, STuple],              [TagFunction, TagFOLFunction, TagTuple,   TagConnection])
+    FF.FFCProjectionConnection  fn k   -> ([SFunction fn, SProjection k],       [TagFunction, TagFOLFunction, TagProjection, TagConnection])
+    FF.FFCProjectionAdjunction  fn k   -> ([SFunction fn, SProjection k, SInverse], [TagFunction, TagFOLFunction, TagProjection, TagInverse, TagAdjunction])
+    FF.FFCTupleInvDecomposition fn     -> ([SFunction fn, STuple],              [TagFunction, TagFOLFunction, TagTuple,   TagInvDecomposition])
+    FF.FFCIRTupleWithProjections fn    -> ([SFunction fn, SIR],                 [TagFunction, TagFOLFunction, TagIR, TagIRTupleProj])
+    FF.FFCIRProjectionsFromTuple fn    -> ([SFunction fn, SIR],                 [TagFunction, TagFOLFunction, TagIR, TagIRProjFromTuple])
+    FF.FFCIRSeparates           fn     -> ([SFunction fn, SIR],                 [TagFunction, TagFOLFunction, TagIR, TagIRSeparates])
+    FF.FFCRelBounds             rn     -> ([SSet rn],                           [TagSet, TagSorting])
+
+  -- Sections 22-35 and R6 are now handled by functionFactAxiomSets above.
 
   -- -------------------------------------------------------------------------
-  -- 23. FOL inverse connection axioms
-  -- -------------------------------------------------------------------------
-  folInverseConnectionAxiomSets :: [AxiomSet]
-  folInverseConnectionAxiomSets = map mkInvConn folSingleArgFunctions
-    where
-      mkInvConn f =
-        axiomSet [SFunction (IR.funcName f), SInverse]
-                 (tags [TagFunction, TagFOLFunction, TagInverse, TagConnection])
-          [mkInvConnectionAxiom f]
-      mkInvConnectionAxiom f =
-        let fInv    = invName f
-            argSort = IR.sortName (head (IR.funcArgSorts f))
-            resSort = IR.sortName (IR.funcResSort f)
-            n1      = fInv ++ "_1"
-            nr      = fInv ++ "_res"
-            lhs     = LConj (LEq (LVar "X1") (LVar n1))
-                            (LEq (LVar "X2") (LVar nr))
-            rhs     = LEq (LVar "X2") (LApp (LVar fInv) [LVar "X1"])
-            body    = LBicond lhs rhs
-            q2      = bForall "X2" (sortMinName argSort) (sortMaxName argSort) body
-            q1      = bForall "X1" (sortMinName resSort) (sortMaxName resSort) q2
-        in LeanAxiom (fInv ++ "_fact") q1
-
-  -- -------------------------------------------------------------------------
-  -- 24. Direct image connection axioms
-  -- -------------------------------------------------------------------------
-  dirImgConnectionAxiomSets :: [AxiomSet]
-  dirImgConnectionAxiomSets = concatMap mkDirImgConn multiArgFolFunctions
-    where
-      mkDirImgConn f =
-        case IR.funcArgument f of
-          Nothing  -> []
-          Just arg ->
-            let dMn  = domMinName f
-                dMx  = domMaxName f
-                rSN  = IR.sortName (IR.funcResSort f)
-                argN = sanitizeName (IR.mereoName arg)
-                resN = sanitizeName (IR.mereoName (IR.funcResObject f))
-                lhs  = LConj (LEq (LVar "A") (LVar argN))
-                             (LEq (LVar "B") (LVar resN))
-                rhs  = LEq (LVar "B") (LApp (LVar (dirImgName f)) [LVar "A"])
-                body = LBicond lhs rhs
-                qB   = bForall "B" (sortMinName rSN) (sortMaxName rSN) body
-                qA   = bForall "A" dMn dMx qB
-            in [ axiomSet [SFunction (IR.funcName f), SImage]
-                          (tags [TagFunction, TagFOLFunction, TagImage, TagConnection])
-                   [LeanAxiom (dirImgName f ++ "_fact") qA]
-               ]
-
-  -- -------------------------------------------------------------------------
-  -- 25. Inverse image connection axioms
-  -- -------------------------------------------------------------------------
-  invImgConnectionAxiomSets :: [AxiomSet]
-  invImgConnectionAxiomSets = map mkInvImgConn multiArgFolFunctions
-    where
-      mkInvImgConn f =
-        let fN   = invImgName f
-            argN = fN ++ "_arg"
-            resN = fN ++ "_res"
-            rSN  = IR.sortName (IR.funcResSort f)
-            dMn  = domMinName f
-            dMx  = domMaxName f
-            lhs  = LConj (LEq (LVar "A") (LVar argN))
-                         (LEq (LVar "B") (LVar resN))
-            rhs  = LEq (LVar "B") (LApp (LVar fN) [LVar "A"])
-            body = LBicond lhs rhs
-            qB   = bForall "B" dMn dMx body
-            qA   = bForall "A" (sortMinName rSN) (sortMaxName rSN) qB
-        in axiomSet [SFunction (IR.funcName f), SImage]
-                    (tags [TagFunction, TagFOLFunction, TagImage, TagConnection])
-             [LeanAxiom (fN ++ "_fact") qA]
-
-  -- -------------------------------------------------------------------------
-  -- 26. FOL adjunction axioms
-  -- -------------------------------------------------------------------------
-  folAdjunctionAxiomSets :: [AxiomSet]
-  folAdjunctionAxiomSets = map mkAdj folSingleArgFunctions
-    where
-      mkAdj f =
-        let fN      = IR.funcName f
-            argSort = IR.sortName (head (IR.funcArgSorts f))
-            resSort = IR.sortName (IR.funcResSort f)
-            fX      = LApp (LVar fN) [LVar "X"]
-            fInvY   = LApp (LVar (invName f)) [LVar "Y"]
-            lhs     = LImpl (LVar "Y") fX
-            rhs     = LImpl fInvY (LVar "X")
-            body    = LBicond lhs rhs
-            qY      = bForall "Y" (sortMinName resSort) (sortMaxName resSort) body
-            qX      = bForall "X" (sortMinName argSort) (sortMaxName argSort) qY
-        in axiomSet [SFunction fN, SInverse]
-                    (tags [TagFunction, TagFOLFunction, TagInverse, TagAdjunction])
-             [LeanAxiom (fN ++ "_adjunction") qX]
-
-  -- -------------------------------------------------------------------------
-  -- 27. Image adjunction axioms
-  -- -------------------------------------------------------------------------
-  imageAdjunctionAxiomSets :: [AxiomSet]
-  imageAdjunctionAxiomSets = map mkAdj multiArgFolFunctions
-    where
-      mkAdj f =
-        let dMn  = domMinName f
-            dMx  = domMaxName f
-            rSN  = IR.sortName (IR.funcResSort f)
-            dirX = LApp (LVar (dirImgName f)) [LVar "X"]
-            invY = LApp (LVar (invImgName f)) [LVar "Y"]
-            lhs  = LImpl (LVar "Y") dirX
-            rhs  = LImpl invY (LVar "X")
-            body = LBicond lhs rhs
-            qY   = bForall "Y" (sortMinName rSN) (sortMaxName rSN) body
-            qX   = bForall "X" dMn dMx qY
-        in axiomSet [SFunction (IR.funcName f), SImage]
-                    (tags [TagFunction, TagFOLFunction, TagImage, TagAdjunction])
-             [LeanAxiom (IR.funcName f ++ "_image_adjunction") qX]
-
-  -- -------------------------------------------------------------------------
-  -- 28. Decomposition axioms: f = f_dir_img ∘ f_tuple
-  -- -------------------------------------------------------------------------
-  decompositionAxiomSets :: [AxiomSet]
-  decompositionAxiomSets = map mkDecomp multiArgFolFunctions
-    where
-      mkDecomp f =
-        let fN      = IR.funcName f
-            argSNs  = map IR.sortName (IR.funcArgSorts f)
-            varNs   = ["X" ++ show i | i <- [1..length argSNs]]
-            tupleApp = LApp (LVar (tupleName f)) (map LVar varNs)
-            dirApp   = LApp (LVar (dirImgName f)) [tupleApp]
-            fApp     = LApp (LVar fN) (map LVar varNs)
-            body     = LEq fApp dirApp
-            quantified =
-              foldr (\(varN, sN) acc ->
-                        bForall varN (sortMinName sN) (sortMaxName sN) acc)
-                    body (zip varNs argSNs)
-        in axiomSet [SFunction fN]
-                    (tags [TagFunction, TagFOLFunction, TagDecomposition])
-             [LeanAxiom (fN ++ "_decomposition") quantified]
-
-  -- -------------------------------------------------------------------------
-  -- 29. Tuple connection axioms: f_tuple_fact
-  -- -------------------------------------------------------------------------
-  tupleFact_AxiomSets :: [AxiomSet]
-  tupleFact_AxiomSets = concatMap mkTupleFact multiArgFolFunctions
-    where
-      mkTupleFact f =
-        case IR.funcArgument f of
-          Nothing  -> []
-          Just arg ->
-            let argObjs  = IR.funcArgObjects f
-                argSorts = IR.funcArgSorts f
-                arity    = length argObjs
-                argVars  = ["X" ++ show i | i <- [1..arity]]
-                resVar   = "X" ++ show (arity + 1)
-                dMn      = domMinName f
-                dMx      = domMaxName f
-                argN     = sanitizeName (IR.mereoName arg)
-                argEqs   = [ LEq (LVar xi) (LVar (sanitizeName (IR.mereoName obj)))
-                           | (xi, obj) <- zip argVars argObjs ]
-                resEq    = LEq (LVar resVar) (LVar argN)
-                lhsConj  = case argEqs of
-                  []     -> resEq
-                  (e:es) -> foldl LConj e (es ++ [resEq])
-                tupleApp = LApp (LVar (tupleName f)) (map LVar argVars)
-                rhsEq    = LEq (LVar resVar) tupleApp
-                body     = LBicond lhsConj rhsEq
-                mkArgQ (varN, sN) acc =
-                  bForall varN (sortMinName sN) (sortMaxName sN) acc
-                resQ acc = bForall resVar dMn dMx acc
-                quantified =
-                  foldr mkArgQ (resQ body) (zip argVars (map IR.sortName argSorts))
-            in [ axiomSet [SFunction (IR.funcName f), STuple]
-                          (tags [TagFunction, TagFOLFunction, TagTuple, TagConnection])
-                   [LeanAxiom (tupleName f ++ "_fact") quantified]
-               ]
-
-  -- -------------------------------------------------------------------------
-  -- 30. Projection connection axioms: f_pi_k_fact
-  -- -------------------------------------------------------------------------
-  projectionConnectionAxiomSets :: [AxiomSet]
-  projectionConnectionAxiomSets = concatMap mkProjConn multiArgFolFunctions
-    where
-      mkProjConn f =
-        let dMn = domMinName f
-            dMx = domMaxName f
-        in [ mkOne dMn dMx k srt
-           | (k, srt) <- zip [1..] (IR.funcArgSorts f) ]
-        where
-          mkOne dMn dMx k srt =
-            let n1   = piName f k ++ "_1"
-                nr   = piName f k ++ "_res"
-                sN   = IR.sortName srt
-                lhs  = LConj (LEq (LVar "X1") (LVar n1))
-                             (LEq (LVar "X2") (LVar nr))
-                rhs  = LEq (LVar "X2") (LApp (LVar (piName f k)) [LVar "X1"])
-                body = LBicond lhs rhs
-                qX2  = bForall "X2" (sortMinName sN) (sortMaxName sN) body
-                qX1  = bForall "X1" dMn dMx qX2
-            in axiomSet [SFunction (IR.funcName f), SProjection k]
-                        (tags [TagFunction, TagFOLFunction, TagProjection, TagConnection])
-                 [LeanAxiom (piName f k ++ "_fact") qX1]
-
-  -- -------------------------------------------------------------------------
-  -- 31. Projection adjunction axioms: f_pi_k_adjunction
-  -- -------------------------------------------------------------------------
-  projectionAdjunctionAxiomSets :: [AxiomSet]
-  projectionAdjunctionAxiomSets = concatMap mkProjAdj multiArgFolFunctions
-    where
-      mkProjAdj f =
-        [ mkOneAdj f k srt
-        | (k, srt) <- zip [1..] (IR.funcArgSorts f) ]
-        where
-          mkOneAdj f k srt =
-            let dMn    = domMinName f
-                dMx    = domMaxName f
-                sN     = IR.sortName srt
-                piN    = piName f k
-                piInvN = piInvName f k
-                piX    = LApp (LVar piN) [LVar "X"]
-                piInvY = LApp (LVar piInvN) [LVar "Y"]
-                lhs    = LImpl (LVar "Y") piX
-                rhs    = LImpl piInvY (LVar "X")
-                body   = LBicond lhs rhs
-                qY     = bForall "Y" (sortMinName sN) (sortMaxName sN) body
-                qX     = bForall "X" dMn dMx qY
-            in axiomSet [SFunction (IR.funcName f), SProjection k, SInverse]
-                        (tags [TagFunction, TagFOLFunction, TagProjection, TagInverse, TagAdjunction])
-                 [LeanAxiom (piN ++ "_adjunction") qX]
-
-  -- -------------------------------------------------------------------------
-  -- 32. Tuple inverse decomposition: f_tuple = f_pi_1_inv ∩ f_pi_2_inv ∩ ...
-  -- -------------------------------------------------------------------------
-  tupleInvDecompAxiomSets :: [AxiomSet]
-  tupleInvDecompAxiomSets = map mkTupleInvDecomp multiArgFolFunctions
-    where
-      mkTupleInvDecomp f =
-        let argSNs   = map IR.sortName (IR.funcArgSorts f)
-            arity    = length argSNs
-            varNs    = ["X" ++ show i | i <- [1..arity]]
-            tupleApp = LApp (LVar (tupleName f)) (map LVar varNs)
-            invApps  = [ LApp (LVar (piInvName f k)) [LVar xk]
-                       | (k, xk) <- zip [1..] varNs ]
-            meetExpr = foldl1 LConj invApps
-            body     = LEq tupleApp meetExpr
-            quantified =
-              foldr (\(varN, sN) acc ->
-                        bForall varN (sortMinName sN) (sortMaxName sN) acc)
-                    body (zip varNs argSNs)
-        in axiomSet [SFunction (IR.funcName f), STuple]
-                    (tags [TagFunction, TagFOLFunction, TagTuple, TagInvDecomposition])
-             [LeanAxiom (tupleName f ++ "_inv_decomposition") quantified]
-
-  -- -------------------------------------------------------------------------
-  -- 33. IR tuple-with-projections axioms
-  -- -------------------------------------------------------------------------
-  irTupleProjAxiomSets :: [AxiomSet]
-  irTupleProjAxiomSets = map mkIRTuple multiArgFolFunctions
-    where
-      mkIRTuple f =
-        let dMn     = domMinName f
-            dMx     = domMaxName f
-            irN     = irPredicateName f
-            arity   = length (IR.funcArgSorts f)
-            piApps  = [LApp (LVar (piName f k)) [LVar "Z"] | k <- [1..arity]]
-            tupleApp = LApp (LVar (tupleName f)) piApps
-            irZ     = LApp (LVar irN) [LVar "Z"]
-            body    = LBicond irZ (LEq (LVar "Z") tupleApp)
-            qZ      = bForall "Z" dMn dMx body
-        in axiomSet [SFunction (IR.funcName f), SIR]
-                    (tags [TagFunction, TagFOLFunction, TagIR, TagIRTupleProj])
-             [LeanAxiom (irN ++ "_tuple_with_projections") qZ]
-
-  -- -------------------------------------------------------------------------
-  -- 34. IR projections-from-tuple axioms
-  -- -------------------------------------------------------------------------
-  irProjFromTupleAxiomSets :: [AxiomSet]
-  irProjFromTupleAxiomSets = map mkIRProj multiArgFolFunctions
-    where
-      mkIRProj f =
-        let argSNs   = map IR.sortName (IR.funcArgSorts f)
-            arity    = length argSNs
-            varNs    = ["X" ++ show i | i <- [1..arity]]
-            irN      = irPredicateName f
-            tupleApp = LApp (LVar (tupleName f)) (map LVar varNs)
-            irTuple  = LApp (LVar irN) [tupleApp]
-            projEqs  = [ LEq (LApp (LVar (piName f k)) [tupleApp]) (LVar xk)
-                       | (k, xk) <- zip [1..] varNs ]
-            rhsConj  = foldl1 LConj projEqs
-            body     = LBicond irTuple rhsConj
-            quantified =
-              foldr (\(varN, sN) acc ->
-                        bForall varN (sortMinName sN) (sortMaxName sN) acc)
-                    body (zip varNs argSNs)
-        in axiomSet [SFunction (IR.funcName f), SIR]
-                    (tags [TagFunction, TagFOLFunction, TagIR, TagIRProjFromTuple])
-             [LeanAxiom (irN ++ "_projections_from_tuple") quantified]
-
-  -- -------------------------------------------------------------------------
-  -- 35. IR separates axioms
-  -- -------------------------------------------------------------------------
-  irSeparatesAxiomSets :: [AxiomSet]
-  irSeparatesAxiomSets = map mkIRSep multiArgFolFunctions
-    where
-      mkIRSep f =
-        let dMn  = domMinName f
-            dMx  = domMaxName f
-            irN  = irPredicateName f
-            irZ  = LApp (LVar irN) [LVar "Z"]
-            body = LBicond (LImpl (LVar "X") (LVar "Z"))
-                           (LImpl (LVar "Y") (LVar "Z"))
-            inner = LImpl irZ body
-            qZ    = bForall "Z" dMn dMx inner
-            sep   = LBicond (LEq (LVar "X") (LVar "Y")) qZ
-            qY    = bForall "Y" dMn dMx sep
-            qX    = bForall "X" dMn dMx qY
-        in axiomSet [SFunction (IR.funcName f), SIR]
-                    (tags [TagFunction, TagFOLFunction, TagIR, TagIRSeparates])
-             [LeanAxiom (irN ++ "_separates") qX]
-
   -- -------------------------------------------------------------------------
   -- 35b. Individual declarations
   -- -------------------------------------------------------------------------
@@ -990,32 +660,6 @@ mkAxiomSets pt = concat
              ]
 
   -- R5 relation arg-object sorting axioms are now handled by sortBoundAxiomSets.
-
-  -- -------------------------------------------------------------------------
-  -- R6. Relation bounds: for all args in range, R(args) lies within
-  --     [dom_Max, dom_Min] — mirroring the unary-set bound pattern.
-  --   R_min : ∀ xs ∈ range, R(xs) → dom_Min
-  --   R_max : ∀ xs ∈ range, dom_Max → R(xs)
-  -- -------------------------------------------------------------------------
-  relBoundsAxiomSets :: [AxiomSet]
-  relBoundsAxiomSets = map mkRelBounds userRelations
-    where
-      mkRelBounds r =
-        let n     = IR.relName r
-            args  = zip [1..] (IR.relArgSorts r)
-            varNs = [ "X" ++ show k | (k, _) <- args ]
-            app   = LApp (LVar n) (map LVar varNs)
-            dMin  = LVar (relDomMinName r)
-            dMax  = LVar (relDomMaxName r)
-            quantify body =
-              foldr (\(varN, srt) acc ->
-                        let (lo, hi) = sortBounds (IR.sortName srt)
-                        in LBoundedForall varN lo hi acc)
-                    body (zip varNs (map snd args))
-        in axiomSet [SSet n] (tags [TagSet, TagSorting])
-             [ LeanAxiom (n ++ minSuffixForAxiomNames) (quantify (LImpl app dMin))
-             , LeanAxiom (n ++ maxSuffixForAxiomNames) (quantify (LImpl dMax app))
-             ]
 
   -- -------------------------------------------------------------------------
   -- 42. User fact axioms (rendered from FCMereologicalTranslation facts)
