@@ -531,7 +531,7 @@ mkAxiomSets sbOpts theory = concat
     in axiomSet path (tags tgs)
          (map (\(nm, expr) -> LeanAxiom nm (mereoExprToLean expr)) (SB.sbeAxioms entry))
 
-  contextToPathAndTags :: SB.SortBoundContext -> ([SubjectPathComponent], [Tag])
+  contextToPathAndTags :: SB.SortBoundContext -> ([SubjectNode], [Tag])
   contextToPathAndTags ctx = case ctx of
     SB.SBCGlobal                      -> ([SGlobal], [TagSorting])
     SB.SBCIndividual n                 -> ([SIndividual n], [TagIndividual, TagSorting])
