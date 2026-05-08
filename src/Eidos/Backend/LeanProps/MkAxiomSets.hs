@@ -31,17 +31,28 @@ sortMinName, sortMaxName :: String -> String
 sortMinName s = s ++ minSuffix
 sortMaxName s = s ++ maxSuffix
 
-uMinName, uMaxName, pMinName, pMaxName :: String
-uMinName = "𝕌_Min"
-uMaxName = "𝕌_Max"
-pMinName = "ℙ_Min"
-pMaxName = "ℙ_Max"
+-- | Canonical names for the three built-in sorts.
+-- These are the single source of truth; change here to rename a sort globally.
+uSortName, pSortName, dSortName :: String
+uSortName = "𝕌"
+pSortName = "ℙ"
+dSortName = "𝔻"
 
-uMin, uMax, pMin, pMax :: LeanExpr
+uMinName, uMaxName, pMinName, pMaxName, dMinName, dMaxName :: String
+uMinName = sortMinName uSortName   -- "𝕌_Min"
+uMaxName = sortMaxName uSortName   -- "𝕌_Max"
+pMinName = sortMinName pSortName   -- "ℙ_Min"
+pMaxName = sortMaxName pSortName   -- "ℙ_Max"
+dMinName = sortMinName dSortName   -- "𝔻_Min"
+dMaxName = sortMaxName dSortName   -- "𝔻_Max"
+
+uMin, uMax, pMin, pMax, dMin, dMax :: LeanExpr
 uMin = LVar uMinName
 uMax = LVar uMaxName
 pMin = LVar pMinName
 pMax = LVar pMaxName
+dMin = LVar dMinName
+dMax = LVar dMaxName
 
 sanitizeName :: String -> String
 sanitizeName = map (\c -> if c == '#' then '_' else c)
@@ -76,13 +87,11 @@ minSuffixForAxiomNames = "_min"
 maxSuffixForAxiomNames = "_max"
 
 sortBounds :: String -> (String, String)
-sortBounds sortN = case sortN of
-  "ℙ" -> (pMinName, pMaxName)
-  "𝕌" -> (uMinName, uMaxName)
-  "𝔻" -> ("𝔻_Min", "𝔻_Max")
-  _   ->
-    let n = sanitizeName sortN
-    in (n ++ minSuffix, n ++ maxSuffix)
+sortBounds sortN
+  | sortN == pSortName = (pMinName, pMaxName)
+  | sortN == uSortName = (uMinName, uMaxName)
+  | sortN == dSortName = (dMinName, dMaxName)
+  | otherwise          = let n = sanitizeName sortN in (n ++ minSuffix, n ++ maxSuffix)
 
 bForall :: String -> String -> String -> LeanExpr -> LeanExpr
 bForall = LBoundedForall
@@ -211,7 +220,7 @@ mkAxiomSets theory = concat
              , IR.mereoKind   m == IR.MereologicalEntityKindSet
              , IR.mereoOrigin m == IR.FromSignature
              , IR.sortKind  (IR.mereoSort m) == IR.SortKindDomain
-             , IR.sortName  (IR.mereoSort m) == "𝔻"
+             , IR.sortName  (IR.mereoSort m) == dSortName
              ]
     else []
 
@@ -255,18 +264,18 @@ mkAxiomSets theory = concat
   -- -------------------------------------------------------------------------
   headerAxiomSets :: [AxiomSet]
   headerAxiomSets =
-    [ axiomSet [SSort "𝕌"] (tags [TagSort, TagDecl])
+    [ axiomSet [SSort uSortName] (tags [TagSort, TagDecl])
         [ LeanAxiom uMinName LProp
         , LeanAxiom uMaxName LProp
         ]
-    , axiomSet [SSort "ℙ"] (tags [TagSort, TagDecl])
+    , axiomSet [SSort pSortName] (tags [TagSort, TagDecl])
         [ LeanAxiom pMinName LProp
         , LeanAxiom pMaxName LProp
         ]
     ] ++
-    [ axiomSet [SSort "𝔻"] (tags [TagSort, TagDecl])
-        [ LeanAxiom "𝔻_Min" LProp
-        , LeanAxiom "𝔻_Max" LProp
+    [ axiomSet [SSort dSortName] (tags [TagSort, TagDecl])
+        [ LeanAxiom dMinName LProp
+        , LeanAxiom dMaxName LProp
         ]
     | usesDomain
     ]
@@ -1041,8 +1050,8 @@ mkAxiomSets theory = concat
       mkSetBounds m =
         let n = IR.mereoName m
         in axiomSet [SGlobal] (tags [TagSorting])
-             [ LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) (LVar "𝔻_Min"))
-             , LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl (LVar "𝔻_Min") (LVar n))
+             [ LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) dMin)
+             , LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl dMin (LVar n))
              ]
 
   -- -------------------------------------------------------------------------
@@ -1066,20 +1075,20 @@ mkAxiomSets theory = concat
   -- -------------------------------------------------------------------------
   sortOrderAxiomSets :: [AxiomSet]
   sortOrderAxiomSets =
-      [ axiomSet [SSort "U"] (tags [TagSort, TagOrdering])
-          [ LeanAxiom "U_ordering" (LImpl uMax uMin)
+      [ axiomSet [SSort uSortName] (tags [TagSort, TagOrdering])
+          [ LeanAxiom (uSortName ++ "_ordering") (LImpl uMax uMin)
           ]
-      , axiomSet [SSort "P"] (tags [TagSort, TagOrdering])
-          [ LeanAxiom "P_upper"     (LImpl uMax pMax)
-          , LeanAxiom "P_ordering" (LImpl pMax pMin)
-          , LeanAxiom "P_lower"     (LImpl pMin uMin)
+      , axiomSet [SSort pSortName] (tags [TagSort, TagOrdering])
+          [ LeanAxiom (pSortName ++ "_upper")    (LImpl uMax pMax)
+          , LeanAxiom (pSortName ++ "_ordering") (LImpl pMax pMin)
+          , LeanAxiom (pSortName ++ "_lower")    (LImpl pMin uMin)
           ]
       ] ++
       (if usesDomain then
-        [ axiomSet [SSort "D"] (tags [TagSort, TagOrdering])
-            [ LeanAxiom "D_upper"    (LImpl uMax (LVar "𝔻_Max"))
-            , LeanAxiom "D_ordering" (LImpl (LVar "𝔻_Max") (LVar "𝔻_Min"))
-            , LeanAxiom "D_lower"    (LImpl (LVar "𝔻_Min") pMax)
+        [ axiomSet [SSort dSortName] (tags [TagSort, TagOrdering])
+            [ LeanAxiom (dSortName ++ "_upper")    (LImpl uMax dMax)
+            , LeanAxiom (dSortName ++ "_ordering") (LImpl dMax dMin)
+            , LeanAxiom (dSortName ++ "_lower")    (LImpl dMin pMax)
             ]
         ]
       else [])
