@@ -1382,10 +1382,14 @@ mkAxiomSets theory = concat
             ]
           _ ->
             -- Sort bounds, individuals, propositions, mereological objects:
-            -- 𝕌-sorted metafact wrapper via WrapMetafact abbreviation.
-            [ axiomSet [SGlobal] (tags [TagImplicitMerge])
-                [LeanAxiom axName (LApp (LVar "WrapMetafact") [uMin, LEq (LVar lhsName) (LVar rhsName)])]
-            ]
+            -- build a WrapMetafact MereoExpr and translate via the central renderer.
+            let mereoExpr = IR.MAbbrevApp "WrapMetafact"
+                              [ IR.MVar "𝕌#min"
+                              , IR.MSymDiff (IR.MVar lhsName) (IR.MVar rhsName)
+                              ]
+            in [ axiomSet [SGlobal] (tags [TagImplicitMerge])
+                   [LeanAxiom axName (mereoExprToLean mereoExpr)]
+               ]
 
       -- | Build a unique Lean-safe axiom name from the LHS entity name and the
       -- RHS qualified name.  Form: @<safeLhs>_from_<subtheory>@, where
