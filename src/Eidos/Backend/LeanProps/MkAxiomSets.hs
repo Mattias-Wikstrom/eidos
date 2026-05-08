@@ -17,6 +17,7 @@ module Eidos.Backend.LeanProps.MkAxiomSets
 
 import           Data.Maybe (fromJust)
 import qualified Eidos.IR as IR
+import qualified Eidos.SortBounds as SB
 import Eidos.Backend.LeanProps.LeanExpr
 import Eidos.Backend.LeanProps.LeanAxiomSet
 
@@ -116,8 +117,8 @@ tSOL  = [TagFunction, TagSOLFunction, TagDecl]
 -- | Build the complete list of 'AxiomSet' values for a theory.
 -- The order matches the current 'theoryToLeanDoc' output exactly, so that
 -- 'axiomSetsToLeanDoc' can reproduce the same Lean 4 text.
-mkAxiomSets :: IR.Theory -> [AxiomSet]
-mkAxiomSets theory = concat
+mkAxiomSets :: SB.SortBoundOptions -> IR.Theory -> [AxiomSet]
+mkAxiomSets sbOpts theory = concat
   [ headerAxiomSets
   , userSortLimitAxiomSets
   , productSortLimitAxiomSets
@@ -140,10 +141,6 @@ mkAxiomSets theory = concat
   , mereoDeclAxiomSets
   , propDeclAxiomSets
   , setDeclAxiomSets
-  , functionArgResultSortingAxiomSets
-  , relArgObjectSortingAxiomSets
-  , folInverseArgResSortingAxiomSets
-  , projectionWitnessSortingAxiomSets
   , functionConnectionAxiomSets
   , folInverseConnectionAxiomSets
   , dirImgConnectionAxiomSets
@@ -159,12 +156,8 @@ mkAxiomSets theory = concat
   , irProjFromTupleAxiomSets
   , irSeparatesAxiomSets
   , individualDeclAxiomSets
-  , mereoBoundsAxiomSets
-  , individualBoundsAxiomSets
-  , propBoundsAxiomSets
-  , setBoundsAxiomSets
+  , sortBoundAxiomSets
   , relBoundsAxiomSets
-  , userSortSetBoundsAxiomSets
   , sortOrderAxiomSets
   , productSortOrderAxiomSets
   , relProductSortOrderAxiomSets
@@ -196,10 +189,6 @@ mkAxiomSets theory = concat
 
   userDeclaredFolFunctions =
     filter (\f -> IR.funcOrigin f == IR.FromSignature) folFunctions
-
-  functionObjects =
-    concatMap (\f -> IR.funcArgObjects f ++ [IR.funcResObject f]) solFunctions ++
-    concatMap (\f -> IR.funcArgObjects f ++ [IR.funcResObject f]) userDeclaredFolFunctions
 
   individualObjects =
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
@@ -455,18 +444,9 @@ mkAxiomSets theory = concat
           Nothing  -> []
           Just arg ->
             let argN = sanitizeName (IR.mereoName arg)
-                dMn  = domMinName f
-                dMx  = domMaxName f
             in [ axiomSet [SFunction (IR.funcName f), STuple, SArgObject 0]
                           (tags [TagFunction, TagFOLFunction, TagTuple, TagDecl])
                    [LeanAxiom argN LProp]
-               , axiomSet [SFunction (IR.funcName f), STuple, SArgObject 0]
-                          (tags [TagFunction, TagFOLFunction, TagTuple, TagSorting])
-                   [ LeanAxiom (argN ++ minSuffixForAxiomNames)
-                       (LImpl pMin (LImpl (LVar argN) (LVar dMn)))
-                   , LeanAxiom (argN ++ maxSuffixForAxiomNames)
-                       (LImpl pMin (LImpl (LVar dMx) (LVar argN)))
-                   ]
                ]
 
   -- -------------------------------------------------------------------------
@@ -497,29 +477,12 @@ mkAxiomSets theory = concat
         let fN   = invImgName f
             argN = fN ++ "_arg"
             resN = fN ++ "_res"
-            rSN  = IR.sortName (IR.funcResSort f)
-            dMn  = domMinName f
-            dMx  = domMaxName f
         in [ axiomSet [SFunction (IR.funcName f), SImage, SArgObject 1]
                       (tags [TagFunction, TagFOLFunction, TagImage, TagDecl])
                [LeanAxiom argN LProp]
-           , axiomSet [SFunction (IR.funcName f), SImage, SArgObject 1]
-                      (tags [TagFunction, TagFOLFunction, TagImage, TagSorting])
-               [ LeanAxiom (argN ++ minSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar argN) (LVar (sortMinName rSN))))
-               , LeanAxiom (argN ++ maxSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar (sortMaxName rSN)) (LVar argN)))
-               ]
            , axiomSet [SFunction (IR.funcName f), SImage, SResObject]
                       (tags [TagFunction, TagFOLFunction, TagImage, TagDecl])
                [LeanAxiom resN LProp]
-           , axiomSet [SFunction (IR.funcName f), SImage, SResObject]
-                      (tags [TagFunction, TagFOLFunction, TagImage, TagSorting])
-               [ LeanAxiom (resN ++ minSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar resN) (LVar dMn)))
-               , LeanAxiom (resN ++ maxSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar dMx) (LVar resN)))
-               ]
            ]
 
   -- -------------------------------------------------------------------------
@@ -553,97 +516,35 @@ mkAxiomSets theory = concat
           [LeanAxiom (IR.mereoName m) LProp]
 
   -- -------------------------------------------------------------------------
-  -- 19. Function argument/result object sorting axioms
+  -- 19-21 + 36-39. Sort bounds (all entity kinds).
+  -- Delegates entirely to Eidos.SortBounds which owns all the semantic logic:
+  -- which entities need bounds, what lo/hi values they have, and whether to
+  -- collapse to a single IsWithinBounds axiom (--sorting-axioms) or expand to
+  -- separate _min/_max axioms.
   -- -------------------------------------------------------------------------
-  functionArgResultSortingAxiomSets :: [AxiomSet]
-  functionArgResultSortingAxiomSets = concatMap mkSorting functionObjects
-    where
-      mkSorting m =
-        let n       = sanitizeName (IR.mereoName m)
-            sN      = IR.sortName (IR.mereoSort m)
-            (lo,hi) = sortBounds sN
-            funcPath = findFunctionPath m
-        in [ axiomSet funcPath (tags [TagFunction, TagSorting])
-               [ LeanAxiom (n ++ minSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar n) (LVar lo)))
-               , LeanAxiom (n ++ maxSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar hi) (LVar n)))
-               ]
-           ]
-      
-      -- Find which function this object belongs to
-      findFunctionPath m = 
-        case findFunctionForObject m of
-          Just f -> [SFunction (IR.funcName f)]
-          Nothing -> [SGlobal]  -- fallback, shouldn't happen for function objects
-      
-      -- Search through all functions to find which one owns this object
-      findFunctionForObject m =
-        let allFuncs = solFunctions ++ userDeclaredFolFunctions
-            matches f = any (\obj -> IR.mereoName obj == IR.mereoName m) 
-                           (IR.funcArgObjects f ++ [IR.funcResObject f])
-        in case filter matches allFuncs of
-             (f:_) -> Just f
-             [] -> Nothing
-             
-  -- -------------------------------------------------------------------------
-  -- 20. FOL inverse arg/res sorting axioms
-  -- -------------------------------------------------------------------------
-  folInverseArgResSortingAxiomSets :: [AxiomSet]
-  folInverseArgResSortingAxiomSets = concatMap mkInvSorting folSingleArgFunctions
-    where
-      mkInvSorting f =
-        let fInv    = invName f
-            argSort = IR.sortName (head (IR.funcArgSorts f))
-            resSort = IR.sortName (IR.funcResSort f)
-            n1      = fInv ++ "_1"
-            nr      = fInv ++ "_res"
-        in [ axiomSet [SFunction (IR.funcName f), SInverse, SArgObject 1]
-                      (tags [TagFunction, TagFOLFunction, TagInverse, TagSorting])
-               [ LeanAxiom (n1 ++ minSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar n1) (LVar (sortMinName resSort))))
-               , LeanAxiom (n1 ++ maxSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar (sortMaxName resSort)) (LVar n1)))
-               ]
-           , axiomSet [SFunction (IR.funcName f), SInverse, SResObject]
-                      (tags [TagFunction, TagFOLFunction, TagInverse, TagSorting])
-               [ LeanAxiom (nr ++ minSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar nr) (LVar (sortMinName argSort))))
-               , LeanAxiom (nr ++ maxSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar (sortMaxName argSort)) (LVar nr)))
-               ]
-           ]
+  sortBoundAxiomSets :: [AxiomSet]
+  sortBoundAxiomSets = map sortBoundToAxiomSet (SB.theorySortBoundEntries sbOpts theory)
 
-  -- -------------------------------------------------------------------------
-  -- 21. Projection witness sorting axioms
-  -- -------------------------------------------------------------------------
-  projectionWitnessSortingAxiomSets :: [AxiomSet]
-  projectionWitnessSortingAxiomSets = concatMap mkProjSorting multiArgFolFunctions
-    where
-      mkProjSorting f =
-        let dMn = domMinName f
-            dMx = domMaxName f
-        in concatMap (mkOne dMn dMx) (zip [1..] (IR.funcArgSorts f))
-        where
-          mkOne dMn dMx (k, srt) =
-            let n1 = piName f k ++ "_1"
-                nr = piName f k ++ "_res"
-                sN = IR.sortName srt
-            in [ axiomSet [SFunction (IR.funcName f), SProjection k, SArgObject 1]
-                          (tags [TagFunction, TagFOLFunction, TagProjection, TagSorting])
-                   [ LeanAxiom (n1 ++ minSuffixForAxiomNames)
-                       (LImpl pMin (LImpl (LVar n1) (LVar dMn)))
-                   , LeanAxiom (n1 ++ maxSuffixForAxiomNames)
-                       (LImpl pMin (LImpl (LVar dMx) (LVar n1)))
-                   ]
-               , axiomSet [SFunction (IR.funcName f), SProjection k, SResObject]
-                          (tags [TagFunction, TagFOLFunction, TagProjection, TagSorting])
-                   [ LeanAxiom (nr ++ minSuffixForAxiomNames)
-                       (LImpl pMin (LImpl (LVar nr) (LVar (sortMinName sN))))
-                   , LeanAxiom (nr ++ maxSuffixForAxiomNames)
-                       (LImpl pMin (LImpl (LVar (sortMaxName sN)) (LVar nr)))
-                   ]
-               ]
+  sortBoundToAxiomSet :: SB.SortBoundEntry -> AxiomSet
+  sortBoundToAxiomSet entry =
+    let (path, tgs) = contextToPathAndTags (SB.sbeContext entry)
+    in axiomSet path (tags tgs)
+         (map (\(nm, expr) -> LeanAxiom nm (mereoExprToLean expr)) (SB.sbeAxioms entry))
+
+  contextToPathAndTags :: SB.SortBoundContext -> ([SubjectPathComponent], [Tag])
+  contextToPathAndTags ctx = case ctx of
+    SB.SBCGlobal                      -> ([SGlobal], [TagSorting])
+    SB.SBCIndividual n                 -> ([SIndividual n], [TagIndividual, TagSorting])
+    SB.SBCSet n                        -> ([SSet n], [TagSet, TagSorting])
+    SB.SBCFunctionObj fn               -> ([SFunction fn], [TagFunction, TagSorting])
+    SB.SBCFunctionTupleArg fn          -> ([SFunction fn, STuple, SArgObject 0], [TagFunction, TagFOLFunction, TagTuple, TagSorting])
+    SB.SBCFunctionImageArg fn          -> ([SFunction fn, SImage, SArgObject 1], [TagFunction, TagFOLFunction, TagImage, TagSorting])
+    SB.SBCFunctionImageRes fn          -> ([SFunction fn, SImage, SResObject], [TagFunction, TagFOLFunction, TagImage, TagSorting])
+    SB.SBCFunctionInverseArg fn        -> ([SFunction fn, SInverse, SArgObject 1], [TagFunction, TagFOLFunction, TagInverse, TagSorting])
+    SB.SBCFunctionInverseRes fn        -> ([SFunction fn, SInverse, SResObject], [TagFunction, TagFOLFunction, TagInverse, TagSorting])
+    SB.SBCFunctionProjectionArg fn k   -> ([SFunction fn, SProjection k, SArgObject 1], [TagFunction, TagFOLFunction, TagProjection, TagSorting])
+    SB.SBCFunctionProjectionRes fn k   -> ([SFunction fn, SProjection k, SResObject], [TagFunction, TagFOLFunction, TagProjection, TagSorting])
+    SB.SBCRelationObj rn               -> ([SSet rn], [TagSet, TagSorting])
 
   -- -------------------------------------------------------------------------
   -- 22. Function connection axioms (f_fact, g_fact, etc.)
@@ -1009,77 +910,8 @@ mkAxiomSets theory = concat
         axiomSet [SIndividual (IR.mereoName m)] (tags tIndividual)
           [LeanAxiom (IR.mereoName m) LProp]
 
-  -- -------------------------------------------------------------------------
-  -- 36. Mereological object bounds
-  -- -------------------------------------------------------------------------
-  mereoBoundsAxiomSets :: [AxiomSet]
-  mereoBoundsAxiomSets = map mkMereoBounds mereoObjects
-    where
-      mkMereoBounds m =
-        let n = IR.mereoName m
-        in axiomSet [SGlobal] (tags [TagSorting])
-             [ LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) uMin)
-             , LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl uMax (LVar n))
-             ]
-
-
-  -- -------------------------------------------------------------------------
-  -- 36a. Individual bounds
-  -- -------------------------------------------------------------------------
-  individualBoundsAxiomSets :: [AxiomSet]
-  individualBoundsAxiomSets = map mkIndividualBounds individualObjects
-    where
-      mkIndividualBounds m =
-        let n    = IR.mereoName m
-            sN   = IR.sortName (IR.mereoSort m)
-            sMin = sortMinName sN
-            sMax = sortMaxName sN
-        in axiomSet [SIndividual n] (tags [TagIndividual, TagSorting])
-             [ LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) (LVar sMin))
-             , LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl (LVar sMax) (LVar n))
-             ]
-
-  -- -------------------------------------------------------------------------
-  -- 37. Propositional object bounds
-  -- -------------------------------------------------------------------------
-  propBoundsAxiomSets :: [AxiomSet]
-  propBoundsAxiomSets = map mkPropBounds propObjects
-    where
-      mkPropBounds m =
-        let n = IR.mereoName m
-        in axiomSet [SGlobal] (tags [TagSorting])
-             [ LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) pMin)
-             , LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl pMax (LVar n))
-             ]
-
-  -- -------------------------------------------------------------------------
-  -- 38. 𝔻-sorted set bounds
-  -- -------------------------------------------------------------------------
-  setBoundsAxiomSets :: [AxiomSet]
-  setBoundsAxiomSets = map mkSetBounds setObjects
-    where
-      mkSetBounds m =
-        let n = IR.mereoName m
-        in axiomSet [SGlobal] (tags [TagSorting])
-             [ LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) dMin)
-             , LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl dMin (LVar n))
-             ]
-
-  -- -------------------------------------------------------------------------
-  -- 39. User sort set bounds
-  -- -------------------------------------------------------------------------
-  userSortSetBoundsAxiomSets :: [AxiomSet]
-  userSortSetBoundsAxiomSets = map mkSetBounds userSortSets
-    where
-      mkSetBounds m =
-        let n    = IR.mereoName m
-            sN   = IR.sortName (IR.mereoSort m)
-            sMin = sortMinName sN
-            sMax = sortMaxName sN
-        in axiomSet [SSet n] (tags [TagSet, TagSorting])
-             [ LeanAxiom (n ++ minSuffixForAxiomNames) (LImpl (LVar n) (LVar sMin))
-             , LeanAxiom (n ++ maxSuffixForAxiomNames) (LImpl (LVar sMax) (LVar n))
-             ]
+  -- Sections 36-39 (mereological, individual, propositional, set bounds) are
+  -- now handled by sortBoundAxiomSets above via Eidos.SortBounds.
 
   -- -------------------------------------------------------------------------
   -- 40. Sort ordering axioms
@@ -1220,25 +1052,7 @@ mkAxiomSets theory = concat
                  (LImpl pMin (LImpl (LVar dMx) (LVar argN)))
              ]
 
-  -- -------------------------------------------------------------------------
-  -- R5. Relation arg-object sorting axioms: R_k bounded within its sort
-  -- (Analogous to functionArgResultSortingAxiomSets.)
-  -- -------------------------------------------------------------------------
-  relArgObjectSortingAxiomSets :: [AxiomSet]
-  relArgObjectSortingAxiomSets = concatMap mkSorting userRelations
-    where
-      mkSorting r =
-        [ let n       = sanitizeName (IR.mereoName obj)
-              sN      = IR.sortName (IR.mereoSort obj)
-              (lo,hi) = sortBounds sN
-          in axiomSet [SSet (IR.relName r)] (tags [TagSet, TagSorting])
-               [ LeanAxiom (n ++ minSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar n) (LVar lo)))
-               , LeanAxiom (n ++ maxSuffixForAxiomNames)
-                   (LImpl pMin (LImpl (LVar hi) (LVar n)))
-               ]
-        | (_, obj) <- zip [1..] (IR.relArgObjects r)
-        ]
+  -- R5 relation arg-object sorting axioms are now handled by sortBoundAxiomSets.
 
   -- -------------------------------------------------------------------------
   -- R6. Relation bounds: for all args in range, R(args) lies within
@@ -1703,11 +1517,11 @@ baseTermToLean (IR.ResolvedBTDescription desc) =
 --
 -- Reflection subtheories are skipped; their Lean 4 treatment is not yet
 -- implemented.
-theoryBlocks :: IR.Theory -> [(String, [AxiomSet])]
-theoryBlocks theory =
+theoryBlocks :: SB.SortBoundOptions -> IR.Theory -> [(String, [AxiomSet])]
+theoryBlocks sbOpts theory =
   childBlocks ++ [rootBlock]
   where
-    rootBlock   = ("__main__", mkAxiomSets theory)
+    rootBlock   = ("__main__", mkAxiomSets sbOpts theory)
     childBlocks = concatMap subBlocks (IR.theorySubtheories theory)
 
     subBlocks :: IR.Theory -> [(String, [AxiomSet])]
@@ -1715,4 +1529,4 @@ theoryBlocks theory =
       | IR.theoryReflection sub = []
       | otherwise =
           concatMap subBlocks (IR.theorySubtheories sub)
-          ++ [(IR.theoryFullyQualifiedName sub, mkAxiomSets sub)]
+          ++ [(IR.theoryFullyQualifiedName sub, mkAxiomSets sbOpts sub)]

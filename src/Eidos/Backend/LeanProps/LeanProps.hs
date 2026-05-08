@@ -37,10 +37,11 @@ module Eidos.Backend.LeanProps.LeanProps
   ) where
 
 import qualified Eidos.IR as IR
+import qualified Eidos.SortBounds as SB
 import Eidos.Backend.LeanProps.LeanExpr
 import Data.List (intercalate, sortOn)
 import qualified Data.Set as Set
-import Eidos.Backend.LeanProps.MkAxiomSets (mkAxiomSets, theoryBlocks)
+import Eidos.Backend.LeanProps.MkAxiomSets (theoryBlocks)
 import Eidos.Backend.LeanProps.LeanAxiomSet
 
 -- ---------------------------------------------------------------------------
@@ -50,11 +51,11 @@ import Eidos.Backend.LeanProps.LeanAxiomSet
 -- | Convert an Eidos theory directly to Lean 4 source (combines both stages).
 exportToLeanPropsWithOptions :: LeanPropsOptions -> IR.Theory -> String
 exportToLeanPropsWithOptions opts theory =
-  let render (ns, as_) =
-        let as1 = if optUseSortingAxioms opts then map collapseSortingSet as_ else as_
-            as2 = if optGroupByEntity opts then sortOn asPath as1 else as1
-        in LeanBlock ns (renderAxiomSetsToDecls opts as2)
-      blocks = map render (theoryBlocks theory)
+  let sbOpts = SB.SortBoundOptions { SB.sboCollapse = optUseSortingAxioms opts }
+      render (ns, as_) =
+        let as1 = if optGroupByEntity opts then sortOn asPath as_ else as_
+        in LeanBlock ns (renderAxiomSetsToDecls opts as1)
+      blocks = map render (theoryBlocks sbOpts theory)
       doc = LeanDoc
         { leanDocTheoryName = IR.theoryFullyQualifiedName theory
         , leanDocBlocks     = blocks
@@ -121,29 +122,6 @@ renderAxiomSetsToDecls opts = concatMap renderOne
 
 subjectPathComment :: SubjectPath -> String
 subjectPathComment = unwords . map show
-
-collapseSortingSet :: AxiomSet -> AxiomSet
-collapseSortingSet as_
-  | not (hasTag TagSorting as_) = as_
-  | otherwise =
-      case asAxioms as_ of
-        [LeanAxiom nMin (LImpl _ (LImpl (LVar obj1) (LVar lo))),
-         LeanAxiom nMax (LImpl _ (LImpl (LVar hi) (LVar obj2)))]
-          | obj1 == obj2
-          , stripSuffix "_min" nMin == Just obj1
-          , stripSuffix "_max" nMax == Just obj1
-          -> as_ { asAxioms = [LeanAxiom (obj1 ++ "_sorting") (LIsWithinBounds lo obj1 hi)] }
-        [LeanAxiom nMin (LImpl (LVar obj1) (LVar lo)),
-         LeanAxiom nMax (LImpl (LVar hi) (LVar obj2))]
-          | obj1 == obj2
-          , stripSuffix "_min" nMin == Just obj1
-          , stripSuffix "_max" nMax == Just obj1
-          -> as_ { asAxioms = [LeanAxiom (obj1 ++ "_sorting") (LIsWithinBounds lo obj1 hi)] }
-        _ -> as_
-  where
-    stripSuffix suffix str =
-      let n = length str - length suffix
-      in if n >= 0 && drop n str == suffix then Just (take n str) else Nothing
 
 data LeanPropsOptions = LeanPropsOptions
   { optGroupByEntity      :: Bool
