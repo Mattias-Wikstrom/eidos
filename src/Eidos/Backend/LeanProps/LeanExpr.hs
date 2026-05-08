@@ -137,7 +137,7 @@ collectUsedAbbrevNames doc =
            , n <- exprAbbrevs (axiomType ax) ]
   where
     knownAbbrevs :: [String]
-    knownAbbrevs = ["IsWithinBounds", "IsIndividual", "ProjectIntoInterval"]
+    knownAbbrevs = map IR.abbrevName IR.allAbbrevDefs
 
     exprAbbrevs :: LeanExpr -> [String]
     exprAbbrevs (LImpl a b)           = exprAbbrevs a ++ exprAbbrevs b
@@ -235,6 +235,18 @@ renderAxiom :: LeanAxiom -> String
 renderAxiom (LeanAxiom name ty) =
   "axiom " ++ name ++ ": " ++ renderLeanExpr ty
 
+-- | Wrap a 'LeanExpr' in parentheses when used as a function argument.
+-- Expressions that already render with outer brackets are left alone;
+-- binders (forall/exists) and bare equality need an explicit wrapper.
+parenArg :: LeanExpr -> String
+parenArg e = case e of
+  LForall    {} -> "(" ++ renderLeanExpr e ++ ")"
+  LForallKw  {} -> "(" ++ renderLeanExpr e ++ ")"
+  LExists    {} -> "(" ++ renderLeanExpr e ++ ")"
+  LEq        {} -> "(" ++ renderLeanExpr e ++ ")"
+  LBoundedForall {} -> "(" ++ renderLeanExpr e ++ ")"
+  _              -> renderLeanExpr e
+
 -- | Render a 'LeanExpr' to a Lean 4 string.
 renderLeanExpr :: LeanExpr -> String
 renderLeanExpr LProp =
@@ -242,7 +254,7 @@ renderLeanExpr LProp =
 renderLeanExpr (LVar n) =
   n
 renderLeanExpr (LApp f args) =
-  "(" ++ renderLeanExpr f ++ " " ++ unwords (map renderLeanExpr args) ++ ")"
+  "(" ++ renderLeanExpr f ++ " " ++ unwords (map parenArg args) ++ ")"
 renderLeanExpr (LImpl a b) =
   "(" ++ renderLeanExpr a ++ " → " ++ renderLeanExpr b ++ ")"
 renderLeanExpr (LConj a b) =

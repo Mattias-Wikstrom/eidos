@@ -184,6 +184,15 @@ allAbbrevDefs =
   , AbbrevDef "IsIndividual" ["lo", "hi", "x"]
       -- 0  (vacuously true in the _Props backend)
       MZero
+  , AbbrevDef "WrapFact" ["x", "y"]
+      -- (x+y) ∸ x
+      (MSymDiff (MSum (MVar "x") (MVar "y")) (MVar "x"))
+  , AbbrevDef "WrapAssertion" ["x", "y", "z"]
+      -- (x+(y×z)) ∸ x
+      (MSymDiff (MSum (MVar "x") (MProd (MVar "y") (MVar "z"))) (MVar "x"))
+  , AbbrevDef "WrapMetafact" ["x", "y"]
+      -- (x+y) ∸ x
+      (MSymDiff (MSum (MVar "x") (MVar "y")) (MVar "x"))
   ]
 
 -- | Collect all 'MAbbrevApp' names reachable from a 'MereoExpr'.

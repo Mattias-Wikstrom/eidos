@@ -962,20 +962,20 @@ wrapAsFact :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
 wrapAsFact th freeVars expr =
   let body = wrapFreeVarsMereo freeVars (propExprToMereo (translatePropExpr th expr))
       pMin = MVar (sortName (theoryProp th) ++ "#min")
-  in MSymDiff (MSum pMin body) pMin
+  in MAbbrevApp "WrapFact" [pMin, body]
 
 wrapAsAssertion :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
 wrapAsAssertion th freeVars expr =
   let body = wrapFreeVarsMereo freeVars (propExprToMereo (translatePropExpr th expr))
       pMin = MVar (sortName (theoryProp th) ++ "#min")
       pMax = MVar (sortName (theoryProp th) ++ "#max")
-  in MSymDiff (MSum pMin (MProd pMax body)) pMin
+  in MAbbrevApp "WrapAssertion" [pMin, pMax, body]
 
 wrapAsMetafact :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
 wrapAsMetafact th freeVars expr =
   let body = wrapFreeVarsMereo freeVars (propExprToMereo (translatePropExpr th expr))
       uMin = MVar (sortName (theoryUniverse th) ++ "#min")
-  in MSymDiff (MSum uMin body) uMin
+  in MAbbrevApp "WrapMetafact" [uMin, body]
 
 -- ---------------------------------------------------------------------------
 -- ResolvedPropExpr → MereoExpr conversion
