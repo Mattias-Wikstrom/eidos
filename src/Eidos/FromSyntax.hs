@@ -1047,6 +1047,8 @@ applyRelOpToMereo leftExpr rfbt =
        "⇒"  -> MRevDiff leftExpr right
        "="  -> MSymDiff leftExpr right      -- = in sort-limit facts translates to ∸
        "≤"  -> MRevDiff leftExpr right      -- ≤ translates to ⇒
+       "∪"  -> MSum     leftExpr right
+       "∩"  -> MProd    leftExpr right
        _    -> MVar ("unknown:" ++ resolvedRFTOp rfbt)
 
 termToMereo :: ResolvedTerm -> MereoExpr
@@ -1062,6 +1064,8 @@ applyArithToMereo leftExpr off =
        "-"  -> MDiff    right    leftExpr
        "∸"  -> MSymDiff leftExpr right
        "⇒"  -> MRevDiff leftExpr right
+       "∪"  -> MSum     leftExpr right
+       "∩"  -> MProd    leftExpr right
        _    -> MVar ("unknown:" ++ resolvedOFFOp off)
 
 factorToMereo :: ResolvedFactor -> MereoExpr
