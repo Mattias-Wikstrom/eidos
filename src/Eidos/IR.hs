@@ -5,6 +5,8 @@
 --   * Types are determined and attached to expressions
 --   * Facts are categorized by their kind
 --   * Subtheories are properly nested
+{-# LANGUAGE PatternSynonyms #-}
+
 module Eidos.IR where
 
 import qualified Data.Map.Strict as Map
@@ -52,18 +54,49 @@ data EntityKind
   | MereologicalEntityKindArgumentOfSOLFunction  -- ^ The f#N argument object of an SOL function
   deriving (Show, Eq)
 
-data FactKind
-  = FactKindFact
-  | FactKindAssertion
-  | FactKindMetafactsFact
-  | FactKindSortLimitation
-  | FactKindImplicitMerge
-    -- ^ Equality fact auto-generated when an implicit subtheory's entity is
-    -- merged into the parent namespace.  Always has the form
-    -- @unqualifiedName = sub.qualifiedName@.  Distinguished from user-written
-    -- assertions so that pretty-printers and downstream passes can suppress
-    -- or specially handle them.
+data FactCategory
+  = FCUserInput
+  | FCSortStructure
+  | FCImplicitMerge
   deriving (Show, Eq)
+
+data FactSubkind
+  = FSFact
+  | FSAssertion
+  | FSMetafactsFact
+  | FSSortLimitation
+  | FSImplicitMerge
+  deriving (Show, Eq)
+
+data FactKind = FactKind
+  { factCategory :: FactCategory
+  , factSubkind  :: FactSubkind
+  }
+  deriving (Show, Eq)
+
+factKindFact, factKindAssertion, factKindMetafactsFact, factKindSortLimitation, factKindImplicitMerge :: FactKind
+factKindFact = FactKind FCUserInput FSFact
+factKindAssertion = FactKind FCUserInput FSAssertion
+factKindMetafactsFact = FactKind FCUserInput FSMetafactsFact
+factKindSortLimitation = FactKind FCSortStructure FSSortLimitation
+factKindImplicitMerge = FactKind FCImplicitMerge FSImplicitMerge
+
+pattern FactKindFact :: FactKind
+pattern FactKindFact = FactKind FCUserInput FSFact
+
+pattern FactKindAssertion :: FactKind
+pattern FactKindAssertion = FactKind FCUserInput FSAssertion
+
+pattern FactKindMetafactsFact :: FactKind
+pattern FactKindMetafactsFact = FactKind FCUserInput FSMetafactsFact
+
+pattern FactKindSortLimitation :: FactKind
+pattern FactKindSortLimitation = FactKind FCSortStructure FSSortLimitation
+
+pattern FactKindImplicitMerge :: FactKind
+pattern FactKindImplicitMerge = FactKind FCImplicitMerge FSImplicitMerge
+
+{-# COMPLETE FactKindFact, FactKindAssertion, FactKindMetafactsFact, FactKindSortLimitation, FactKindImplicitMerge #-}
 
 -- ---------------------------------------------------------------------------
 -- Entity sum type
