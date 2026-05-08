@@ -14,8 +14,8 @@ module Eidos.Pipeline
   ) where
 
 import qualified Eidos.IR as IR
-import qualified Eidos.SortBounds as SB
-import qualified Eidos.FunctionFacts as FF
+import qualified Eidos.Pipeline.SortBounds as SB
+import qualified Eidos.Pipeline.FunctionFacts as FF
 
 -- ---------------------------------------------------------------------------
 -- Options

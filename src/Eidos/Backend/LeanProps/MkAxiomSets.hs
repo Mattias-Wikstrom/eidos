@@ -18,8 +18,8 @@ module Eidos.Backend.LeanProps.MkAxiomSets
 import           Data.Maybe (fromJust)
 import qualified Eidos.IR as IR
 import qualified Eidos.Pipeline as PL
-import qualified Eidos.SortBounds as SB
-import qualified Eidos.FunctionFacts as FF
+import qualified Eidos.Pipeline.SortBounds as SB
+import qualified Eidos.Pipeline.FunctionFacts as FF
 import Eidos.Backend.LeanProps.LeanExpr
 import Eidos.Backend.LeanProps.LeanAxiomSet
 

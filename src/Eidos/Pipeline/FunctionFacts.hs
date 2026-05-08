@@ -13,7 +13,7 @@
 -- (IsWithinBounds, WrapMetafact) and user-declared functions or relations.
 -- 'IR.MBoundedSum' provides bounded universal quantification; the backend
 -- may later rewrite it to @bforall@ syntax if that option is chosen.
-module Eidos.FunctionFacts
+module Eidos.Pipeline.FunctionFacts
   ( FunctionFactContext (..)
   , FunctionFactEntry (..)
   , theoryFunctionFactEntries

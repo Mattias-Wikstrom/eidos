@@ -10,7 +10,7 @@
 --
 -- Backends render the pre-built 'MereoExpr' values without any semantic logic
 -- of their own.
-module Eidos.SortBounds
+module Eidos.Pipeline.SortBounds
   ( SortBoundOptions (..)
   , defaultSortBoundOptions
   , SortBoundContext (..)
