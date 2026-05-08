@@ -103,10 +103,8 @@ renderAxiomSetsToDecls opts = concatMap renderOne
     rewriteBounded (LApp f args) = LApp (rewriteBounded f) (map rewriteBounded args)
     rewriteBounded (LProjectIntoInterval x lo hi) =
       LProjectIntoInterval (rewriteBounded x) (rewriteBounded lo) (rewriteBounded hi)
-    rewriteBounded (LFactWrapper body)      = LFactWrapper      (rewriteBounded body)
-    rewriteBounded (LAssertionWrapper body) = LAssertionWrapper (rewriteBounded body)
     rewriteBounded (LMetafactWrapper body)  = LMetafactWrapper  (rewriteBounded body)
-    rewriteBounded x = x  -- LVar, LIsWithinBounds, LIsIndividual, LProp are leaves
+    rewriteBounded x = x
 
 subjectPathComment :: SubjectPath -> String
 subjectPathComment = unwords . map show

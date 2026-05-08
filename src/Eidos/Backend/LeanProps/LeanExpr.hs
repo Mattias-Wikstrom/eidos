@@ -118,10 +118,6 @@ data LeanExpr
     --   @forall var : Prop, (IsWithinBounds lo hi var) → body@.
   | LProjectIntoInterval LeanExpr LeanExpr LeanExpr
     -- ^ @ProjectIntoInterval x lo hi@
-  | LFactWrapper LeanExpr
-    -- ^ Plain fact wrapper: @(P_Min ∧ body) ↔ P_Min@.
-  | LAssertionWrapper LeanExpr
-    -- ^ Assertion wrapper: @(P_Min ∧ (P_Max ∨ body)) ↔ P_Min@.
   | LMetafactWrapper LeanExpr
     -- ^ Metafact wrapper: @(U_Min ∧ body) ↔ U_Min@.
   deriving (Eq, Show)
@@ -161,8 +157,6 @@ collectUsedAbbrevNames doc =
     exprAbbrevs (LIsIndividual _ _ _)    = ["IsIndividual"]
     exprAbbrevs (LProjectIntoInterval x lo hi) =
       "ProjectIntoInterval" : concatMap exprAbbrevs [x, lo, hi]
-    exprAbbrevs (LFactWrapper b)      = exprAbbrevs b
-    exprAbbrevs (LAssertionWrapper b) = exprAbbrevs b
     exprAbbrevs (LMetafactWrapper b)  = exprAbbrevs b
     exprAbbrevs _                     = []  -- LProp, LVar (non-abbrev)
 
@@ -278,9 +272,5 @@ renderLeanExpr (LProjectIntoInterval x lo hi) =
     ++ renderLeanExpr x ++ " "
     ++ renderLeanExpr lo ++ " "
     ++ renderLeanExpr hi ++ ")"
-renderLeanExpr (LFactWrapper body) =
-  renderLeanExpr (LBicond (LConj (LVar "ℙ_Min") body) (LVar "ℙ_Min"))
-renderLeanExpr (LAssertionWrapper body) =
-  renderLeanExpr (LBicond (LConj (LVar "ℙ_Min") (LDisj (LVar "ℙ_Max") body)) (LVar "ℙ_Min"))
 renderLeanExpr (LMetafactWrapper body) =
   renderLeanExpr (LBicond (LConj (LVar "𝕌_Min") body) (LVar "𝕌_Min"))
