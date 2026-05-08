@@ -1196,9 +1196,9 @@ mkAxiomSets theory = concat
   relArgObjectDeclAxiomSets = concatMap mkArgDecls userRelations
     where
       mkArgDecls r =
-        [ axiomSet [SSet (IR.relName r), SArgObject k] (tags [TagSet, TagDecl])
+        [ axiomSet [SSet (IR.relName r)] (tags [TagSet, TagDecl])
             [LeanAxiom (sanitizeName (IR.mereoName obj)) LProp]
-        | (k, obj) <- zip [1..] (IR.relArgObjects r)
+        | (_, obj) <- zip [1..] (IR.relArgObjects r)
         ]
 
   -- -------------------------------------------------------------------------
@@ -1231,13 +1231,13 @@ mkAxiomSets theory = concat
         [ let n       = sanitizeName (IR.mereoName obj)
               sN      = IR.sortName (IR.mereoSort obj)
               (lo,hi) = sortBounds sN
-          in axiomSet [SSet (IR.relName r), SArgObject k] (tags [TagSet, TagSorting])
+          in axiomSet [SSet (IR.relName r)] (tags [TagSet, TagSorting])
                [ LeanAxiom (n ++ minSuffixForAxiomNames)
                    (LImpl pMin (LImpl (LVar n) (LVar lo)))
                , LeanAxiom (n ++ maxSuffixForAxiomNames)
                    (LImpl pMin (LImpl (LVar hi) (LVar n)))
                ]
-        | (k, obj) <- zip [1..] (IR.relArgObjects r)
+        | (_, obj) <- zip [1..] (IR.relArgObjects r)
         ]
 
   -- -------------------------------------------------------------------------
