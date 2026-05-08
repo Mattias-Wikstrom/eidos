@@ -82,10 +82,24 @@ renderAxiomSetsToDecls opts = concatMap renderOne
           tagDecls = if optAddTagComments opts
                      then [DeclComment (tagSetComment (asTags as_))]
                      else []
-          axDecls = map (DeclAxiom . mapAxiom) (asAxioms as_)
+          axDecls = map (DeclAxiom . mapAxiom as_) (asAxioms as_)
       in DeclBlankLine : commentDecls ++ tagDecls ++ axDecls
 
-    mapAxiom ax = ax { axiomType = rewriteBounded (axiomType ax) }
+    mapAxiom as_ ax =
+      let rewritten = rewriteBounded (axiomType ax)
+          wrapped = if hasTag TagSorting as_
+                    then wrapSortingAsMetafact rewritten
+                    else rewritten
+      in ax { axiomType = wrapped }
+
+    -- NOTE: temporary backend-side policy: emit sorting axioms as
+    -- WrapMetafact ℙ_Min (<sorting formula body>).
+    -- If the formula is already prefixed by ℙ_Min → ..., strip that
+    -- antecedent to avoid duplicating ℙ_Min in the rendered output.
+    wrapSortingAsMetafact (LImpl (LVar "ℙ_Min") body) =
+      LApp (LVar "WrapMetafact") [LVar "ℙ_Min", body]
+    wrapSortingAsMetafact x =
+      LApp (LVar "WrapMetafact") [LVar "ℙ_Min", x]
 
     rewriteBounded (LBoundedForall var lo hi body)
       | optUseBoundedForallSyntax opts =
