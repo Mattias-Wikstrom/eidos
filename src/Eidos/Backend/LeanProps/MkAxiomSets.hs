@@ -1382,9 +1382,9 @@ mkAxiomSets theory = concat
             ]
           _ ->
             -- Sort bounds, individuals, propositions, mereological objects:
-            -- 𝕌-sorted metafact wrapper.
+            -- 𝕌-sorted metafact wrapper via WrapMetafact abbreviation.
             [ axiomSet [SGlobal] (tags [TagImplicitMerge])
-                [LeanAxiom axName (LMetafactWrapper (LEq (LVar lhsName) (LVar rhsName)))]
+                [LeanAxiom axName (LApp (LVar "WrapMetafact") [uMin, LEq (LVar lhsName) (LVar rhsName)])]
             ]
 
       -- | Build a unique Lean-safe axiom name from the LHS entity name and the

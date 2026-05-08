@@ -56,21 +56,21 @@ allTypes doc = [ axiomType ax | DeclAxiom ax <- leanDocDecls doc ]
 hasType :: LeanDoc -> LeanExpr -> Bool
 hasType doc ty = ty `elem` allTypes doc
 
--- | Bodies of all 'LAssertionWrapper' axioms in the doc.
+-- | Bodies of all 'WrapAssertion' axioms in the doc.
 assertionBodies :: LeanDoc -> [LeanExpr]
-assertionBodies doc = [ body | LAssertionWrapper body <- allTypes doc ]
+assertionBodies doc = [ body | LApp (LVar "WrapAssertion") [_, _, body] <- allTypes doc ]
 
 -- | True when some assertion body equals the given expression.
 hasAssertionBody :: LeanDoc -> LeanExpr -> Bool
 hasAssertionBody doc body = body `elem` assertionBodies doc
 
--- | Bodies of all 'LMetafactWrapper' axioms in the doc.
+-- | Bodies of all 'WrapMetafact' axioms in the doc.
 metafactBodies :: LeanDoc -> [LeanExpr]
-metafactBodies doc = [ body | LMetafactWrapper body <- allTypes doc ]
+metafactBodies doc = [ body | LApp (LVar "WrapMetafact") [_, body] <- allTypes doc ]
 
--- | Bodies of all 'LFactWrapper' axioms in the doc.
+-- | Bodies of all 'WrapFact' axioms in the doc.
 factBodies :: LeanDoc -> [LeanExpr]
-factBodies doc = [ body | LFactWrapper body <- allTypes doc ]
+factBodies doc = [ body | LApp (LVar "WrapFact") [_, body] <- allTypes doc ]
 
 -- ---------------------------------------------------------------------------
 -- Main

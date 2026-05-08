@@ -118,8 +118,6 @@ data LeanExpr
     --   @forall var : Prop, (IsWithinBounds lo hi var) → body@.
   | LProjectIntoInterval LeanExpr LeanExpr LeanExpr
     -- ^ @ProjectIntoInterval x lo hi@
-  | LMetafactWrapper LeanExpr
-    -- ^ Metafact wrapper: @(U_Min ∧ body) ↔ U_Min@.
   deriving (Eq, Show)
 
 -- ---------------------------------------------------------------------------
@@ -157,7 +155,6 @@ collectUsedAbbrevNames doc =
     exprAbbrevs (LIsIndividual _ _ _)    = ["IsIndividual"]
     exprAbbrevs (LProjectIntoInterval x lo hi) =
       "ProjectIntoInterval" : concatMap exprAbbrevs [x, lo, hi]
-    exprAbbrevs (LMetafactWrapper b)  = exprAbbrevs b
     exprAbbrevs _                     = []  -- LProp, LVar (non-abbrev)
 
 -- | Render a 'LeanDoc' to Lean 4 source text.
@@ -284,5 +281,3 @@ renderLeanExpr (LProjectIntoInterval x lo hi) =
     ++ renderLeanExpr x ++ " "
     ++ renderLeanExpr lo ++ " "
     ++ renderLeanExpr hi ++ ")"
-renderLeanExpr (LMetafactWrapper body) =
-  renderLeanExpr (LBicond (LConj (LVar "𝕌_Min") body) (LVar "𝕌_Min"))

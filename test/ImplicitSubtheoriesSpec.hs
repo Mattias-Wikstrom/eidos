@@ -76,7 +76,7 @@ mergeIsMetafactWrapped doc lhs rhs =
   let mergeName = lhs ++ "_from_" ++ rhs
   in any (\ax -> axiomName ax == mergeName && isMetafactWrapped (axiomType ax)) (axioms doc)
   where
-    isMetafactWrapped (LMetafactWrapper _) = True
+    isMetafactWrapped (LApp (LVar "WrapMetafact") _) = True
     isMetafactWrapped _ = False
 
 -- | True when a merge fact is a plain equality (for functions).

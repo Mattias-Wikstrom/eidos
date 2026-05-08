@@ -94,16 +94,15 @@ hasPropDecl doc name = hasType doc LProp && any isPropAxiom (axioms doc)
 -- ---------------------------------------------------------------------------
 -- Fact-wrapper helpers
 --
--- The three fact-wrapper nodes (LFactWrapper, LAssertionWrapper,
--- LMetafactWrapper) give tests a stable handle on semantic intent that
--- is independent of the concrete Lean 4 encoding.  All helpers below
--- pattern-match on these nodes directly so that changes to how the
--- wrappers are rendered never break a passing test.
+-- Facts, assertions, and metafacts are emitted as LApp nodes calling the
+-- WrapFact / WrapAssertion / WrapMetafact abbreviations.  The helpers below
+-- extract the body argument so tests can check semantic intent without
+-- depending on the exact argument order of each abbreviation.
 -- ---------------------------------------------------------------------------
 
--- | Bodies of all 'LAssertionWrapper' axioms in the doc.
+-- | Bodies of all 'WrapAssertion' axioms in the doc.
 assertionBodies :: LeanDoc -> [LeanExpr]
-assertionBodies doc = [ body | LAssertionWrapper body <- allTypes doc ]
+assertionBodies doc = [ body | LApp (LVar "WrapAssertion") [_, _, body] <- allTypes doc ]
 
 -- | True when some assertion axiom in the doc has exactly this body.
 hasAssertionBody :: LeanDoc -> LeanExpr -> Bool
@@ -113,9 +112,9 @@ hasAssertionBody doc body = body `elem` assertionBodies doc
 hasAssertionBodyWith :: LeanDoc -> (LeanExpr -> Bool) -> Bool
 hasAssertionBodyWith doc p = any p (assertionBodies doc)
 
--- | Bodies of all 'LMetafactWrapper' axioms in the doc.
+-- | Bodies of all 'WrapMetafact' axioms in the doc.
 metafactBodies :: LeanDoc -> [LeanExpr]
-metafactBodies doc = [ body | LMetafactWrapper body <- allTypes doc ]
+metafactBodies doc = [ body | LApp (LVar "WrapMetafact") [_, body] <- allTypes doc ]
 
 -- | True when some metafact axiom in the doc has exactly this body.
 hasMetafactBody :: LeanDoc -> LeanExpr -> Bool
@@ -189,25 +188,22 @@ main = hspec $ do
       in do
         rendered `shouldSatisfy` ("∀ X : Prop," `isPrefixOf`)
 
-    it "renders LAssertionWrapper: output contains P_Min and body" $
-      -- The exact encoding is an implementation detail; we only check that
-      -- the rendered string mentions both the wrapper anchor (P_Min) and
-      -- the body content.
-      let rendered = renderLeanExpr (LAssertionWrapper (LVar "MyProp"))
+    it "renders WrapAssertion LApp: output contains abbreviation name and body" $
+      let rendered = renderLeanExpr (LApp (LVar "WrapAssertion") [pMin, pMax, LVar "MyProp"])
       in do
-        rendered `shouldSatisfy` ("P_Min" `isInfixOf`)
+        rendered `shouldSatisfy` ("WrapAssertion" `isInfixOf`)
         rendered `shouldSatisfy` ("MyProp" `isInfixOf`)
 
-    it "renders LMetafactWrapper: output contains U_Min and body" $
-      let rendered = renderLeanExpr (LMetafactWrapper (LVar "MySet"))
+    it "renders WrapMetafact LApp: output contains abbreviation name and body" $
+      let rendered = renderLeanExpr (LApp (LVar "WrapMetafact") [uMin, LVar "MySet"])
       in do
-        rendered `shouldSatisfy` ("U_Min" `isInfixOf`)
+        rendered `shouldSatisfy` ("WrapMetafact" `isInfixOf`)
         rendered `shouldSatisfy` ("MySet" `isInfixOf`)
 
-    it "renders LFactWrapper: output contains P_Min and body" $
-      let rendered = renderLeanExpr (LFactWrapper (LVar "MyFact"))
+    it "renders WrapFact LApp: output contains abbreviation name and body" $
+      let rendered = renderLeanExpr (LApp (LVar "WrapFact") [pMin, LVar "MyFact"])
       in do
-        rendered `shouldSatisfy` ("P_Min" `isInfixOf`)
+        rendered `shouldSatisfy` ("WrapFact" `isInfixOf`)
         rendered `shouldSatisfy` ("MyFact" `isInfixOf`)
 
   -- =========================================================================
@@ -387,7 +383,7 @@ main = hspec $ do
   describe "theoryToLeanDoc – assertions" $ do
   -- =========================================================================
 
-    it "wraps each assertion in an LAssertionWrapper axiom" $ do
+    it "wraps each assertion in a WrapAssertion axiom" $ do
       doc <- buildStr [r|{ signature { P : ℙ; }, axioms { assertions { P; } } }|]
       hasAssertionBodyWith doc (const True) `shouldBe` True
 
@@ -411,7 +407,7 @@ main = hspec $ do
       doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P ↔ Q; } } }|]
       hasAssertionBody doc (LBicond (LVar "P") (LVar "Q")) `shouldBe` True
 
-    it "generates one LAssertionWrapper axiom per assertion" $ do
+    it "generates one WrapAssertion axiom per assertion" $ do
       doc <- buildStr [r|{ signature { P : ℙ; Q : ℙ; }, axioms { assertions { P; Q; } } }|]
       length (assertionBodies doc) `shouldBe` 2
 
@@ -419,7 +415,7 @@ main = hspec $ do
   describe "theoryToLeanDoc – metafacts" $ do
   -- =========================================================================
 
-    it "wraps each metafact in an LMetafactWrapper axiom" $ do
+    it "wraps each metafact in a WrapMetafact axiom" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A × B; } } }|]
       hasMetafactBodyWith doc (const True) `shouldBe` True
 
@@ -439,7 +435,7 @@ main = hspec $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A ∸ B; } } }|]
       hasMetafactBody doc (LBicond (LVar "A") (LVar "B")) `shouldBe` True
 
-    it "generates one LMetafactWrapper axiom per metafact" $ do
+    it "generates one WrapMetafact axiom per metafact" $ do
       doc <- buildStr [r|{ signature { A : 𝕌; B : 𝕌; }, axioms { metafacts { A × B; A + B; } } }|]
       length (metafactBodies doc) `shouldBe` 2
 
@@ -699,7 +695,7 @@ main = hspec $ do
         }}
       }|]
       -- The comprehension { y : S | y =_S x } produces a LBoundedForall
-      -- as the body of the LAssertionWrapper axiom.
+      -- as the body of the WrapAssertion axiom.
       hasAssertionBodyWith doc (\case
         LBoundedForall _ _ _ _ -> True
         _ -> False) `shouldBe` True
