@@ -32,6 +32,8 @@ library
                     , Eidos.Pipeline.SortBounds
                     , Eidos.Pipeline
                     , Eidos.Pipeline.FunctionFacts
+                    , Eidos.Pipeline.AxiomSet
+                    , Eidos.Pipeline.MkAxiomSets
                     , Eidos.Resolution.BuildMonad
                     , Eidos.Wasm.Wasm
     hs-source-dirs:   src

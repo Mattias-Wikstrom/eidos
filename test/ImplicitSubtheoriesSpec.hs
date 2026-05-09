@@ -16,10 +16,12 @@ import Data.List (nub, isInfixOf)
 
 import Eidos.Parse.Parser            (parseString)
 import Eidos.FromSyntax        (buildTheoryPure)
-import Eidos.BuildMonad        (emptyPureResolver)
+import Eidos.Resolution.BuildMonad (emptyPureResolver)
+import qualified Eidos.Pipeline as PL
+import Eidos.Pipeline.MkAxiomSets (mkAxiomSets)
 import Eidos.Backend.LeanProps.LeanExpr   (LeanDoc(..), LeanBlock(..), LeanDecl(..), LeanAxiom(..),
                                 LeanExpr(..), renderLeanExpr, renderLeanDoc)
-import Eidos.Backend.LeanProps.MkAxiomSets (mkAxiomSets)
+import Eidos.Backend.LeanProps.LeanProps (renderAxiomSetsToDecls, defaultLeanPropsOptions)
 import Eidos.Backend.LeanProps.LeanAxiomSet (AxiomSet(..), Tag(..))
 
 -- ---------------------------------------------------------------------------
@@ -32,9 +34,10 @@ buildStr src = case parseString src of
   Right ast -> case buildTheoryPure emptyPureResolver Nothing ast of
     Left err -> fail ("Build error: " ++ err)
     Right th ->
-      let axiomSets = mkAxiomSets th
-          decls = [ DeclAxiom ax | as <- axiomSets, ax <- asAxioms as ]
-      in return (LeanDoc "" [LeanBlock "__main__" decls])
+      let pt        = PL.prepareTheory PL.defaultPipelineOptions th
+          axiomSets = mkAxiomSets pt
+          decls     = renderAxiomSetsToDecls defaultLeanPropsOptions axiomSets
+      in return (LeanDoc { leanDocTheoryName = "", leanDocBlocks = [LeanBlock "__main__" decls] })
 
 -- | All axioms in a doc.
 axioms :: LeanDoc -> [LeanAxiom]

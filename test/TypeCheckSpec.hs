@@ -26,7 +26,7 @@ import Eidos.IR
 import qualified Eidos.IR as IR
 import Eidos.Parse.Parser      (parseString)
 import Eidos.FromSyntax  (buildTheoryPure)
-import Eidos.BuildMonad  (emptyPureResolver)
+import Eidos.Resolution.BuildMonad  (emptyPureResolver)
 
 -- ---------------------------------------------------------------------------
 -- Helpers

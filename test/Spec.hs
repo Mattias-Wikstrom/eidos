@@ -8,7 +8,7 @@ import Text.RawString.QQ (r)
 
 import Eidos.Parse.Parser (parseString)
 import Eidos.FromSyntax (buildTheoryPure)
-import Eidos.BuildMonad (mkPureResolver, emptyPureResolver)
+import Eidos.Resolution.BuildMonad (mkPureResolver, emptyPureResolver)
 import Eidos.Print.Pretty (prettyTheoryDecl)
 import Eidos.Parse.AST
 import qualified Eidos.Parse.AST as AST

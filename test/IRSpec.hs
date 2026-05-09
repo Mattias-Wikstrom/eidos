@@ -13,7 +13,7 @@ import Control.Exception (try, evaluate, SomeException, displayException)
 
 import Eidos.Parse.Parser         (parseString)
 import Eidos.FromSyntax     (buildTheoryPure)
-import Eidos.BuildMonad     (emptyPureResolver, mkPureResolver)
+import Eidos.Resolution.BuildMonad     (emptyPureResolver, mkPureResolver)
 import Eidos.IR
 
 -- ---------------------------------------------------------------------------

@@ -2,8 +2,8 @@
 --
 -- The pipeline has three stages:
 --
---   1. 'mkAxiomSets' (from 'Eidos.Export.MkAxiomSets') builds a normalized
---      list of tagged 'AxiomSet' values from the 'IR.Theory'.
+--   1. 'theoryBlocks' (from 'Eidos.Pipeline.MkAxiomSets') builds a
+--      normalized list of tagged 'AxiomSet' values from the 'IR.Theory'.
 --
 --   2. 'renderAxiomSetsToDecls' maps those sets to 'LeanDecl' values (with
 --      optional grouping/sorting rewrites controlled by 'LeanPropsOptions').
@@ -29,6 +29,7 @@ module Eidos.Backend.LeanProps.LeanProps
     -- * Pipeline stages
   , renderLeanDoc
   , renderLeanExpr
+  , renderAxiomSetsToDecls
     -- * Convenience entry point
   , LeanPropsOptions (..)
   , defaultLeanPropsOptions
@@ -38,17 +39,17 @@ module Eidos.Backend.LeanProps.LeanProps
 
 import qualified Eidos.IR as IR
 import qualified Eidos.Pipeline as PL
-import Eidos.Backend.LeanProps.LeanExpr
-import Data.List (intercalate, sortOn)
+import           Eidos.Pipeline.AxiomSet
+import           Eidos.Backend.LeanProps.LeanExpr
+import           Eidos.Backend.LeanProps.MkAxiomSets (theoryBlocks, axBodyToLean)
+import           Data.List (intercalate, sortOn)
 import qualified Data.Set as Set
-import Eidos.Backend.LeanProps.MkAxiomSets (theoryBlocks)
-import Eidos.Backend.LeanProps.LeanAxiomSet
 
 -- ---------------------------------------------------------------------------
 -- Convenience entry point
 -- ---------------------------------------------------------------------------
 
--- | Convert an Eidos theory directly to Lean 4 source (combines both stages).
+-- | Convert an Eidos theory directly to Lean 4 source (combines all stages).
 exportToLeanPropsWithOptions :: LeanPropsOptions -> IR.Theory -> String
 exportToLeanPropsWithOptions opts theory =
   let pipeOpts = PL.PipelineOptions { PL.pipeCollapseSortBounds = optUseSortingAxioms opts }
@@ -84,15 +85,16 @@ renderAxiomSetsToDecls opts = concatMap renderOne
           tagDecls = if optAddTagComments opts
                      then [DeclComment (tagSetComment (asTags as_))]
                      else []
-          axDecls = map (DeclAxiom . mapAxiom as_) (asAxioms as_)
+          axDecls = map (DeclAxiom . renderAxiom as_) (asAxioms as_)
       in DeclBlankLine : commentDecls ++ tagDecls ++ axDecls
 
-    mapAxiom as_ ax =
-      let rewritten = rewriteBounded (axiomType ax)
-          wrapped = if hasTag TagSorting as_
-                    then wrapSortingAsMetafact rewritten
-                    else rewritten
-      in ax { axiomType = wrapped }
+    renderAxiom as_ (name, body) =
+      let lean      = axBodyToLean body
+          rewritten = rewriteBounded lean
+          wrapped   = if hasTag TagSorting as_
+                      then wrapSortingAsMetafact rewritten
+                      else rewritten
+      in LeanAxiom name wrapped
 
     -- NOTE: temporary backend-side policy: emit sorting axioms as
     -- WrapMetafact ℙ_Min (<sorting formula body>).
@@ -125,20 +127,20 @@ subjectPathComment :: SubjectPath -> String
 subjectPathComment = unwords . map show
 
 data LeanPropsOptions = LeanPropsOptions
-  { optGroupByEntity      :: Bool
-  , optUseSortingAxioms   :: Bool
-  , optAddGroupComments   :: Bool
+  { optGroupByEntity          :: Bool
+  , optUseSortingAxioms       :: Bool
+  , optAddGroupComments       :: Bool
   , optUseBoundedForallSyntax :: Bool
-  , optAddTagComments      :: Bool
+  , optAddTagComments         :: Bool
   } deriving (Eq, Show)
 
 defaultLeanPropsOptions :: LeanPropsOptions
 defaultLeanPropsOptions = LeanPropsOptions
-  { optGroupByEntity = False
-  , optUseSortingAxioms = False
-  , optAddGroupComments = False
+  { optGroupByEntity          = False
+  , optUseSortingAxioms       = False
+  , optAddGroupComments       = False
   , optUseBoundedForallSyntax = False
-  , optAddTagComments = False
+  , optAddTagComments         = False
   }
 
 tagSetComment :: TagSet -> String
