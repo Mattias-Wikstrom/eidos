@@ -27,10 +27,8 @@ library
                     , Eidos.Print.JSON
                     , Eidos.Backend.Lean.Lean
                     , Eidos.Backend.LeanProps.LeanProps
-                    , Eidos.Backend.LeanProps.LeanAxiomSet
                     , Eidos.Backend.LeanProps.MkAxiomSets
                     , Eidos.Backend.CoqProps.CoqExpr
-                    , Eidos.Backend.CoqProps.CoqAxiomSet
                     , Eidos.Backend.CoqProps.MkAxiomSets
                     , Eidos.Backend.CoqProps.CoqProps
                     , Eidos.Pipeline.SortBounds
