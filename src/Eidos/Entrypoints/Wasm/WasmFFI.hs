@@ -42,7 +42,7 @@ import Foreign.C.String  (CString, newCString, peekCString)
 import qualified Data.Map.Strict as Map
 
 import Eidos.Entrypoints.Wasm.Wasm (compileBundleWithTypes, compileSingle, mainKey)
-import Eidos.ExternalRef (TheoryType(..))
+import Eidos.Pipeline.Resolution.ExternalRef (TheoryType(..))
 
 -- ---------------------------------------------------------------------------
 -- hs_compile_single
