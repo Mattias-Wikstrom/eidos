@@ -1,0 +1,5 @@
+{
+  signature {
+    MySet ⊆ 𝔻;
+  }
+}

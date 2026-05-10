@@ -1,0 +1,6 @@
+{
+  signature {
+    sort S;
+    f : S → S;
+  }
+}

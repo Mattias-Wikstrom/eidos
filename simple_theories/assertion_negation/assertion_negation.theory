@@ -1,0 +1,10 @@
+{
+  signature {
+    P : ℙ;
+  },
+  axioms {
+    assertions {
+      ¬P;
+    }
+  }
+}

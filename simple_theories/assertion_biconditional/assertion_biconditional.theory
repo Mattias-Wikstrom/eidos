@@ -1,0 +1,11 @@
+{
+  signature {
+    P : ℙ;
+    Q : ℙ;
+  },
+  axioms {
+    assertions {
+      P ↔ Q;
+    }
+  }
+}

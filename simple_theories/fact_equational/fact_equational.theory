@@ -1,0 +1,11 @@
+{
+  signature {
+    sort S;
+    f : S → S;
+  },
+  axioms {
+    facts {
+      x : S,  f(f(x)) = f(x);
+    }
+  }
+}

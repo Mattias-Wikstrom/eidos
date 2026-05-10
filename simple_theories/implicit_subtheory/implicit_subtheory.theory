@@ -1,0 +1,11 @@
+{
+  subtheories {
+    implicit {
+      base: {
+        signature {
+          sort S;
+        }
+      }
+    }
+  }
+}

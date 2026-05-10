@@ -1,0 +1,7 @@
+{
+  signature {
+    sort A;
+    sort B;
+    A subsort B;
+  }
+}

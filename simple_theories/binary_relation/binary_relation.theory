@@ -1,0 +1,6 @@
+{
+  signature {
+    sort S;
+    R ⊆ S, S;
+  }
+}

@@ -1,0 +1,7 @@
+{
+  subtheories {
+    implicit {
+      base: @base
+    }
+  }
+}

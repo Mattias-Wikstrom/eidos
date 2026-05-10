@@ -1,0 +1,10 @@
+{
+  signature {
+    A : 𝕌;
+  },
+  axioms {
+    metafacts {
+      X : 𝕌,  A - (A - X);
+    }
+  }
+}

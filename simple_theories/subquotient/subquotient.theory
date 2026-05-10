@@ -1,0 +1,6 @@
+{
+  signature {
+    sort E;
+    C subquotient E;
+  }
+}

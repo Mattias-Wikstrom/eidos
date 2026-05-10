@@ -1,0 +1,6 @@
+{
+  signature {
+    sort S;
+    MySet ⊆ S;
+  }
+}

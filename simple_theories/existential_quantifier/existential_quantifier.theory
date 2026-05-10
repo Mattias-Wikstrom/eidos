@@ -1,0 +1,11 @@
+{
+  signature {
+    sort S;
+    R ⊆ S, S;
+  },
+  axioms {
+    assertions {
+      x : S,  R(x, x) → ∃y : S R(x, y);
+    }
+  }
+}
