@@ -1083,9 +1083,9 @@ applyArithToMereo leftExpr off =
   in case resolvedOFFOp off of
        "+"  -> MSum     leftExpr right
        "×"  -> MProd    leftExpr right
-       "-"  -> MDiff    right    leftExpr
+       "-"  -> MDiff    leftExpr right    
        "∸"  -> MSymDiff leftExpr right
-       "⇒"  -> MRevDiff leftExpr right
+       "⇒"  -> MRevDiff right leftExpr
        "∪"  -> MSum     leftExpr right
        "∩"  -> MProd    leftExpr right
        _    -> MVar ("unknown:" ++ resolvedOFFOp off)
