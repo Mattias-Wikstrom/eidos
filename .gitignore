@@ -1,2 +1,6 @@
 dist-newstyle/
 cabal-store.zip
+
+# AI tooling worktree scratch space
+.claire/
+.claude/
