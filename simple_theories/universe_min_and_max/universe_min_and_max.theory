@@ -1,0 +1,9 @@
+{
+  signature {
+  },
+  axioms {
+    metafacts {
+       𝕌#min - 𝕌#max;
+    }
+  }
+}

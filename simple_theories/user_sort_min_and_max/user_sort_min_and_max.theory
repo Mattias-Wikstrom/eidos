@@ -1,0 +1,10 @@
+{
+  signature {
+    sort S;
+  },
+  axioms {
+    metafacts {
+      S#min - S#max;
+    }
+  }
+}
