@@ -13,7 +13,7 @@ strategies (macros, grouped-by-subject output, combined axioms) requires
 touching the generation code.
 
 The refactor introduces a **mid-level IR** (`AxiomSet`) that sits between
-`Eidos.IR` and `LeanDoc`.  Generation produces `AxiomSet` values; rendering
+`Eidos.Pipeline.FromSyntax.IR` and `LeanDoc`.  Generation produces `AxiomSet` values; rendering
 consumes them.
 
 ---

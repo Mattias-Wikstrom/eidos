@@ -8,10 +8,10 @@ import System.FilePath ((</>))
 import System.Directory (createDirectoryIfMissing)
 import Data.List (isInfixOf)
 
-import Eidos.Parse.Parser (parseString)
-import Eidos.FromSyntax (buildTheoryWithResolver, buildTheoryFromFile)
-import Eidos.Resolution.ExternalRef (ExternalRefResult(..), ExternalRefSource(..), TheoryType(..), mockResolver)
-import qualified Eidos.IR as IR
+import Eidos.Pipeline.Parse.Parser (parseString)
+import Eidos.Pipeline.FromSyntax.FromSyntax (buildTheoryWithResolver, buildTheoryFromFile)
+import Eidos.Pipeline.Resolution.ExternalRef (ExternalRefResult(..), ExternalRefSource(..), TheoryType(..), mockResolver)
+import qualified Eidos.Pipeline.FromSyntax.IR as IR
 
 main :: IO ()
 main = hspec $ do

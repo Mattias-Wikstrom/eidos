@@ -6,10 +6,10 @@ import Text.Megaparsec (errorBundlePretty)
 import Data.List (isInfixOf)
 import Text.RawString.QQ (r)
 
-import Eidos.Parse.Parser (parseString)
-import Eidos.Check.SubLanguage
-import Eidos.Resolution.ExternalRef (TheoryType(..))
-import Eidos.Parse.AST
+import Eidos.Pipeline.Parse.Parser (parseString)
+import Eidos.Pipeline.FromSyntax.Check.SubLanguage
+import Eidos.Pipeline.Resolution.ExternalRef (TheoryType(..))
+import Eidos.Pipeline.Parse.AST
 
 ------------------------------------------------------------
 -- Helpers

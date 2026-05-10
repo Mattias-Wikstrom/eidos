@@ -6,13 +6,13 @@ import Text.Megaparsec (errorBundlePretty)
 import Data.List (isInfixOf)
 import Text.RawString.QQ (r)
 
-import Eidos.Parse.Parser (parseString)
-import Eidos.FromSyntax (buildTheoryPure)
+import Eidos.Pipeline.Parse.Parser (parseString)
+import Eidos.Pipeline.FromSyntax.FromSyntax (buildTheoryPure)
 import Eidos.Print.Pretty (prettyTheoryDecl)
-import Eidos.Parse.AST
-import qualified Eidos.Parse.AST as AST
-import Eidos.IR
-import qualified Eidos.IR as IR
+import Eidos.Pipeline.Parse.AST
+import qualified Eidos.Pipeline.Parse.AST as AST
+import Eidos.Pipeline.FromSyntax.IR
+import qualified Eidos.Pipeline.FromSyntax.IR as IR
 
 ------------------------------------------------------------
 -- Test runner helpers (pure - no IO)

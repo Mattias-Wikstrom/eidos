@@ -4,10 +4,10 @@ module Main where
 import Test.Hspec
 import Text.Megaparsec (errorBundlePretty)
 
-import Eidos.Parse.Parser (parseString)
+import Eidos.Pipeline.Parse.Parser (parseString)
 import Eidos.Print.Pretty (prettyTheoryDecl)
-import Eidos.Parse.AST
-import qualified Eidos.Parse.AST as AST
+import Eidos.Pipeline.Parse.AST
+import qualified Eidos.Pipeline.Parse.AST as AST
 import Text.RawString.QQ (r)
 
 main :: IO ()

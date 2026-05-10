@@ -12,32 +12,34 @@ common deps
 
 library
     import:           warnings, deps
-    exposed-modules:  Eidos.Parse.Lexer
-                    , Eidos.Parse.AST
-                    , Eidos.Parse.Parser
-                    , Eidos.FromSyntax
-                    , Eidos.IR
-                    , Eidos.Backend.LeanProps.LeanExpr
+    exposed-modules:  Eidos.Pipeline.Parse.Lexer
+                    , Eidos.Pipeline.Parse.AST
+                    , Eidos.Pipeline.Parse.Parser
+                    , Eidos.Pipeline.FromSyntax.FromSyntax
+                    , Eidos.Pipeline.FromSyntax.IR
+                    , Eidos.Pipeline.Targets.LeanProps.LeanExpr
                     , Eidos.Print.Pretty
                     , Eidos.Print.DebugIR
-                    , Eidos.Check.TypeCheck
-                    , Eidos.Resolution.ExternalRef
-                    , Eidos.Resolution.Resolution 
-                    , Eidos.Check.SubLanguage
+                    , Eidos.Pipeline.FromSyntax.Check.TypeCheck
+                    , Eidos.Pipeline.Resolution.ExternalRef
+                    , Eidos.Pipeline.Resolution.Resolution 
+                    , Eidos.Pipeline.FromSyntax.Check.SubLanguage
                     , Eidos.Print.JSON
-                    , Eidos.Backend.Lean.Lean
-                    , Eidos.Backend.LeanProps.LeanProps
-                    , Eidos.Backend.LeanProps.MkAxiomSets
-                    , Eidos.Backend.CoqProps.CoqExpr
-                    , Eidos.Backend.CoqProps.MkAxiomSets
-                    , Eidos.Backend.CoqProps.CoqProps
-                    , Eidos.Pipeline.SortBounds
-                    , Eidos.Pipeline
-                    , Eidos.Pipeline.FunctionFacts
-                    , Eidos.Pipeline.AxiomSet
-                    , Eidos.Pipeline.MkAxiomSets
-                    , Eidos.Resolution.BuildMonad
-                    , Eidos.Wasm.Wasm
+                    , Eidos.Pipeline.Targets.Lean.Lean
+                    , Eidos.Pipeline.Targets.LeanProps.LeanProps
+                    , Eidos.Pipeline.Targets.LeanProps.MkAxiomSets
+                    , Eidos.Pipeline.Targets.CoqProps.CoqExpr
+                    , Eidos.Pipeline.Targets.CoqProps.MkAxiomSets
+                    , Eidos.Pipeline.Targets.CoqProps.CoqProps
+                    , Eidos.Pipeline.IRProcessing.SortBounds
+                    , Eidos.Pipeline.InvokePipeline
+                    , Eidos.Pipeline.IRProcessing.FunctionFacts
+                    , Eidos.Pipeline.IRProcessing.AxiomSet
+                    , Eidos.Pipeline.IRProcessing.MkAxiomSets
+                    , Eidos.Pipeline.Resolution.BuildMonad
+                    , Eidos.Entrypoints.Wasm.Wasm
+                    , Eidos.Entrypoints.Wasm.WasmFFI
+                    , Eidos.Entrypoints.CommandLine.Main
     hs-source-dirs:   src
     default-language: GHC2021
     build-depends:    megaparsec >=9.0

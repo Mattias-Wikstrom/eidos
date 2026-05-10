@@ -22,11 +22,11 @@ import           Data.List      (intercalate)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe     (isJust, mapMaybe)
 
-import           Eidos.Parse.AST
-import qualified Eidos.Parse.AST as AST
-import           Eidos.IR as IR
+import           Eidos.Pipeline.Parse.AST
+import qualified Eidos.Pipeline.Parse.AST as AST
+import           Eidos.Pipeline.FromSyntax.IR as IR
 
-import Eidos.Resolution.ExternalRef (TheoryType)
+import Eidos.Pipeline.Resolution.ExternalRef (TheoryType)
 
 -- ---------------------------------------------------------------------------
 -- Pretty-printing options
