@@ -41,6 +41,12 @@ sanitizeName = map (\c -> if c == '#' then '_' else c)
 -- works with opaque 'LeanExpr' values.
 resolveName :: String -> String
 resolveName n = case n of
+  "⊤"     -> "ℙ_Min"
+  "⊥"     -> "ℙ_Max"
+  "ℙ#min" -> "ℙ_Min"
+  "ℙ#max" -> "ℙ_Max"
+  "𝕌#min" -> "𝕌_Min"
+  "𝕌#max" -> "𝕌_Max"
   other
     | Just base <- stripSuffix "#min" other -> sanitizeName base ++ minSuffix
     | Just base <- stripSuffix "#max" other -> sanitizeName base ++ maxSuffix
@@ -95,9 +101,15 @@ mereoExprToLean (IR.MRevDiff a b) = LImpl   (mereoExprToLean a) (mereoExprToLean
 mereoExprToLean (IR.MSymDiff a b) = LBicond (mereoExprToLean a) (mereoExprToLean b)
 mereoExprToLean (IR.MVar n)       = LVar (resolveName n)
 mereoExprToLean IR.MZero          = LVar "True"
+mereoExprToLean (IR.MAbbrevApp "ProjectIntoInterval" [x, lo, hi]) =
+  LProjectIntoInterval (mereoExprToLean x) (mereoExprToLean lo) (mereoExprToLean hi)
 mereoExprToLean (IR.MAbbrevApp name args) =
   LApp (LVar name) (map mereoExprToLean args)
 mereoExprToLean (IR.MBoundedSum var lo hi body) =
-  LForallKw var LProp
-    (LImpl (LApp (LVar "IsWithinBounds") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
-           (mereoExprToLean body))
+  case (lo, hi) of
+    (IR.MVar loName, IR.MVar hiName) ->
+      LBoundedForall var (resolveName loName) (resolveName hiName) (mereoExprToLean body)
+    _ ->
+      LForallKw var LProp
+        (LImpl (LApp (LVar "IsWithinBounds") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
+               (mereoExprToLean body))

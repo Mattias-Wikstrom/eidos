@@ -26,7 +26,6 @@ import Eidos.IR
 import qualified Eidos.IR as IR
 import Eidos.Parse.Parser      (parseString)
 import Eidos.FromSyntax  (buildTheoryPure)
-import Eidos.Resolution.BuildMonad  (emptyPureResolver)
 
 -- ---------------------------------------------------------------------------
 -- Helpers
@@ -36,7 +35,7 @@ import Eidos.Resolution.BuildMonad  (emptyPureResolver)
 buildStr :: String -> Either String Theory
 buildStr src = case parseString src of
   Left  err -> Left ("Parse error: " ++ show err)
-  Right ast -> buildTheoryPure emptyPureResolver Nothing ast
+  Right ast -> buildTheoryPure ast
 
 -- | Assert that building the source *succeeds*.
 shouldAccept :: String -> Expectation

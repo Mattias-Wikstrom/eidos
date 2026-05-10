@@ -3,6 +3,7 @@ module Eidos.FromSyntax
   ( buildTheoryFromFile
   , buildTheoryPure
   , buildTheoryFromResolved
+  , buildTheoryWithResolver
   , BuildError
   ) where
 
@@ -22,7 +23,7 @@ import           Eidos.Parse.Parser         (parseString)
 import           Eidos.Check.TypeCheck
 import           Eidos.Check.SubLanguage
 
-import           Eidos.Resolution.Resolution    (resolveExternalRefs, BuildError)
+import           Eidos.Resolution.Resolution    (resolveExternalRefs, resolveWithFn, BuildError)
 
 -- ---------------------------------------------------------------------------
 -- Public entry points
@@ -50,6 +51,17 @@ buildTheoryFromFile filePath td = do
 -- | Pure entry point with no external references (for @--pure@ mode and testing).
 buildTheoryPure :: TheoryDecl -> Either BuildError Theory
 buildTheoryPure td = buildTheoryFromResolved Map.empty [] td
+
+-- | Pure entry point with a custom resolver function (for testing external references).
+buildTheoryWithResolver
+  :: (Maybe String -> String -> Either ExternalRefError ExternalRefResult)
+  -> Maybe String
+  -> TheoryDecl
+  -> Either BuildError Theory
+buildTheoryWithResolver fn baseCtx td =
+  case resolveWithFn fn baseCtx td of
+    Left err    -> Left err
+    Right refMap -> buildTheoryFromResolved refMap [] td
 
 -- ---------------------------------------------------------------------------
 -- Core theory builder (pure)
@@ -760,8 +772,10 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
 
       let th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
 
-      if isImplicit && not (isInternalName name) && not (null localToSub)
-        then foldM (addUnqualified name qualifiedName) th1 localToSub
+      if isImplicit && not (isInternalName name) && not (null transformed)
+        then if not (null localToSub)
+               then foldM (addUnqualified name qualifiedName) th1 localToSub
+               else Right $ foldl (\t e -> addEntityToParent t name e) th1 transformed
         else Right th1
 
 termFromEntityWithName :: String -> Entity -> ResolvedTerm

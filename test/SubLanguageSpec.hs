@@ -8,7 +8,7 @@ import Text.RawString.QQ (r)
 
 import Eidos.Parse.Parser (parseString)
 import Eidos.Check.SubLanguage
-import Eidos.ExternalRef (TheoryType(..))
+import Eidos.Resolution.ExternalRef (TheoryType(..))
 import Eidos.Parse.AST
 
 ------------------------------------------------------------
@@ -354,12 +354,12 @@ main = hspec $ do
 
     it "parses set comprehension { x : A | φ(x) }" $
       case parseString "{ signature { sort S; }, axioms { assertions { {x : S | x =_S x} ⊆ {x : S | x =_S x}; } } }" of
-        Left err -> fail ("Parse failed: " ++ show err)
+        Left err -> expectationFailure ("Parse failed: " ++ show err)
         Right _  -> return ()
 
     it "parses description ιx : A φ(x)" $
       case parseString "{ signature { sort S; a : S; }, axioms { assertions { ιx : S x =_S a; } } }" of
-        Left err -> fail ("Parse failed: " ++ show err)
+        Left err -> expectationFailure ("Parse failed: " ++ show err)
         Right _  -> return ()
 
     it "accepts set comprehension in .fol theory" $

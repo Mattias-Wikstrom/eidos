@@ -9,7 +9,6 @@ import Data.List (nub)
 
 import Eidos.Parse.Parser     (parseString)
 import Eidos.FromSyntax (buildTheoryPure)
-import Eidos.Resolution.BuildMonad (emptyPureResolver)
 import qualified Eidos.Pipeline as PL
 import Eidos.Pipeline.MkAxiomSets (mkAxiomSets)
 import Eidos.Backend.LeanProps.LeanProps
@@ -20,9 +19,9 @@ import Eidos.Backend.LeanProps.LeanAxiomSet (AxiomSet(..))
 -- ---------------------------------------------------------------------------
 
 uName, pName, dName :: String
-uName = "U"
-pName = "P"
-dName = "D"
+uName = "𝕌"
+pName = "ℙ"
+dName = "𝔻"
 
 minSuffix, maxSuffix :: String
 minSuffix = "_Min"
@@ -53,7 +52,7 @@ sortMaxName name = name ++ maxSuffix
 buildStr :: String -> IO LeanDoc
 buildStr src = case parseString src of
   Left err  -> fail ("Parse error: " ++ show err)
-  Right ast -> case buildTheoryPure emptyPureResolver Nothing ast of
+  Right ast -> case buildTheoryPure ast of
     Left err -> fail ("Build error: " ++ err)
     Right th ->
       let pt        = PL.prepareTheory PL.defaultPipelineOptions th

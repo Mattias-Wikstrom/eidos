@@ -10,7 +10,7 @@ import Data.List (isInfixOf)
 
 import Eidos.Parse.Parser (parseString)
 import Eidos.FromSyntax (buildTheoryWithResolver, buildTheoryFromFile)
-import Eidos.ExternalRef (ExternalRefResult(..), ExternalRefSource(..), TheoryType(..), mockResolver)
+import Eidos.Resolution.ExternalRef (ExternalRefResult(..), ExternalRefSource(..), TheoryType(..), mockResolver)
 import qualified Eidos.IR as IR
 
 main :: IO ()

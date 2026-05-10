@@ -91,19 +91,7 @@ renderAxiomSetsToDecls opts = concatMap renderOne
     renderAxiom as_ (name, body) =
       let lean      = axBodyToLean body
           rewritten = rewriteBounded lean
-          wrapped   = if hasTag TagSorting as_
-                      then wrapSortingAsMetafact rewritten
-                      else rewritten
-      in LeanAxiom name wrapped
-
-    -- NOTE: temporary backend-side policy: emit sorting axioms as
-    -- WrapMetafact ℙ_Min (<sorting formula body>).
-    -- If the formula is already prefixed by ℙ_Min → ..., strip that
-    -- antecedent to avoid duplicating ℙ_Min in the rendered output.
-    wrapSortingAsMetafact (LImpl (LVar "ℙ_Min") body) =
-      LApp (LVar "WrapMetafact") [LVar "ℙ_Min", body]
-    wrapSortingAsMetafact x =
-      LApp (LVar "WrapMetafact") [LVar "ℙ_Min", x]
+      in LeanAxiom name rewritten
 
     rewriteBounded (LBoundedForall var lo hi body)
       | optUseBoundedForallSyntax opts =

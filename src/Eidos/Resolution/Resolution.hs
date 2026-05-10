@@ -5,6 +5,7 @@
 -- 'BuildM' monad and 'MonadExternalRefResolver' to perform file I/O.
 module Eidos.Resolution.Resolution
   ( resolveExternalRefs
+  , resolveWithFn
   , ResolutionError
   , BuildError
   ) where
@@ -21,6 +22,15 @@ import           Eidos.Parse.Parser   (parseString)
 
 -- | Type alias for resolution errors (same as BuildError)
 type ResolutionError = String
+
+-- | Pure resolution using a custom resolver function (for testing).
+resolveWithFn
+  :: (Maybe String -> String -> Either ExternalRefError ExternalRefResult)
+  -> Maybe String
+  -> TheoryDecl
+  -> Either BuildError (Map.Map String (TheoryBody, TheoryType))
+resolveWithFn fn baseCtx td =
+  runReader (runBuildM (collectRefs (AST.theoryBody td)) baseCtx) (FnResolver fn)
 
 -- | Collect all external subtheory sources reachable from a 'TheoryDecl'
 -- without constructing any IR. Returns a map from reference identifier to
@@ -83,7 +93,7 @@ collectRefsItem acc item = case itemDef item of
         "Parse error in " ++ extRefIdentifier res ++ ": " ++ show parseErr
       Right a -> return a
     let body = AST.theoryBody ast
-        key  = extRefIdentifier res
+        key  = refPath
         tt   = extRefTheoryType res
     nested <- collectRefs body
     return (Map.insert key (body, tt) (Map.union acc nested))

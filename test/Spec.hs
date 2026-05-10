@@ -8,7 +8,6 @@ import Text.RawString.QQ (r)
 
 import Eidos.Parse.Parser (parseString)
 import Eidos.FromSyntax (buildTheoryPure)
-import Eidos.Resolution.BuildMonad (mkPureResolver, emptyPureResolver)
 import Eidos.Print.Pretty (prettyTheoryDecl)
 import Eidos.Parse.AST
 import qualified Eidos.Parse.AST as AST
@@ -19,22 +18,19 @@ import qualified Eidos.IR as IR
 -- Test runner helpers (pure - no IO)
 ------------------------------------------------------------
 
--- For tests without external references, use empty resolver
 run :: String -> Either String Theory
 run input =
   case parseString input of
     Left err -> Left (errorBundlePretty err)
     Right ast ->
-      let pureResolver = emptyPureResolver
-      in buildTheoryPure pureResolver Nothing ast
+      buildTheoryPure ast
 
 runExpectFail :: String -> Either String String
 runExpectFail input =
   case parseString input of
     Left err -> Right (errorBundlePretty err)
     Right ast ->
-      let pureResolver = emptyPureResolver
-      in case buildTheoryPure pureResolver Nothing ast of
+      case buildTheoryPure ast of
         Left err -> Right err
         Right _ -> Left "Expected failure but succeeded"
 

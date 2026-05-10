@@ -18,7 +18,6 @@ import Data.List (nub, isPrefixOf, isInfixOf)
 
 import Eidos.Parse.Parser     (parseString)
 import Eidos.FromSyntax (buildTheoryPure)
-import Eidos.Resolution.BuildMonad (emptyPureResolver)
 import qualified Eidos.Pipeline as PL
 import Eidos.Pipeline.MkAxiomSets (mkAxiomSets)
 import Eidos.Backend.LeanProps.LeanProps
@@ -30,9 +29,9 @@ import Eidos.Backend.LeanProps.LeanAxiomSet (AxiomSet(..))
 
 -- Base names for built-in sorts
 uName, pName, dName :: String
-uName = "U"
-pName = "P"
-dName = "D"
+uName = "𝕌"
+pName = "ℙ"
+dName = "𝔻"
 
 -- Suffixes for bounds
 minSuffix, maxSuffix :: String
@@ -64,7 +63,7 @@ propDeclName = id  -- Just the name itself, but centralized for consistency
 buildStr :: String -> IO LeanDoc
 buildStr src = case parseString src of
   Left err  -> fail ("Parse error: " ++ show err)
-  Right ast -> case buildTheoryPure emptyPureResolver Nothing ast of
+  Right ast -> case buildTheoryPure ast of
     Left err -> fail ("Build error: " ++ err)
     Right th ->
       let pt        = PL.prepareTheory PL.defaultPipelineOptions th

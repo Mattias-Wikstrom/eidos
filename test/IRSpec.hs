@@ -13,7 +13,7 @@ import Control.Exception (try, evaluate, SomeException, displayException)
 
 import Eidos.Parse.Parser         (parseString)
 import Eidos.FromSyntax     (buildTheoryPure)
-import Eidos.Resolution.BuildMonad     (emptyPureResolver, mkPureResolver)
+import Eidos.Resolution.BuildMonad     (mkPureResolver)
 import Eidos.IR
 
 -- ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ import Eidos.IR
 buildStr :: String -> IO Theory
 buildStr input = case parseString input of
   Left err  -> fail ("Parse error: " ++ show err)
-  Right ast -> case buildTheoryPure emptyPureResolver Nothing ast of
+  Right ast -> case buildTheoryPure ast of
     Left err -> fail ("Build error: " ++ err)
     Right th -> return th
 
@@ -689,15 +689,15 @@ main = hspec $ do
       -- No user assertions were written, so assertion list should be empty
       length assertionFacts `shouldBe` 0
 
-    it "item3: merge fact for single implicit sub has form 'S = sub.S'" $ do
+    it "item3: merge fact for single implicit sub has form 'S#min = sub.S#min'" $ do
       th <- buildStr [r|{
         subtheories { implicit {
           sub: { signature { sort S; } }
         }}
       }|]
       let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
-      -- Find the fact that mentions S and sub.S
-      mergeFacts `shouldSatisfy` any (mergeFactMentions "S" "sub.S")
+      -- Sorts generate #min and #max bound merge facts
+      mergeFacts `shouldSatisfy` any (mergeFactMentions "S#min" "sub.S#min")
 
     it "item3: two implicit subs each get their own merge equality fact" $ do
       th <- buildStr [r|{
@@ -706,8 +706,8 @@ main = hspec $ do
         }}
       }|]
       let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
-      mergeFacts `shouldSatisfy` any (mergeFactMentions "S" "sub1.S")
-      mergeFacts `shouldSatisfy` any (mergeFactMentions "S" "sub2.S")
+      mergeFacts `shouldSatisfy` any (mergeFactMentions "S#min" "sub1.S#min")
+      mergeFacts `shouldSatisfy` any (mergeFactMentions "S#min" "sub2.S#min")
 
     it "item3: unqualified name is always the LHS of the merge fact" $ do
       th <- buildStr [r|{
@@ -864,7 +864,7 @@ buildStrEither :: String -> IO (Either String Theory)
 buildStrEither input = do
   case parseString input of
     Left err -> return (Left (show err))
-    Right ast -> case buildTheoryPure emptyPureResolver Nothing ast of
+    Right ast -> case buildTheoryPure ast of
       Left err -> return (Left err)
       Right th -> return (Right th)
 
