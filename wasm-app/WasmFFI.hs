@@ -21,8 +21,8 @@ module WasmFFI
   ) where
 
 import qualified Data.Map.Strict as Map
-import Eidos.Wasm.Wasm (compileBundleWithTypes, mainKey)
-import Eidos.Resolution.ExternalRef (TheoryType(..))
+import Eidos.Entrypoints.Wasm.Wasm (compileBundleWithTypes, mainKey)
+import Eidos.Pipeline.Resolution.ExternalRef (TheoryType(..))
 
 -- ---------------------------------------------------------------------------
 -- Top-level entry point

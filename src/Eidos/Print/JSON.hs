@@ -16,7 +16,7 @@ import           Data.List (isInfixOf, intercalate)
 import qualified Data.Map.Strict as Map
 import           GHC.Generics
 
-import qualified Eidos.IR as IR
+import qualified Eidos.Pipeline.FromSyntax.IR as IR
 
 -- | Simplified export structure for JSON (user-friendly, excludes internal noise)
 data TheoryExport = TheoryExport

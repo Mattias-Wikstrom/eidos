@@ -8,7 +8,7 @@ import System.FilePath ((</>), takeExtension)
 import Control.Monad (filterM)
 import Data.List (isSuffixOf)
 
-import Eidos.Parse.Parser (parseString)
+import Eidos.Pipeline.Parse.Parser (parseString)
 
 main :: IO ()
 main = do

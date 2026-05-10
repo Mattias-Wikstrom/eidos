@@ -7,12 +7,12 @@ import Test.Hspec
 import Text.RawString.QQ (r)
 import Data.List (nub)
 
-import Eidos.Parse.Parser     (parseString)
-import Eidos.FromSyntax (buildTheoryPure)
+import Eidos.Pipeline.Parse.Parser     (parseString)
+import Eidos.Pipeline.FromSyntax.FromSyntax (buildTheoryPure)
 import qualified Eidos.Pipeline as PL
-import Eidos.Pipeline.MkAxiomSets (mkAxiomSets)
-import Eidos.Backend.LeanProps.LeanProps
-import Eidos.Backend.LeanProps.LeanAxiomSet (AxiomSet(..))
+import Eidos.Pipeline.IRProcessing.MkAxiomSets (mkAxiomSets)
+import Eidos.Pipeline.Targets.LeanProps.LeanProps
+import Eidos.Pipeline.Targets.LeanProps.LeanAxiomSet (AxiomSet(..))
 
 -- ---------------------------------------------------------------------------
 -- Naming conventions (mirror LeanProps.hs — single point of change)

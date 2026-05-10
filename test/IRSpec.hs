@@ -11,10 +11,10 @@ import qualified Data.Map.Strict as Map
 import Text.RawString.QQ    (r)
 import Control.Exception (try, evaluate, SomeException, displayException)
 
-import Eidos.Parse.Parser         (parseString)
-import Eidos.FromSyntax     (buildTheoryPure)
-import Eidos.Resolution.BuildMonad     (mkPureResolver)
-import Eidos.IR
+import Eidos.Pipeline.Parse.Parser         (parseString)
+import Eidos.Pipeline.FromSyntax.FromSyntax     (buildTheoryPure)
+import Eidos.Pipeline.Resolution.BuildMonad     (mkPureResolver)
+import Eidos.Pipeline.FromSyntax.IR
 
 -- ---------------------------------------------------------------------------
 -- Helpers

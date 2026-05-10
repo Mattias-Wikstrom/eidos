@@ -14,14 +14,14 @@ module Main where
 import Test.Hspec
 import Text.RawString.QQ (r)
 
-import Eidos.Parse.Parser            (parseString)
-import Eidos.FromSyntax        (buildTheoryPure)
+import Eidos.Pipeline.Parse.Parser            (parseString)
+import Eidos.Pipeline.FromSyntax.FromSyntax        (buildTheoryPure)
 import qualified Eidos.Pipeline as PL
-import Eidos.Pipeline.MkAxiomSets (mkAxiomSets)
-import Eidos.Backend.LeanProps.LeanExpr   (LeanDoc(..), LeanBlock(..), LeanDecl(..), LeanAxiom(..),
+import Eidos.Pipeline.IRProcessing.MkAxiomSets (mkAxiomSets)
+import Eidos.Pipeline.Targets.LeanProps.LeanExpr   (LeanDoc(..), LeanBlock(..), LeanDecl(..), LeanAxiom(..),
                                 LeanExpr(..), renderLeanExpr)
-import Eidos.Backend.LeanProps.LeanProps (renderAxiomSetsToDecls, defaultLeanPropsOptions)
-import Eidos.Backend.LeanProps.LeanAxiomSet (AxiomSet(..))
+import Eidos.Pipeline.Targets.LeanProps.LeanProps (renderAxiomSetsToDecls, defaultLeanPropsOptions)
+import Eidos.Pipeline.Targets.LeanProps.LeanAxiomSet (AxiomSet(..))
 
 -- ---------------------------------------------------------------------------
 -- Shared bound names (mirror LeanPropsSpec conventions)

@@ -5,7 +5,7 @@ module Eidos.Print.DebugIR
 import           Data.List      (intercalate, sortOn)
 import qualified Data.Map.Strict as Map
 
-import           Eidos.IR
+import           Eidos.Pipeline.FromSyntax.IR
 import           Eidos.Print.Pretty   (prettyResolvedPropExpr)
 
 -- | Produce a deterministic, human-readable dump of a theory's IR.

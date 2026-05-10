@@ -14,14 +14,14 @@ import Test.Hspec
 import Text.RawString.QQ (r)
 import Data.List (nub, isInfixOf)
 
-import Eidos.Parse.Parser            (parseString)
-import Eidos.FromSyntax        (buildTheoryPure)
+import Eidos.Pipeline.Parse.Parser            (parseString)
+import Eidos.Pipeline.FromSyntax.FromSyntax        (buildTheoryPure)
 import qualified Eidos.Pipeline as PL
-import Eidos.Pipeline.MkAxiomSets (mkAxiomSets)
-import Eidos.Backend.LeanProps.LeanExpr   (LeanDoc(..), LeanBlock(..), LeanDecl(..), LeanAxiom(..),
+import Eidos.Pipeline.IRProcessing.MkAxiomSets (mkAxiomSets)
+import Eidos.Pipeline.Targets.LeanProps.LeanExpr   (LeanDoc(..), LeanBlock(..), LeanDecl(..), LeanAxiom(..),
                                 LeanExpr(..), renderLeanExpr, renderLeanDoc)
-import Eidos.Backend.LeanProps.LeanProps (renderAxiomSetsToDecls, defaultLeanPropsOptions)
-import Eidos.Backend.LeanProps.LeanAxiomSet (AxiomSet(..), Tag(..))
+import Eidos.Pipeline.Targets.LeanProps.LeanProps (renderAxiomSetsToDecls, defaultLeanPropsOptions)
+import Eidos.Pipeline.Targets.LeanProps.LeanAxiomSet (AxiomSet(..), Tag(..))
 
 -- ---------------------------------------------------------------------------
 -- Helpers
