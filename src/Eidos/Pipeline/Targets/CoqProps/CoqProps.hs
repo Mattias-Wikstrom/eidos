@@ -35,7 +35,7 @@ module Eidos.Pipeline.Targets.CoqProps.CoqProps
   ) where
 
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
-import qualified Eidos.Pipeline as PL
+import qualified Eidos.Pipeline.InvokePipeline as PL
 import           Eidos.Pipeline.IRProcessing.AxiomSet
 import           Eidos.Pipeline.Targets.CoqProps.CoqExpr
 import           Eidos.Pipeline.Targets.CoqProps.MkAxiomSets (theoryBlocks, axBodyToCoq)

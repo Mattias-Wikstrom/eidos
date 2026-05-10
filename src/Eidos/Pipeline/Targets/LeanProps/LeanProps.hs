@@ -38,7 +38,7 @@ module Eidos.Pipeline.Targets.LeanProps.LeanProps
   ) where
 
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
-import qualified Eidos.Pipeline as PL
+import qualified Eidos.Pipeline.InvokePipeline as PL
 import           Eidos.Pipeline.IRProcessing.AxiomSet
 import           Eidos.Pipeline.Targets.LeanProps.LeanExpr
 import           Eidos.Pipeline.Targets.LeanProps.MkAxiomSets (theoryBlocks, axBodyToLean)
