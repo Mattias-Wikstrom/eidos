@@ -17,7 +17,7 @@ module Eidos.Pipeline.IRProcessing.MkAxiomSets
 
 import           Data.Maybe (fromJust)
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
-import qualified Eidos.Pipeline.InvokePipeline as PL
+import qualified Eidos.Pipeline.PipelineCore as PL
 import qualified Eidos.Pipeline.IRProcessing.SortBounds as SB
 import qualified Eidos.Pipeline.IRProcessing.FunctionFacts as FF
 import           Eidos.Pipeline.IRProcessing.AxiomSet
