@@ -33,47 +33,13 @@ module Eidos.Pipeline.Targets.LeanProps.LeanProps
     -- * Convenience entry point
   , LeanPropsOptions (..)
   , defaultLeanPropsOptions
-  , exportToLeanPropsWithOptions
-  , exportToLeanProps
   ) where
 
-import qualified Eidos.Pipeline.FromSyntax.IR as IR
-import qualified Eidos.Pipeline.InvokePipeline as PL
 import           Eidos.Pipeline.IRProcessing.AxiomSet
 import           Eidos.Pipeline.Targets.LeanProps.LeanExpr
-import           Eidos.Pipeline.Targets.LeanProps.MkAxiomSets (theoryBlocks, axBodyToLean)
-import           Data.List (intercalate, sortOn)
+import           Eidos.Pipeline.Targets.LeanProps.MkAxiomSets (axBodyToLean)
+import           Data.List (intercalate)
 import qualified Data.Set as Set
-
--- ---------------------------------------------------------------------------
--- Convenience entry point
--- ---------------------------------------------------------------------------
-
--- | Convert an Eidos theory directly to Lean 4 source (combines all stages).
-exportToLeanPropsWithOptions :: LeanPropsOptions -> IR.Theory -> String
-exportToLeanPropsWithOptions opts theory =
-  let pipeOpts = PL.PipelineOptions { PL.pipeCollapseSortBounds = optUseSortingAxioms opts }
-      prepared = PL.prepareTheory pipeOpts theory
-      render (ns, as_) =
-        let as1 = if optGroupByEntity opts then sortOn asPath as_ else as_
-        in LeanBlock ns (renderAxiomSetsToDecls opts as1)
-      blocks = map render (theoryBlocks prepared)
-      doc = LeanDoc
-        { leanDocTheoryName = IR.theoryFullyQualifiedName theory
-        , leanDocBlocks     = blocks
-        }
-      header =
-        if optUseBoundedForallSyntax opts
-        then unlines
-          [ "macro \"bforall \" x:ident \" in \" lo:term \"..\" hi:term \", \" body:term : term =>"
-          , "  `(forall $x : Prop, (IsWithinBounds $lo $hi $x) → $body)"
-          , ""
-          ]
-        else ""
-  in header ++ renderLeanDoc doc
-
-exportToLeanProps :: IR.Theory -> String
-exportToLeanProps = exportToLeanPropsWithOptions defaultLeanPropsOptions
 
 renderAxiomSetsToDecls :: LeanPropsOptions -> [AxiomSet] -> [LeanDecl]
 renderAxiomSetsToDecls opts = concatMap renderOne

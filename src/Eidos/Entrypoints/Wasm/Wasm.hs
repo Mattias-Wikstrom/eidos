@@ -10,8 +10,8 @@ import Text.Megaparsec          (errorBundlePretty)
 import Eidos.Pipeline.Parse.Parser       (parseString)
 import Eidos.Pipeline.Parse.AST          (TheoryDecl(..), TheoryBody)
 import Eidos.Pipeline.Resolution.ExternalRef        (TheoryType(..))
-import Eidos.Pipeline.Targets.LeanProps.LeanProps (exportToLeanProps)
 import Eidos.Pipeline.FromSyntax.FromSyntax (buildTheoryPure, buildTheoryFromResolved)
+import qualified Eidos.Pipeline.InvokePipeline as PL
 
 -- ---------------------------------------------------------------------------
 -- Public API
@@ -61,4 +61,4 @@ compileBundleWithTypes mainSrc deps =
             Left buildErr ->
               "Error: build error: " ++ buildErr
             Right theory ->
-              exportToLeanProps theory
+              PL.invokePipeline PL.TargetLeanProps PL.defaultTargetOptions theory

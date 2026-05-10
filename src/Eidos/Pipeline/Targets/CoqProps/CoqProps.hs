@@ -30,38 +30,13 @@ module Eidos.Pipeline.Targets.CoqProps.CoqProps
     -- * Convenience entry point
   , CoqPropsOptions (..)
   , defaultCoqPropsOptions
-  , exportToCoqPropsWithOptions
-  , exportToCoqProps
   ) where
 
-import qualified Eidos.Pipeline.FromSyntax.IR as IR
-import qualified Eidos.Pipeline.InvokePipeline as PL
 import           Eidos.Pipeline.IRProcessing.AxiomSet
 import           Eidos.Pipeline.Targets.CoqProps.CoqExpr
-import           Eidos.Pipeline.Targets.CoqProps.MkAxiomSets (theoryBlocks, axBodyToCoq)
-import           Data.List (intercalate, sortOn)
+import           Eidos.Pipeline.Targets.CoqProps.MkAxiomSets (axBodyToCoq)
+import           Data.List (intercalate)
 import qualified Data.Set as Set
-
--- ---------------------------------------------------------------------------
--- Convenience entry point
--- ---------------------------------------------------------------------------
-
-exportToCoqPropsWithOptions :: CoqPropsOptions -> IR.Theory -> String
-exportToCoqPropsWithOptions opts theory =
-  let pipeOpts = PL.PipelineOptions { PL.pipeCollapseSortBounds = optUseSortingAxioms opts }
-      prepared = PL.prepareTheory pipeOpts theory
-      render (ns, as_) =
-        let as1 = if optGroupByEntity opts then sortOn asPath as_ else as_
-        in CoqBlock ns (renderAxiomSetsToDecls opts as1)
-      blocks = map render (theoryBlocks prepared)
-      doc = CoqDoc
-        { coqDocTheoryName = IR.theoryFullyQualifiedName theory
-        , coqDocBlocks     = blocks
-        }
-  in renderCoqDoc doc
-
-exportToCoqProps :: IR.Theory -> String
-exportToCoqProps = exportToCoqPropsWithOptions defaultCoqPropsOptions
 
 renderAxiomSetsToDecls :: CoqPropsOptions -> [AxiomSet] -> [CoqDecl]
 renderAxiomSetsToDecls opts = concatMap renderOne

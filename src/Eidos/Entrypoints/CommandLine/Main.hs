@@ -15,10 +15,9 @@ import           Eidos.Print.DebugIR      (dumpTheoryIR)
 import           Eidos.Print.JSON         (exportTheoryToJSONString)
 
 import           Eidos.Pipeline.FromSyntax.IR as IR
+import qualified Eidos.Pipeline.InvokePipeline as PL
 
-import           Eidos.Pipeline.Targets.LeanProps.LeanProps (exportToLeanProps)
 import qualified Eidos.Pipeline.Targets.LeanProps.LeanProps as LeanProps
-import           Eidos.Pipeline.Targets.Lean.Lean (exportToLean)
 import qualified Eidos.Pipeline.Targets.CoqProps.CoqProps as CoqProps
 
 main :: IO ()
@@ -161,7 +160,7 @@ main = do
                   IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
                   exitFailure
                 Right theory -> do
-                  putStr $ CoqProps.exportToCoqPropsWithOptions opts theory
+                  putStr $ PL.invokePipeline PL.TargetCoqProps (toTargetOptionsFromCoq opts) theory
                   exitSuccess
 
     ("--lean_using_props":rest) -> do
@@ -182,7 +181,7 @@ main = do
                   IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
                   exitFailure
                 Right theory -> do
-                  putStr $ LeanProps.exportToLeanPropsWithOptions opts theory
+                  putStr $ PL.invokePipeline PL.TargetLeanProps (toTargetOptionsFromLean opts) theory
                   exitSuccess
 
     ["--lean", filePath] -> do
@@ -198,7 +197,7 @@ main = do
               IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
               exitFailure
             Right theory -> do
-              putStr $ Eidos.Pipeline.Targets.Lean.Lean.exportToLean theory
+              putStr $ PL.invokePipeline PL.TargetLean PL.defaultTargetOptions theory
               exitSuccess
 
     _ -> do
@@ -242,3 +241,20 @@ parseLeanPropsOptions flags =
     apply o "--bounded-forall-syntax" = o { LeanProps.optUseBoundedForallSyntax = True }
     apply o "--comment-tags"          = o { LeanProps.optAddTagComments = True }
     apply o _                         = o
+
+toTargetOptionsFromCoq :: CoqProps.CoqPropsOptions -> PL.TargetOptions
+toTargetOptionsFromCoq o = PL.defaultTargetOptions
+  { PL.toGroupByEntity = CoqProps.optGroupByEntity o
+  , PL.toUseSortingAxioms = CoqProps.optUseSortingAxioms o
+  , PL.toAddGroupComments = CoqProps.optAddGroupComments o
+  , PL.toAddTagComments = CoqProps.optAddTagComments o
+  }
+
+toTargetOptionsFromLean :: LeanProps.LeanPropsOptions -> PL.TargetOptions
+toTargetOptionsFromLean o = PL.defaultTargetOptions
+  { PL.toGroupByEntity = LeanProps.optGroupByEntity o
+  , PL.toUseSortingAxioms = LeanProps.optUseSortingAxioms o
+  , PL.toAddGroupComments = LeanProps.optAddGroupComments o
+  , PL.toUseBoundedForallSyntax = LeanProps.optUseBoundedForallSyntax o
+  , PL.toAddTagComments = LeanProps.optAddTagComments o
+  }
