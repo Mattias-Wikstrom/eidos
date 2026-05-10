@@ -57,12 +57,6 @@ sanitizeName = concatMap sanitizeChar
 -- | Map IR-internal symbolic names to their Coq identifiers.
 resolveName :: String -> String
 resolveName n = case n of
-  "⊤"     -> "ℙ_Min"
-  "⊥"     -> "ℙ_Max"
-  "ℙ#min" -> "ℙ_Min"
-  "ℙ#max" -> "ℙ_Max"
-  "𝕌#min" -> "𝕌_Min"
-  "𝕌#max" -> "𝕌_Max"
   other
     | Just base <- stripSuffix "#min" other -> sanitizeName base ++ minSuffix
     | Just base <- stripSuffix "#max" other -> sanitizeName base ++ maxSuffix
