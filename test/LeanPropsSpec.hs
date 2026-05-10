@@ -18,10 +18,10 @@ import Data.List (nub, isPrefixOf, isInfixOf)
 
 import Eidos.Pipeline.Parse.Parser     (parseString)
 import Eidos.Pipeline.FromSyntax.FromSyntax (buildTheoryPure)
-import qualified Eidos.Pipeline as PL
+import qualified Eidos.Pipeline.InvokePipeline as PL
 import Eidos.Pipeline.IRProcessing.MkAxiomSets (mkAxiomSets)
 import Eidos.Pipeline.Targets.LeanProps.LeanProps
-import Eidos.Pipeline.Targets.LeanProps.LeanAxiomSet (AxiomSet(..))
+import Eidos.Pipeline.IRProcessing.AxiomSet (AxiomSet(..))
 
 -- ---------------------------------------------------------------------------
 -- Naming conventions

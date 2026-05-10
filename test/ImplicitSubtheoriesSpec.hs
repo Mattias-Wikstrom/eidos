@@ -16,12 +16,12 @@ import Data.List (nub, isInfixOf)
 
 import Eidos.Pipeline.Parse.Parser            (parseString)
 import Eidos.Pipeline.FromSyntax.FromSyntax        (buildTheoryPure)
-import qualified Eidos.Pipeline as PL
+import qualified Eidos.Pipeline.InvokePipeline as PL
 import Eidos.Pipeline.IRProcessing.MkAxiomSets (mkAxiomSets)
 import Eidos.Pipeline.Targets.LeanProps.LeanExpr   (LeanDoc(..), LeanBlock(..), LeanDecl(..), LeanAxiom(..),
                                 LeanExpr(..), renderLeanExpr, renderLeanDoc)
 import Eidos.Pipeline.Targets.LeanProps.LeanProps (renderAxiomSetsToDecls, defaultLeanPropsOptions)
-import Eidos.Pipeline.Targets.LeanProps.LeanAxiomSet (AxiomSet(..), Tag(..))
+import Eidos.Pipeline.IRProcessing.AxiomSet (AxiomSet(..), Tag(..))
 
 -- ---------------------------------------------------------------------------
 -- Helpers
