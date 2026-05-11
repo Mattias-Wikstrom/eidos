@@ -32,10 +32,11 @@ module Eidos.Pipeline.Targets.CoqProps.CoqProps
   , defaultCoqPropsOptions
   ) where
 
-import           Eidos.Pipeline.IRProcessing.AxiomSet
+import qualified Eidos.Pipeline.FromSyntax.IR as IR        
+import Eidos.Pipeline.IRProcessing.AxiomSet
 import           Eidos.Pipeline.Targets.CoqProps.CoqExpr
-import           Eidos.Pipeline.Targets.CoqProps.MkAxiomSets (axBodyToCoq)
-import           Data.List (intercalate)
+import           Eidos.Pipeline.Targets.CoqProps.MkAxiomSets (theoryBlocks, axBodyToCoq, mereoExprToCoq)
+import           Data.List (intercalate, sortOn)
 import qualified Data.Set as Set
 
 renderAxiomSetsToDecls :: CoqPropsOptions -> [AxiomSet] -> [CoqDecl]
@@ -44,10 +45,14 @@ renderAxiomSetsToDecls opts = concatMap renderOne
     renderOne as_ =
       let commentDecls = [ DeclComment (subjectPathComment (asPath as_)) | optAddGroupComments opts ]
           tagDecls     = [ DeclComment (tagSetComment (asTags as_))      | optAddTagComments opts ]
-          axDecls      = map (DeclAxiom . renderAxiom) (asAxioms as_)
+          axDecls      = map renderOneDecl (asAxioms as_)
       in DeclBlankLine : commentDecls ++ tagDecls ++ axDecls
 
-    renderAxiom (name, body) = CoqAxiom name (axBodyToCoq body)
+    -- | Render a single (name, body) pair as either a DeclDef or DeclAxiom.
+    renderOneDecl (name, ABDef params mereoBody) =
+      DeclDef $ CoqDef name params (mereoExprToCoq mereoBody)
+    renderOneDecl (name, body) =
+      DeclAxiom (CoqAxiom name (axBodyToCoq body))
 
 subjectPathComment :: SubjectPath -> String
 subjectPathComment = unwords . map prettySubjectNode

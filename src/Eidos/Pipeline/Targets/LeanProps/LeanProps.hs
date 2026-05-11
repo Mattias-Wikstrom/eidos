@@ -35,10 +35,11 @@ module Eidos.Pipeline.Targets.LeanProps.LeanProps
   , defaultLeanPropsOptions
   ) where
 
+import qualified Eidos.Pipeline.FromSyntax.IR as IR         
 import           Eidos.Pipeline.IRProcessing.AxiomSet
 import           Eidos.Pipeline.Targets.LeanProps.LeanExpr
-import           Eidos.Pipeline.Targets.LeanProps.MkAxiomSets (axBodyToLean)
-import           Data.List (intercalate)
+import           Eidos.Pipeline.Targets.LeanProps.MkAxiomSets (theoryBlocks, axBodyToLean, mereoExprToLean)
+import           Data.List (intercalate, sortOn)
 import qualified Data.Set as Set
 
 renderAxiomSetsToDecls :: LeanPropsOptions -> [AxiomSet] -> [LeanDecl]
@@ -51,8 +52,14 @@ renderAxiomSetsToDecls opts = concatMap renderOne
           tagDecls = if optAddTagComments opts
                      then [DeclComment (tagSetComment (asTags as_))]
                      else []
-          axDecls = map (DeclAxiom . renderAxiom as_) (asAxioms as_)
+          axDecls = map (renderOneDecl as_) (asAxioms as_)
       in DeclBlankLine : commentDecls ++ tagDecls ++ axDecls
+
+    -- | Render a single (name, body) pair as either a DeclDef or DeclAxiom.
+    renderOneDecl as_ (name, ABDef params mereoBody) =
+      DeclDef $ LeanDef name params (rewriteBounded (mereoExprToLean mereoBody))
+    renderOneDecl as_ (name, body) =
+      DeclAxiom (renderAxiom as_ (name, body))
 
     renderAxiom as_ (name, body) =
       let lean      = axBodyToLean body

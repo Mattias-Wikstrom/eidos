@@ -34,6 +34,7 @@ library
                     , Eidos.Pipeline.IRProcessing.SortBounds
                     , Eidos.Pipeline.InvokePipeline
                     , Eidos.Pipeline.PipelineCore
+                    , Eidos.Pipeline.IRProcessing.MereologicalOpDefs
                     , Eidos.Pipeline.IRProcessing.FunctionFacts
                     , Eidos.Pipeline.IRProcessing.AxiomSet
                     , Eidos.Pipeline.IRProcessing.MkAxiomSets

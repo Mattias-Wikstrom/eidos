@@ -83,6 +83,12 @@ data AxiomBody
     -- ^ Axiom with mereological content.
   | ABFuncEq String String
     -- ^ Assert that two named, non-@Prop@ entities are equal: @l = r@.
+  | ABDef [String] IR.MereoExpr
+    -- ^ Define a function with the given parameter names and mereological body.
+    --   Backends emit @def name (p1 : Prop) … : Prop := body@ (Lean) or
+    --   @Definition name (p1 : Prop) … : Prop := body.@ (Coq) rather than
+    --   @axiom@\/@Axiom@.  Parameter names in the body are referenced via
+    --   'IR.MVar'; the same names must appear in the body.
   deriving (Eq, Show)
 
 -- ---------------------------------------------------------------------------
@@ -168,6 +174,10 @@ data Tag = TagSort
     -- ^ A user-written assertion or metafact from the theory source.
   | TagImplicitMerge
     -- ^ An implicit merge fact connecting entities across subtheories.
+  | TagMereologicalOpDef
+    -- ^ A per-theory definition of one of the five built-in mereological
+    --   operations (+, ×, −, ⇒, ∸), relativized to the theory's universe.
+    --   Backends emit these as @def@\/@Definition@ (not @axiom@\/@Axiom@).
 
   deriving (Eq, Ord, Show, Enum, Bounded)
 
