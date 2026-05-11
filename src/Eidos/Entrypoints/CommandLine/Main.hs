@@ -184,6 +184,23 @@ main = do
                   putStr $ PL.invokePipeline PL.TargetLeanProps (toTargetOptionsFromLean opts) theory
                   exitSuccess
 
+
+    ["--mereological", filePath] -> do
+      result <- parseFile filePath
+      case result of
+        Left err -> do
+          IO.hPutStrLn IO.stderr ("Parse error: " ++ show err)
+          exitFailure
+        Right ast -> do
+          irResult <- buildTheoryFromFile filePath ast
+          case irResult of
+            Left buildErr -> do
+              IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
+              exitFailure
+            Right theory -> do
+              putStr $ PL.invokePipeline PL.TargetMereological PL.defaultTargetOptions theory
+              exitSuccess
+
     ["--lean", filePath] -> do
       result <- parseFile filePath
       case result of
@@ -216,6 +233,7 @@ usage = do
       IO.hPutStrLn IO.stderr "    Optional flags before file: --group-by-entity --sorting-axioms --comment-groups --comment-tags"
       IO.hPutStrLn IO.stderr "  eidos-parser --lean_using_props <file.theory>  # Export to Lean 4 (handles ℙ, 𝕌, and mixed theories)"
       IO.hPutStrLn IO.stderr "    Optional flags before file: --group-by-entity --sorting-axioms --comment-groups --comment-tags --bounded-forall-syntax"
+      IO.hPutStrLn IO.stderr "  eidos-parser --mereological <file.theory>     # Export a first-pass mereological core theory"
       IO.hPutStrLn IO.stderr "  eidos-parser --json <file.theory>             # Export IR as JSON"
       IO.hPutStrLn IO.stderr "  eidos-parser --json --compact <file.theory>   # Export IR as compact JSON"
       IO.hPutStrLn IO.stderr "  eidos-parser --lean <file.theory>             # Export to Lean 4 using structure-based encoding (sorts → Types)"

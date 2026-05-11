@@ -25,9 +25,10 @@ import qualified Eidos.Pipeline.Targets.CoqProps.MkAxiomSets as CoqPropsMk
 import qualified Eidos.Pipeline.Targets.Lean.Lean as Lean
 import qualified Eidos.Pipeline.Targets.LeanProps.LeanProps as LeanProps
 import qualified Eidos.Pipeline.Targets.LeanProps.MkAxiomSets as LeanPropsMk
+import qualified Eidos.Pipeline.Targets.Mereological.Mereological as Mereological
 import           Data.List (sortOn)
 
-data PipelineTarget = TargetLean | TargetLeanProps | TargetCoqProps
+data PipelineTarget = TargetLean | TargetLeanProps | TargetCoqProps | TargetMereological
   deriving (Show, Eq)
 
 data TargetOptions = TargetOptions
@@ -83,6 +84,9 @@ invokePipeline target opts theory =
             , CoqProps.coqDocBlocks = blocks
             }
       in CoqProps.renderCoqDoc doc
+    TargetMereological ->
+      let prepared = prepareTheory defaultPipelineOptions theory
+      in Mereological.exportToMereological prepared
   where
     leanOpts = LeanProps.defaultLeanPropsOptions
       { LeanProps.optGroupByEntity = toGroupByEntity opts
