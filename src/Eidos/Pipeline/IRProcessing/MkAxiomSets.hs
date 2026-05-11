@@ -100,6 +100,7 @@ tSOL        = [TagFunction, TagSOLFunction, TagDecl]
 mkAxiomSets :: PL.PreparedTheory -> [AxiomSet]
 mkAxiomSets pt = concat
   [ mereologicalOpDefAxiomSets
+  , userAbbrevDefAxiomSets
   , headerAxiomSets
   , userSortLimitAxiomSets
   , productSortLimitAxiomSets
@@ -233,6 +234,17 @@ mkAxiomSets pt = concat
       mkOpDef entry =
         axiomSet [SGlobal] (tags [TagMereologicalOpDef])
           [(MOD.modDefName entry, ABDef (MOD.modParams entry) (MOD.modBody entry))]
+
+  -- -------------------------------------------------------------------------
+  -- 0b. User-defined abbreviations from abbreviations { } sections.
+  --     Emitted as def/Definition (not axiom/Axiom) by backends.
+  -- -------------------------------------------------------------------------
+  userAbbrevDefAxiomSets :: [AxiomSet]
+  userAbbrevDefAxiomSets = map mkAbbrevDef (PL.ptUserAbbrevDefs pt)
+    where
+      mkAbbrevDef ad =
+        axiomSet [SGlobal] (tags [TagUserAbbrevDef])
+          [(IR.abbrevName ad, ABDef (IR.abbrevParams ad) (IR.abbrevBody ad))]
 
   -- -------------------------------------------------------------------------
   -- 1. Header: U/P (and optionally D) limit objects
