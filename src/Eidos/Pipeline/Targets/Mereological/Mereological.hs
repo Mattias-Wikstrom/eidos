@@ -6,6 +6,7 @@ import qualified Data.List as L
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
 import qualified Eidos.Pipeline.IRProcessing.MereologicalOpDefs as MOD
 import qualified Eidos.Pipeline.PipelineCore as PC
+import qualified Eidos.Pipeline.IRProcessing.SortBounds as SB
 
 univPrefix, propPrefix, minSuffix, maxSuffix :: String
 univPrefix = "Univ"
@@ -44,9 +45,15 @@ exportToMereological prepared =
 
     metafacts =
       let facts = IR.theoryFacts (PC.ptTheory prepared)
-      in case [renderMereoExpr me ++ ";" | f <- facts, Just me <- [IR.factMereoExpr f]] of
+          translated = [renderMereoExpr me ++ ";" | f <- facts, Just me <- [IR.factMereoExpr f]]
+          sortBoundFacts = [ rewriteAxiomName nm ++ " : " ++ renderMereoExpr me ++ ";"
+                           | e <- PC.ptSortBounds prepared, (nm, me) <- SB.sbeAxioms e ]
+          sortOrderFacts = [ rewriteAxiomName nm ++ " : " ++ renderMereoExpr me ++ ";"
+                           | e <- PC.ptSortOrder prepared, (nm, me) <- SB.soeAxioms e ]
+          allMetafacts = L.nub (sortBoundFacts ++ sortOrderFacts ++ translated)
+      in case allMetafacts of
            [] -> ["/* no translated mereological facts yet */"]
-           xs -> L.nub xs
+           xs -> xs
 
 usedBaseAbbrevDefs :: PC.PreparedTheory -> [MOD.MereoOpDefEntry] -> [IR.AbbrevDef]
 usedBaseAbbrevDefs prepared defs =
@@ -108,6 +115,14 @@ rewriteSpecialVar n = case n of
   "ℙ#min" -> propPrefix ++ minSuffix
   "ℙ#max" -> propPrefix ++ maxSuffix
   _       -> n
+
+rewriteAxiomName :: String -> String
+rewriteAxiomName n = case n of
+  "𝕌_ordering" -> univPrefix ++ "_ordering"
+  "ℙ_upper"    -> propPrefix ++ "_upper"
+  "ℙ_ordering" -> propPrefix ++ "_ordering"
+  "ℙ_lower"    -> propPrefix ++ "_lower"
+  _            -> n
 
 userObjectNames :: IR.Theory -> [String]
 userObjectNames th =
