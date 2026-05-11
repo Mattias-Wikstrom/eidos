@@ -3,17 +3,17 @@
 {
   signature {
     sort S;
-    sort T subsort S;
-  }
-
+    T subsort S;
+  },
   abbreviations {
     Impl(x, y) := x ⇒ y; // "x implies y" as the reverse-difference x ⇒ y
     Join(x, y, z) := x + (y + z); // ternary join
     Closure(x) := x + (x ⇒ x);
-  }
-
+  },
   axioms {
-    Impl(𝔻#min, 𝔻#max);
-    Join(𝔻#min, 𝔻#min, 𝔻#min);
+    metafacts {
+      Impl(𝔻#min, 𝔻#max);
+      Join(𝔻#min, 𝔻#min, 𝔻#min);
+    }
   }
 }
