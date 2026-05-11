@@ -20,10 +20,11 @@ newtype TheoryBody = TheoryBody { sections :: [Section] }
   deriving (Show, Eq)
 
 data Section
-  = SectionSignature   SignatureSection
-  | SectionAxioms      AxiomsWrapper
-  | SectionSubtheories SubtheoriesSection
-  | SectionBareAxioms  AxiomsSection
+  = SectionSignature     SignatureSection
+  | SectionAxioms        AxiomsWrapper
+  | SectionSubtheories   SubtheoriesSection
+  | SectionBareAxioms    AxiomsSection
+  | SectionAbbreviations AbbreviationsSection
   deriving (Show, Eq)
 
 -- ---------------------------------------------------------------------------
@@ -69,6 +70,23 @@ data IndividualDeclaration = IndividualDeclaration
 data SetDeclaration = SetDeclaration
   { setName   :: String
   , setDomain :: [SortExpr]
+  } deriving (Show, Eq)
+
+-- ---------------------------------------------------------------------------
+-- Abbreviations
+-- ---------------------------------------------------------------------------
+
+-- | abbreviations { Name(p1, p2, …) := expr ; … }
+newtype AbbreviationsSection = AbbreviationsSection { abbrevItems :: [AbbrevDefItem] }
+  deriving (Show, Eq)
+
+-- | A single user-defined abbreviation definition.
+--   Names must start with an uppercase letter.
+--   Parameters are plain identifiers (bound inside 'abbrevBody').
+data AbbrevDefItem = AbbrevDefItem
+  { abbrevItemName   :: String    -- ^ Must start with uppercase
+  , abbrevItemParams :: [String]  -- ^ Parameter names
+  , abbrevItemBody   :: Term      -- ^ Mereological expression body
   } deriving (Show, Eq)
 
 -- ---------------------------------------------------------------------------

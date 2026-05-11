@@ -99,7 +99,8 @@ classifyEntity (EntityFunction f) =
   case funcKind f of
     FunctionKindFOLFunctionFromTheory -> FOLFunctionClass (length (funcArgSorts f))
     FunctionKindSOLFunctionFromTheory -> SOLFunctionClass (length (funcArgSorts f))
-    _ -> error "unexpected function kind"  -- only user-declared functions appear here
+    FunctionKindUserAbbreviation      -> SOLFunctionClass (length (funcArgSorts f))
+    _ -> OtherMereologicalClass  -- built-in ops and auxiliary functions
 classifyEntity (EntityRelation r) = RelationClass (length (relArgSorts r))
 classifyEntity (EntityMereological m) =
   case mereoKind m of
@@ -203,7 +204,8 @@ classifyLevel2 (EntityFunction f) =
   case funcKind f of
     FunctionKindFOLFunctionFromTheory -> L2FOLFunction (length (funcArgSorts f))
     FunctionKindSOLFunctionFromTheory -> L2SOLFunction (length (funcArgSorts f))
-    _ -> L2BareMereological  -- shouldn't happen for user functions
+    FunctionKindUserAbbreviation      -> L2SOLFunction (length (funcArgSorts f))
+    _ -> L2BareMereological
 classifyLevel2 (EntityRelation r) = L2FOLFunction (length (relArgSorts r))  -- relations are FOL predicates
 classifyLevel2 (EntityMereological m) =
   case mereoKind m of

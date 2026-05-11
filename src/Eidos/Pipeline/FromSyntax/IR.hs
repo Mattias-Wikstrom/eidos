@@ -43,6 +43,7 @@ data EntityKind
   | FunctionKindDirectImageFunction        -- ^ Auto-generated direct-image SOL function f#dir_img
   | FunctionKindInverseImageFunction       -- ^ Auto-generated inverse-image SOL function f#inv_img
   | FunctionKindMereologicalOperation      -- ^ Built-in mereological op (+, ×, -, ⇒, ∸)
+  | FunctionKindUserAbbreviation           -- ^ User-defined abbreviation from @abbreviations { }@ section
   -- Mereological object kinds
   | MereologicalEntityKindMereological          -- ^ Bare mereological object (no subtype)
   | MereologicalEntityKindIndividual            -- ^ An individual element of a sort
@@ -396,6 +397,11 @@ data Theory = Theory
   , theoryDiff                      :: Function
   , theoryRevDiff                   :: Function
   , theorySymDiff                   :: Function
+  , theoryUserAbbrevDefs            :: [AbbrevDef]
+    -- ^ User-defined abbreviations from @abbreviations { }@ sections in the
+    -- source theory.  These are separate from the compiler-internal
+    -- 'allAbbrevDefs' registry and must never pollute that namespace.
+    -- Backends may use this list to emit user abbreviation definitions.
   }
 
 instance Show Theory where

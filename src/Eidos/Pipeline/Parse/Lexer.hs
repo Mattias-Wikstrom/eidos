@@ -15,6 +15,7 @@ module Eidos.Pipeline.Parse.Lexer
   , lbrace, rbrace, lparen, rparen, lbrack, rbrack
   , pipe, iotaOp
   , semi, colon, comma, dot, hash, at, underscore, caret
+  , colonEquals
   , lt, gt, doubleLt, doubleGt
     -- * Operators
   , arrow, bicond, impliedBy, impliesOp
@@ -26,6 +27,7 @@ module Eidos.Pipeline.Parse.Lexer
     -- * Keywords
   , kwSignature, kwAxioms, kwAssertions, kwFacts
   , kwMetafacts, kwSubtheories, kwNamed, kwSort
+  , kwAbbreviations
   , kwImplicit, kwReflection
   , kwSubquotient, kwSubsort, kwQuotient
   , kwMin, kwMax, kwRes, kwArg, kwDom
@@ -90,6 +92,10 @@ hash       = symbol "#"
 at        = symbol "@"
 underscore = symbol "_"
 caret      = symbol "^"
+
+-- | ':=' assignment operator for abbreviation definitions.
+colonEquals :: Parser String
+colonEquals = symbol ":="
 
 lt, gt, doubleLt, doubleGt :: Parser String
 doubleLt     = symbol "<<"
@@ -157,6 +163,7 @@ structuralKeywords :: [String]
 structuralKeywords =
   [ "signature", "axioms", "assertions", "facts"
   , "metafacts", "subtheories", "named", "sort"
+  , "abbreviations"
   , "implicit", "reflection"
   , "subquotient", "subsort", "quotient"
   ]
@@ -172,6 +179,9 @@ kwMetafacts    = keyword "metafacts"
 kwSubtheories  = keyword "subtheories"
 kwNamed        = keyword "named"
 kwSort         = keyword "sort"
+
+kwAbbreviations :: Parser String
+kwAbbreviations = keyword "abbreviations"
 
 kwImplicit, kwReflection :: Parser String
 kwImplicit   = keyword "implicit"

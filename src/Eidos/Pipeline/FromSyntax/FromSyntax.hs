@@ -7,7 +7,7 @@ module Eidos.Pipeline.FromSyntax.FromSyntax
   , BuildError
   ) where
 
-import           Control.Monad        (forM_, when, foldM)
+import           Control.Monad        (forM_, when, unless, foldM)
 import           Data.Char            (isUpper)
 import           Data.List            (find, intercalate, isSuffixOf)
 import qualified Data.Map.Strict      as Map
@@ -100,8 +100,13 @@ decorateTheoryBody refMap body parentMaybe name isReflection constraints = do
   -- ── Pass 2: signature ─────────────────────────────────────────────────
   th3 <- foldM (buildSignatureSection th2) th2 (sections body)
 
+  -- ── Pass 2.5: abbreviations ───────────────────────────────────────────
+  -- Abbreviation entities are added to theoryObjectsByName so that Pass 3
+  -- name resolution can find them when they are called in axiom bodies.
+  th3a <- foldM buildAbbreviationsSection th3 (sections body)
+
   -- ── Pass 3: axioms ────────────────────────────────────────────────────
-  th4 <- foldM (buildAxiomsSection th3) th3 (sections body)
+  th4 <- foldM (buildAxiomsSection th3a) th3a (sections body)
 
   -- ── Mereological translations ─────────────────────────────────────────
   let translations = concatMap (mereologicalTranslation th4) (theoryFacts th4)
@@ -312,6 +317,150 @@ buildSignatureItem th0 th item = do
           return (if shouldInsert then addEntityToTh th' (EntityRelation rel) else th')
 
 -- ---------------------------------------------------------------------------
+-- Pass 2.5 — Abbreviations
+-- ---------------------------------------------------------------------------
+
+-- | Process a single 'SectionAbbreviations' section.
+-- Each item is validated, converted to an 'AbbrevDef', stored in
+-- 'theoryUserAbbrevDefs', and also registered in 'theoryObjectsByName' as a
+-- synthetic SOL-function-shaped entity so that Pass 3 name resolution can
+-- resolve calls to user abbreviations inside axiom bodies.
+buildAbbreviationsSection :: Theory -> Section -> Either BuildError Theory
+buildAbbreviationsSection th (SectionAbbreviations (AbbreviationsSection items)) =
+  foldM buildAbbrevDefItem th items
+buildAbbreviationsSection th _ = Right th
+
+buildAbbrevDefItem :: Theory -> AbbrevDefItem -> Either BuildError Theory
+buildAbbrevDefItem th item = do
+  let nm     = abbrevItemName   item
+      params = abbrevItemParams item
+      bodyT  = abbrevItemBody   item
+
+  -- Validate: name must start uppercase (already checked in parser, but
+  -- defensive check here too).
+  when (null nm || not (firstLetterIsUppercase nm)) $
+    Left $ "Abbreviation name must start with uppercase: " ++ nm
+
+  -- Validate: no duplicate parameter names.
+  let dupParams = [ p | p <- params, length (filter (== p) params) > 1 ]
+  case dupParams of
+    (p:_) -> Left $ "Duplicate parameter name '" ++ p ++ "' in abbreviation '" ++ nm ++ "'"
+    []    -> return ()
+
+  -- Validate: name must not clash with a compiler-internal abbreviation.
+  when (nm `elem` map abbrevName allAbbrevDefs) $
+    Left $ "Abbreviation name '" ++ nm ++ "' clashes with a compiler-internal abbreviation"
+
+  -- Collect the set of known abbreviation names so the body can reference
+  -- previously-defined user abbreviations.
+  let knownAbbrevNames = map abbrevName (theoryUserAbbrevDefs th)
+
+  -- Convert AST Term body to MereoExpr, with params as bound variable names.
+  body <- astTermToMereoExpr nm params knownAbbrevNames bodyT
+
+  let ad = AbbrevDef nm params body
+
+  -- Register as a synthetic SOL-function entity so name resolution finds it.
+  let universe = theoryUniverse th
+      syntheticFn = mkSOLFunction th nm FunctionKindUserAbbreviation
+                      (replicate (length params) universe) universe FromSignature
+      th1 = addEntityToTh th (EntityFunction syntheticFn)
+
+  -- Store in theoryUserAbbrevDefs.
+  let th2 = th1 { theoryUserAbbrevDefs = theoryUserAbbrevDefs th1 ++ [ad] }
+
+  return th2
+
+-- | Convert an AST 'Term' to a 'MereoExpr' for use as an abbreviation body.
+-- Only mereological operators (+, ×, -, ⇒, ∸) are allowed; any other
+-- construct is rejected with a descriptive error.
+--
+-- @params@ are the parameter names — they resolve as 'MVar'.
+-- @knownAbbrevs@ are names of previously-defined abbreviations that may be
+-- called inside this body.
+astTermToMereoExpr
+  :: String    -- ^ Abbreviation name (for error messages)
+  -> [String]  -- ^ Parameter names
+  -> [String]  -- ^ Known user abbreviation names
+  -> Term
+  -> Either BuildError MereoExpr
+astTermToMereoExpr ctx params knownAbbrevs (Term leftF rests) = do
+  l  <- goFactor leftF
+  rs <- mapM goOFF rests
+  return (foldl applyOp l rs)
+  where
+    applyOp acc (op, rhs) = case op of
+      "+"  -> MSum     acc rhs
+      "×"  -> MProd    acc rhs
+      "*"  -> MProd    acc rhs
+      "-"  -> MDiff    rhs  acc   -- MDiff(a,b) = b - a, i.e. b → a
+      "⇒"  -> MRevDiff acc rhs
+      "∸"  -> MSymDiff acc rhs
+      "∪"  -> MSum     acc rhs
+      "∩"  -> MProd    acc rhs
+      other -> error $ "astTermToMereoExpr: unexpected op " ++ other
+
+    goOFF (OperationFollowedByFactor _ op rightF) = do
+      rhs <- goFactor rightF
+      return (op, rhs)
+
+    goFactor (Factor base suffixes) = case suffixes of
+      [] -> goBase base
+      [SuffixCall (CallSuffix args)] -> do
+        -- Abbreviation application: Name(arg1, arg2, …)
+        name <- case base of
+          BTAtomic (ConstantRef [] n) -> return n
+          _ -> Left $ "In abbreviation '" ++ ctx ++ "': call target must be a plain name"
+        unless (name `elem` knownAbbrevs
+                || name `elem` map abbrevName allAbbrevDefs) $
+          Left $ "In abbreviation '" ++ ctx ++ "': unknown abbreviation '" ++ name ++ "'"
+        argExprs <- mapM (astTermToMereoExpr ctx params knownAbbrevs) args
+        return (MAbbrevApp name argExprs)
+      _ ->
+        Left $ "In abbreviation '" ++ ctx ++ "': unsupported term suffix in body"
+
+    goBase (BTAtomic (ConstantRef [] name))
+      | name `elem` params = return (MVar name)
+      | name `elem` knownAbbrevs
+        || name `elem` map abbrevName allAbbrevDefs =
+          -- Zero-argument abbreviation reference — unusual but allow it.
+          return (MAbbrevApp name [])
+      | otherwise =
+          Left $ "In abbreviation '" ++ ctx ++ "': unknown name '" ++ name
+              ++ "' (not a parameter or known abbreviation)"
+    goBase (BTParen inner) = do
+      -- Parenthesised expression: only pure-term form is accepted.
+      case extractTermFromPropExpr inner of
+        Just t  -> astTermToMereoExpr ctx params knownAbbrevs t
+        Nothing -> Left $ "In abbreviation '" ++ ctx
+                       ++ "': parenthesised body must be a mereological term, "
+                       ++ "not a proposition"
+    goBase other =
+      Left $ "In abbreviation '" ++ ctx ++ "': unsupported base term in body: "
+          ++ describeBase other
+
+-- | Extract the inner 'Term' from a 'PropExpr' that is a plain term
+-- (no propositional connectives, no quantifiers).
+extractTermFromPropExpr :: PropExpr -> Maybe Term
+extractTermFromPropExpr (PropExpr (RightImpl left Nothing) []) =
+  case left of
+    LeftImpl (Disj (Conj (NegChild (Quantified [] (AtomicProp (TermPair t [])))) []) []) [] ->
+      Just t
+    _ -> Nothing
+extractTermFromPropExpr _ = Nothing
+
+describeBase :: BaseTerm -> String
+describeBase (BTAtomic _)                 = "qualified constant reference"
+describeBase (BTEvaluationInTheory _)     = "evaluation-in-theory expression"
+describeBase (BTProjectionToInterval _)   = "projection-to-interval"
+describeBase (BTProjectionToSort _)       = "projection-to-sort"
+describeBase (BTGeneralizedSumOrProduct _) = "generalized sum or product"
+describeBase (BTSetComprehension _)       = "set comprehension"
+describeBase (BTDescription _)            = "description (ι)"
+describeBase (BTSingleton _)              = "singleton"
+describeBase (BTParen _)                  = "parenthesised expression"
+
+-- ---------------------------------------------------------------------------
 -- Pass 3 — Axioms
 -- ---------------------------------------------------------------------------
 
@@ -457,6 +606,7 @@ createTheory parentMaybe name isRefl =
         , theoryDiff                         = diffF
         , theoryRevDiff                      = revDiffF
         , theorySymDiff                      = symDiffF
+        , theoryUserAbbrevDefs               = []
         }
 
       universe = mkSort th SortKindUniverse "𝕌" InEveryTheory
@@ -1334,6 +1484,7 @@ entityToExprType (EntityFunction f) =
   case funcKind f of
     FunctionKindFOLFunctionFromTheory -> FOLFunctionClass (length (funcArgSorts f))
     FunctionKindSOLFunctionFromTheory -> SOLFunctionClass (length (funcArgSorts f))
+    FunctionKindUserAbbreviation      -> SOLFunctionClass (length (funcArgSorts f))
     _ -> OtherMereologicalClass
 entityToExprType (EntityRelation r)    = RelationClass (length (relArgSorts r))
 entityToExprType (EntityMereological m) =
