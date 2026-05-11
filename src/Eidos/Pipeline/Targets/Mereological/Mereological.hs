@@ -17,8 +17,10 @@ exportToMereological prepared =
     ++ ["    }", "  }", "}"]
   where
     defs = PC.ptMereologicalOpDefs prepared
+    baseAbbrevs = usedBaseAbbrevDefs prepared defs
     abbreviationsSection =
       [ "  abbreviations {" ]
+      ++ map ("    " ++) (map renderBaseAbbrevDef baseAbbrevs)
       ++ map ("    " ++) (map renderDef defs)
       ++ [ "  }," ]
 
@@ -27,6 +29,40 @@ exportToMereological prepared =
       in case [renderMereoExpr me ++ ";" | f <- facts, Just me <- [IR.factMereoExpr f]] of
            [] -> ["/* no translated mereological facts yet */"]
            xs -> L.nub xs
+
+usedBaseAbbrevDefs :: PC.PreparedTheory -> [MOD.MereoOpDefEntry] -> [IR.AbbrevDef]
+usedBaseAbbrevDefs prepared defs =
+  [ ad
+  | ad <- IR.allAbbrevDefs
+  , IR.abbrevName ad `elem` closure
+  ]
+  where
+    facts = IR.theoryFacts (PC.ptTheory prepared)
+    seedNames =
+      concatMap (IR.collectUsedAbbrevNames . MOD.modBody) defs
+      ++ concat [ IR.collectUsedAbbrevNames me | f <- facts, Just me <- [IR.factMereoExpr f] ]
+    closure = closeOverAbbrevDeps (L.nub seedNames)
+
+closeOverAbbrevDeps :: [String] -> [String]
+closeOverAbbrevDeps seed = go (L.nub seed)
+  where
+    go acc =
+      let next =
+            L.nub
+              [ n
+              | ad <- IR.allAbbrevDefs
+              , IR.abbrevName ad `elem` acc
+              , n <- IR.collectUsedAbbrevNames (IR.abbrevBody ad)
+              ]
+          acc' = L.nub (acc ++ next)
+      in if length acc' == length acc then acc else go acc'
+
+renderBaseAbbrevDef :: IR.AbbrevDef -> String
+renderBaseAbbrevDef ad =
+  IR.abbrevName ad
+    ++ "(" ++ L.intercalate ", " (IR.abbrevParams ad) ++ ") := "
+    ++ renderMereoExpr (IR.abbrevBody ad)
+    ++ ";"
 
 renderDef :: MOD.MereoOpDefEntry -> String
 renderDef def =
