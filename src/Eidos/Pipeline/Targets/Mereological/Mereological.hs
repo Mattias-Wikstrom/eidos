@@ -7,17 +7,35 @@ import qualified Eidos.Pipeline.FromSyntax.IR as IR
 import qualified Eidos.Pipeline.IRProcessing.MereologicalOpDefs as MOD
 import qualified Eidos.Pipeline.PipelineCore as PC
 
+univPrefix, propPrefix, minSuffix, maxSuffix :: String
+univPrefix = "Univ"
+propPrefix = "Pr"
+minSuffix = "_Min"
+maxSuffix = "_Max"
+
 exportToMereological :: PC.PreparedTheory -> String
 exportToMereological prepared =
   unlines $
     [ "{" ]
+    ++ signatureSection
+    ++ [","]
     ++ abbreviationsSection
     ++ ["", "  axioms {", "    metafacts {"]
     ++ map ("      " ++) metafacts
     ++ ["    }", "  }", "}"]
   where
+    th = PC.ptTheory prepared
     defs = PC.ptMereologicalOpDefs prepared
     baseAbbrevs = usedBaseAbbrevDefs prepared defs
+    signatureSection =
+      [ "  signature {"
+      , "    " ++ univPrefix ++ minSuffix ++ " : 𝕌;"
+      , "    " ++ univPrefix ++ maxSuffix ++ " : 𝕌;"
+      , "    " ++ propPrefix ++ minSuffix ++ " : 𝕌;"
+      , "    " ++ propPrefix ++ maxSuffix ++ " : 𝕌;"
+      ]
+      ++ map (\n -> "    " ++ n ++ " : 𝕌;") (userObjectNames th)
+      ++ [ "  }" ]
     abbreviationsSection =
       [ "  abbreviations {" ]
       ++ map ("    " ++) (map renderBaseAbbrevDef baseAbbrevs)
@@ -77,8 +95,27 @@ renderMereoExpr (IR.MProd a b) = "(" ++ renderMereoExpr a ++ " × " ++ renderMer
 renderMereoExpr (IR.MDiff a b) = "(" ++ renderMereoExpr a ++ " - " ++ renderMereoExpr b ++ ")"
 renderMereoExpr (IR.MRevDiff a b) = "(" ++ renderMereoExpr a ++ " ⇒ " ++ renderMereoExpr b ++ ")"
 renderMereoExpr (IR.MSymDiff a b) = "(" ++ renderMereoExpr a ++ " ∸ " ++ renderMereoExpr b ++ ")"
-renderMereoExpr (IR.MVar x) = x
+renderMereoExpr (IR.MVar x) = rewriteSpecialVar x
 renderMereoExpr IR.MZero = "0"
 renderMereoExpr (IR.MAbbrevApp n args) = n ++ "(" ++ L.intercalate ", " (map renderMereoExpr args) ++ ")"
 renderMereoExpr (IR.MBoundedSum v lo hi body) =
   "Σ " ++ v ++ " ∈ [" ++ renderMereoExpr lo ++ ", " ++ renderMereoExpr hi ++ "]. " ++ renderMereoExpr body
+
+rewriteSpecialVar :: String -> String
+rewriteSpecialVar n = case n of
+  "𝕌#min" -> univPrefix ++ minSuffix
+  "𝕌#max" -> univPrefix ++ maxSuffix
+  "ℙ#min" -> propPrefix ++ minSuffix
+  "ℙ#max" -> propPrefix ++ maxSuffix
+  _       -> n
+
+userObjectNames :: IR.Theory -> [String]
+userObjectNames th =
+  L.nub
+    [ IR.mereoName m
+    | IR.EntityMereological m <- IR.theoryObjects th
+    , IR.mereoOrigin m == IR.FromSignature
+    , IR.mereoKind m == IR.MereologicalEntityKindProposition
+        || IR.mereoKind m == IR.MereologicalEntityKindIndividual
+        || IR.mereoKind m == IR.MereologicalEntityKindSet
+    ]
