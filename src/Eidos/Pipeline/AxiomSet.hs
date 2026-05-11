@@ -177,6 +177,9 @@ data Tag = TagSort
     -- ^ A per-theory definition of one of the five built-in mereological
     --   operations (+, ×, −, ⇒, ∸), relativized to the theory's universe.
     --   Backends emit these as @def@\/@Definition@ (not @axiom@\/@Axiom@).
+  | TagUserAbbrevDef
+    -- ^ A user-defined abbreviation from an @abbreviations { }@ section.
+    --   Backends emit these as @def@\/@Definition@ (not @axiom@\/@Axiom@).
 
   deriving (Eq, Ord, Show, Enum, Bounded)
 

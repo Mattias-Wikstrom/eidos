@@ -53,6 +53,9 @@ data PreparedTheory = PreparedTheory
   , ptMereologicalOpDefs :: [MOD.MereoOpDefEntry]
     -- ^ Per-theory definitions of +, ×, −, ⇒, ∸ relativized to the
     --   theory's universe.  Backends emit these as @def@\/@Definition@.
+  , ptUserAbbrevDefs :: [IR.AbbrevDef]
+    -- ^ User-defined abbreviations from @abbreviations { }@ sections.
+    --   Backends emit these as @def@\/@Definition@.
   } deriving (Show)
 
 -- | Run all pipeline-level passes for one theory.
@@ -65,6 +68,7 @@ prepareTheory opts theory = PreparedTheory
   , ptSortOrder          = SB.theorySortOrderEntries theory
   , ptFunctionFacts      = FF.theoryFunctionFactEntries theory
   , ptMereologicalOpDefs = MOD.theoryMereoOpDefEntries theory
+  , ptUserAbbrevDefs     = IR.theoryUserAbbrevDefs theory
   }
   where
     sbOpts = SB.SortBoundOptions { SB.sboCollapse = pipeCollapseSortBounds opts }
