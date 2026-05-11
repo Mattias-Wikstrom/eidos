@@ -630,7 +630,7 @@ mkAxiomSets pt = concat
     where
       allTranslationFacts = translationOfFacts ++ translationOfAssertions ++ translationOfMetafacts
       totalFacts = length allTranslationFacts
-      mkLabel idx = if totalFacts > 1 then "ax" ++ show idx else ""
+      mkLabel idx = "ax" ++ show idx
 
       mkTranslationAS idx fact =
         axiomSet [SGlobal] (tags [TagUserFact])
