@@ -188,6 +188,7 @@ isEmptySection :: Section -> Bool
 isEmptySection (SectionSignature (SignatureSection [])) = True
 isEmptySection (SectionAxioms (AxiomsWrapper [])) = True
 isEmptySection (SectionSubtheories (SubtheoriesSection [])) = True
+isEmptySection (SectionAbbreviations (AbbreviationsSection [])) = True
 isEmptySection _ = False
 
 -- ---------------------------------------------------------------------------
@@ -204,6 +205,10 @@ prettySectionWithOpts opts level sec =
         "axioms " ++ prettyAxiomsWrapperWithOpts opts axs
       SectionSubtheories subs ->
         "subtheories " ++ prettySubtheoriesSectionWithOpts opts subs
+      SectionBareAxioms axs ->
+        prettyAxiomsSection axs
+      SectionAbbreviations abbrevs ->
+        "abbreviations " ++ prettyAbbreviationsSectionWithOpts opts abbrevs
 
 prettySignatureSectionWithOpts :: PrettyOptions -> SignatureSection -> Doc
 prettySignatureSectionWithOpts opts (SignatureSection items) =
@@ -442,6 +447,22 @@ prettyTermSuffix suffix =
 
 prettyTheoryName :: TheoryName -> Doc
 prettyTheoryName (TheoryName nm) = nm
+
+-- ---------------------------------------------------------------------------
+-- Abbreviations pretty-printing
+-- ---------------------------------------------------------------------------
+
+prettyAbbreviationsSectionWithOpts :: PrettyOptions -> AbbreviationsSection -> Doc
+prettyAbbreviationsSectionWithOpts opts (AbbreviationsSection items) =
+  if null items
+  then "{}"
+  else "{\n" ++
+       intercalate "\n" (map (prettyWithOpts opts 1 . prettyAbbrevDefItem) items) ++
+       "\n}"
+
+prettyAbbrevDefItem :: AbbrevDefItem -> Doc
+prettyAbbrevDefItem (AbbrevDefItem nm params body) =
+  nm ++ "(" ++ intercalate ", " params ++ ") := " ++ prettyTerm body ++ ";"
 
 -- ---------------------------------------------------------------------------
 -- Fact pretty-printing (AST placeholder)

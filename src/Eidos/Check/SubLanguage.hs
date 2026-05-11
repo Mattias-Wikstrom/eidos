@@ -90,10 +90,11 @@ viol = Violation
 checkEquational :: TheoryBody -> [Violation]
 checkEquational body = concatMap checkSection (sections body)
   where
-    checkSection (SectionSignature sig)    = checkSigEquational sig
-    checkSection (SectionAxioms aw)        = concatMap checkAxSection (axiomsSections aw)
-    checkSection (SectionBareAxioms axs)   = checkAxSection axs
-    checkSection (SectionSubtheories _)    = []  -- inline subtheories checked separately
+    checkSection (SectionSignature sig)      = checkSigEquational sig
+    checkSection (SectionAxioms aw)          = concatMap checkAxSection (axiomsSections aw)
+    checkSection (SectionBareAxioms axs)     = checkAxSection axs
+    checkSection (SectionSubtheories _)      = []  -- inline subtheories checked separately
+    checkSection (SectionAbbreviations _)    = []  -- abbreviation bodies are mereological; no logical restrictions apply
 
     checkAxSection (AxAssertions _) =
       [viol "assertions" "assertions section is not allowed in equational logic; use facts instead"]
@@ -187,10 +188,11 @@ checkEquational body = concatMap checkSection (sections body)
 checkRegular :: TheoryBody -> [Violation]
 checkRegular body = concatMap checkSection (sections body)
   where
-    checkSection (SectionSignature sig)  = checkSigRegular sig
-    checkSection (SectionAxioms aw)      = concatMap checkAxSection (axiomsSections aw)
-    checkSection (SectionBareAxioms axs) = checkAxSection axs
-    checkSection (SectionSubtheories _)  = []
+    checkSection (SectionSignature sig)   = checkSigRegular sig
+    checkSection (SectionAxioms aw)       = concatMap checkAxSection (axiomsSections aw)
+    checkSection (SectionBareAxioms axs)  = checkAxSection axs
+    checkSection (SectionSubtheories _)   = []
+    checkSection (SectionAbbreviations _) = []
 
     checkAxSection (AxMetafacts _) =
       [viol "metafacts" "metafacts section is not allowed in regular logic"]
@@ -260,10 +262,11 @@ checkRegular body = concatMap checkSection (sections body)
 checkCoherent :: TheoryBody -> [Violation]
 checkCoherent body = concatMap checkSection (sections body)
   where
-    checkSection (SectionSignature sig)  = checkSigCoherent sig
-    checkSection (SectionAxioms aw)      = concatMap checkAxSection (axiomsSections aw)
-    checkSection (SectionBareAxioms axs) = checkAxSection axs
-    checkSection (SectionSubtheories _)  = []
+    checkSection (SectionSignature sig)   = checkSigCoherent sig
+    checkSection (SectionAxioms aw)       = concatMap checkAxSection (axiomsSections aw)
+    checkSection (SectionBareAxioms axs)  = checkAxSection axs
+    checkSection (SectionSubtheories _)   = []
+    checkSection (SectionAbbreviations _) = []
 
     checkAxSection (AxMetafacts _) =
       [viol "metafacts" "metafacts section is not allowed in coherent logic"]
@@ -330,10 +333,11 @@ checkCoherent body = concatMap checkSection (sections body)
 checkFOL :: TheoryBody -> [Violation]
 checkFOL body = concatMap checkSection (sections body)
   where
-    checkSection (SectionSignature sig)  = checkSigFOL sig
-    checkSection (SectionAxioms aw)      = concatMap checkAxSection (axiomsSections aw)
-    checkSection (SectionBareAxioms axs) = checkAxSection axs
-    checkSection (SectionSubtheories _)  = []
+    checkSection (SectionSignature sig)   = checkSigFOL sig
+    checkSection (SectionAxioms aw)       = concatMap checkAxSection (axiomsSections aw)
+    checkSection (SectionBareAxioms axs)  = checkAxSection axs
+    checkSection (SectionSubtheories _)   = []
+    checkSection (SectionAbbreviations _) = []
 
     checkAxSection (AxAssertions (AssertionsSection props)) =
       concatMap (checkPropFOL "assertions") props
@@ -397,10 +401,11 @@ checkFOL body = concatMap checkSection (sections body)
 checkPropositional :: TheoryBody -> [Violation]
 checkPropositional body = concatMap checkSection (sections body)
   where
-    checkSection (SectionSignature sig)  = checkSigProp sig
-    checkSection (SectionAxioms aw)      = concatMap checkAxSection (axiomsSections aw)
-    checkSection (SectionBareAxioms axs) = checkAxSection axs
-    checkSection (SectionSubtheories _)  = []
+    checkSection (SectionSignature sig)   = checkSigProp sig
+    checkSection (SectionAxioms aw)       = concatMap checkAxSection (axiomsSections aw)
+    checkSection (SectionBareAxioms axs)  = checkAxSection axs
+    checkSection (SectionSubtheories _)   = []
+    checkSection (SectionAbbreviations _) = []
 
     checkAxSection (AxAssertions (AssertionsSection props)) =
       concatMap (checkPropProp "assertions") props
@@ -500,6 +505,7 @@ checkMereological body = concatMap checkSection (sections body)
     checkSection (SectionAxioms aw)        = checkAxiomsWrapperMereo aw
     checkSection (SectionBareAxioms axs)   = checkBareAxiomsMereo axs
     checkSection (SectionSubtheories _)    = []
+    checkSection (SectionAbbreviations _)  = []
 
     checkAxiomsWrapperMereo (AxiomsWrapper axss) =
       -- Allow the axioms wrapper if it only contains metafacts.

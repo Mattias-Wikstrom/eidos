@@ -28,6 +28,7 @@ dumpTheoryIR = go 0
         , ind (level + 1) ++ "object count: " ++ show (length (theoryObjects th))
         , ind (level + 1) ++ "name map keys: " ++ show (Map.size (theoryObjectsByName th))
         , ind (level + 1) ++ "fact count: " ++ show (length (theoryFacts th))
+        , ind (level + 1) ++ "user abbreviation count: " ++ show (length (theoryUserAbbrevDefs th))
         , ind (level + 1) ++ "subtheory count: " ++ show (length (theorySubtheories th))
         , ind (level + 1) ++ "builtins:"
         , ind (level + 2) ++ "universe sort: " ++ sortName (theoryUniverse th)

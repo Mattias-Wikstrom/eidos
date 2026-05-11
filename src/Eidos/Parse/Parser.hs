@@ -18,6 +18,7 @@ module Eidos.Parse.Parser
   ) where
 
 import           Control.Monad          (void, unless)
+import           Data.Char              (isUpper)
 import           Data.Void              (Void)
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
@@ -62,9 +63,10 @@ pTheoryBody = TheoryBody <$> (pSection `sepEndBy` comma)
 
 pSection :: Parser Section
 pSection =
-      SectionSignature   <$> pSignatureSection
-  <|> SectionAxioms      <$> pAxiomsWrapper
-  <|> SectionSubtheories <$> pSubtheoriesSection
+      SectionSignature     <$> pSignatureSection
+  <|> SectionAxioms        <$> pAxiomsWrapper
+  <|> SectionSubtheories   <$> pSubtheoriesSection
+  <|> SectionAbbreviations <$> pAbbreviationsSection
 
 -- ---------------------------------------------------------------------------
 -- Signature
@@ -302,6 +304,32 @@ pSubtheoryDef :: Parser SubtheoryDef
 pSubtheoryDef =
       SubtheoryBody        <$> between lbrace rbrace pTheoryBody
   <|> SubtheoryExternalRef <$> (at *> dottedIdent)
+
+-- ---------------------------------------------------------------------------
+-- Abbreviations
+-- ---------------------------------------------------------------------------
+
+-- | abbreviations { Name(p1, p2) := expr ; … }
+pAbbreviationsSection :: Parser AbbreviationsSection
+pAbbreviationsSection =
+  AbbreviationsSection <$>
+    (kwAbbreviations *> between lbrace rbrace (many pAbbrevDefItem))
+
+-- | One abbreviation definition: Name(p1, p2, …) := body ;
+--
+-- The name must start with an uppercase letter (abbreviations are
+-- mereological, not FOL).  Parameter names are plain lowercase-or-uppercase
+-- identifiers used only inside the body.
+pAbbrevDefItem :: Parser AbbrevDefItem
+pAbbrevDefItem = do
+  name <- ident
+  when (null name || not (isUpper (head name))) $
+    fail $ "abbreviation name must start with an uppercase letter, got: " ++ show name
+  params <- between lparen rparen (ident `sepBy` comma)
+  void colonEquals
+  body <- pTerm
+  void semi
+  return $ AbbrevDefItem name params body
 
 -- ---------------------------------------------------------------------------
 -- Propositions
