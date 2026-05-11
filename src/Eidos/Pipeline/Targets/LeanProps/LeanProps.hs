@@ -78,7 +78,7 @@ renderAxiomSetsToDecls opts = concatMap renderOne
     rewriteBounded x = x
 
 subjectPathComment :: SubjectPath -> String
-subjectPathComment = unwords . map show
+subjectPathComment = unwords . map prettySubjectNode
 
 data LeanPropsOptions = LeanPropsOptions
   { optGroupByEntity          :: Bool

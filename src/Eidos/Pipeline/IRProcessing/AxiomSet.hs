@@ -34,6 +34,7 @@ module Eidos.Pipeline.IRProcessing.AxiomSet
     -- * Subject paths
   , SubjectNode (..)
   , SubjectPath
+  , prettySubjectNode  -- ^ human-readable rendering (no Unicode escaping)
     -- * Axiom sets
   , AxiomSet (..)
   , axiomSet     -- ^ smart constructor
@@ -289,6 +290,27 @@ axiomSet path ts axs
            else if not subEntityOk
              then error $ "Pipeline.AxiomSet.axiomSet: sub-entity nodes only allowed under SFunction, path: " ++ show path
              else AxiomSet { asPath = path, asTags = ts, asAxioms = axs }
+
+-- ---------------------------------------------------------------------------
+-- Pretty-printing helpers
+-- ---------------------------------------------------------------------------
+
+-- | Render a 'SubjectNode' as a human-readable string without escaping
+-- Unicode characters (unlike the derived 'Show' instance, which would turn
+-- @"𝕌"@ into @"\\120140"@).
+prettySubjectNode :: SubjectNode -> String
+prettySubjectNode SGlobal         = "SGlobal"
+prettySubjectNode (SSort n)       = "SSort \"" ++ n ++ "\""
+prettySubjectNode (SSet n)        = "SSet \"" ++ n ++ "\""
+prettySubjectNode (SIndividual n) = "SIndividual \"" ++ n ++ "\""
+prettySubjectNode (SFunction n)   = "SFunction \"" ++ n ++ "\""
+prettySubjectNode SImage          = "SImage"
+prettySubjectNode (SProjection k) = "SProjection " ++ show k
+prettySubjectNode STuple          = "STuple"
+prettySubjectNode SInverse        = "SInverse"
+prettySubjectNode SIR             = "SIR"
+prettySubjectNode (SArgObject k)  = "SArgObject " ++ show k
+prettySubjectNode SResObject      = "SResObject"
 
 -- ---------------------------------------------------------------------------
 -- Query helpers

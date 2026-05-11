@@ -50,7 +50,7 @@ renderAxiomSetsToDecls opts = concatMap renderOne
     renderAxiom (name, body) = CoqAxiom name (axBodyToCoq body)
 
 subjectPathComment :: SubjectPath -> String
-subjectPathComment = unwords . map show
+subjectPathComment = unwords . map prettySubjectNode
 
 data CoqPropsOptions = CoqPropsOptions
   { optGroupByEntity    :: Bool
