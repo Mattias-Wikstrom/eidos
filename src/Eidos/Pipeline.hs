@@ -16,6 +16,7 @@ module Eidos.Pipeline
 import qualified Eidos.IR as IR
 import qualified Eidos.Pipeline.SortBounds as SB
 import qualified Eidos.Pipeline.FunctionFacts as FF
+import qualified Eidos.Pipeline.MereologicalOpDefs as MOD
 
 -- ---------------------------------------------------------------------------
 -- Options
@@ -44,22 +45,26 @@ defaultPipelineOptions = PipelineOptions
 -- the pipeline-level transformations (sort-bound computation, future passes)
 -- are performed exactly once, outside the backend.
 data PreparedTheory = PreparedTheory
-  { ptOptions       :: PipelineOptions
-  , ptTheory        :: IR.Theory
-  , ptSortBounds    :: [SB.SortBoundEntry]
-  , ptSortOrder     :: [SB.SortOrderEntry]
-  , ptFunctionFacts :: [FF.FunctionFactEntry]
+  { ptOptions            :: PipelineOptions
+  , ptTheory             :: IR.Theory
+  , ptSortBounds         :: [SB.SortBoundEntry]
+  , ptSortOrder          :: [SB.SortOrderEntry]
+  , ptFunctionFacts      :: [FF.FunctionFactEntry]
+  , ptMereologicalOpDefs :: [MOD.MereoOpDefEntry]
+    -- ^ Per-theory definitions of +, ×, −, ⇒, ∸ relativized to the
+    --   theory's universe.  Backends emit these as @def@\/@Definition@.
   } deriving (Show)
 
 -- | Run all pipeline-level passes for one theory.
 -- Call this once per theory (including each subtheory).
 prepareTheory :: PipelineOptions -> IR.Theory -> PreparedTheory
 prepareTheory opts theory = PreparedTheory
-  { ptOptions       = opts
-  , ptTheory        = theory
-  , ptSortBounds    = SB.theorySortBoundEntries sbOpts theory
-  , ptSortOrder     = SB.theorySortOrderEntries theory
-  , ptFunctionFacts = FF.theoryFunctionFactEntries theory
+  { ptOptions            = opts
+  , ptTheory             = theory
+  , ptSortBounds         = SB.theorySortBoundEntries sbOpts theory
+  , ptSortOrder          = SB.theorySortOrderEntries theory
+  , ptFunctionFacts      = FF.theoryFunctionFactEntries theory
+  , ptMereologicalOpDefs = MOD.theoryMereoOpDefEntries theory
   }
   where
     sbOpts = SB.SortBoundOptions { SB.sboCollapse = pipeCollapseSortBounds opts }

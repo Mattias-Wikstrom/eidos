@@ -41,7 +41,7 @@ import qualified Eidos.IR as IR
 import qualified Eidos.Pipeline as PL
 import           Eidos.Pipeline.AxiomSet
 import           Eidos.Backend.LeanProps.LeanExpr
-import           Eidos.Backend.LeanProps.MkAxiomSets (theoryBlocks, axBodyToLean)
+import           Eidos.Backend.LeanProps.MkAxiomSets (theoryBlocks, axBodyToLean, mereoExprToLean)
 import           Data.List (intercalate, sortOn)
 import qualified Data.Set as Set
 
@@ -85,25 +85,19 @@ renderAxiomSetsToDecls opts = concatMap renderOne
           tagDecls = if optAddTagComments opts
                      then [DeclComment (tagSetComment (asTags as_))]
                      else []
-          axDecls = map (DeclAxiom . renderAxiom as_) (asAxioms as_)
+          axDecls = map (renderOneDecl as_) (asAxioms as_)
       in DeclBlankLine : commentDecls ++ tagDecls ++ axDecls
+
+    -- | Render a single (name, body) pair as either a DeclDef or DeclAxiom.
+    renderOneDecl as_ (name, ABDef params mereoBody) =
+      DeclDef $ LeanDef name params (rewriteBounded (mereoExprToLean mereoBody))
+    renderOneDecl as_ (name, body) =
+      DeclAxiom (renderAxiom as_ (name, body))
 
     renderAxiom as_ (name, body) =
       let lean      = axBodyToLean body
           rewritten = rewriteBounded lean
-          wrapped   = if hasTag TagSorting as_
-                      then wrapSortingAsMetafact rewritten
-                      else rewritten
-      in LeanAxiom name wrapped
-
-    -- NOTE: temporary backend-side policy: emit sorting axioms as
-    -- WrapMetafact ℙ_Min (<sorting formula body>).
-    -- If the formula is already prefixed by ℙ_Min → ..., strip that
-    -- antecedent to avoid duplicating ℙ_Min in the rendered output.
-    wrapSortingAsMetafact (LImpl (LVar "ℙ_Min") body) =
-      LApp (LVar "WrapMetafact") [LVar "ℙ_Min", body]
-    wrapSortingAsMetafact x =
-      LApp (LVar "WrapMetafact") [LVar "ℙ_Min", x]
+      in LeanAxiom name rewritten
 
     rewriteBounded (LBoundedForall var lo hi body)
       | optUseBoundedForallSyntax opts =

@@ -36,6 +36,7 @@ library
                     , Eidos.Pipeline.SortBounds
                     , Eidos.Pipeline
                     , Eidos.Pipeline.FunctionFacts
+                    , Eidos.Pipeline.MereologicalOpDefs
                     , Eidos.Pipeline.AxiomSet
                     , Eidos.Pipeline.MkAxiomSets
                     , Eidos.Resolution.BuildMonad

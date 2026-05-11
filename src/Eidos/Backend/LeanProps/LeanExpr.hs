@@ -18,6 +18,8 @@ module Eidos.Backend.LeanProps.LeanExpr
     LeanDoc (..)
   , LeanBlock (..)
   , LeanDecl (..)
+    -- * Definitions
+  , LeanDef (..)
     -- * Axioms
   , LeanAxiom (..)
     -- * Expression language
@@ -62,7 +64,19 @@ data LeanDecl
   = DeclComment  String    -- ^ @-- comment@
   | DeclBlankLine           -- ^ empty line
   | DeclAxiom    LeanAxiom -- ^ @axiom name : body@
+  | DeclDef      LeanDef   -- ^ @def name (p : Prop) … : Prop := body@
   deriving (Eq, Show)
+
+-- ---------------------------------------------------------------------------
+-- Definitions
+-- ---------------------------------------------------------------------------
+
+-- | A @def@ statement: a named function with all-@Prop@ parameters and body.
+data LeanDef = LeanDef
+  { leanDefName   :: String
+  , leanDefParams :: [String]   -- ^ Parameter names; each has type @Prop@.
+  , leanDefBody   :: LeanExpr
+  } deriving (Eq, Show)
 
 -- ---------------------------------------------------------------------------
 -- Axioms
@@ -131,9 +145,11 @@ collectUsedAbbrevNames :: LeanDoc -> [String]
 collectUsedAbbrevNames doc =
   nub [ n | blk  <- leanDocBlocks doc
            , decl <- blockDecls blk
-           , DeclAxiom ax <- [decl]
-           , n <- exprAbbrevs (axiomType ax) ]
+           , n   <- declAbbrevs decl ]
   where
+    declAbbrevs (DeclAxiom ax) = exprAbbrevs (axiomType ax)
+    declAbbrevs (DeclDef   df) = exprAbbrevs (leanDefBody df)
+    declAbbrevs _              = []
     knownAbbrevs :: [String]
     knownAbbrevs = map IR.abbrevName IR.allAbbrevDefs
 
@@ -227,6 +243,13 @@ renderDecl :: LeanDecl -> String
 renderDecl DeclBlankLine    = ""
 renderDecl (DeclComment c)  = "-- " ++ c
 renderDecl (DeclAxiom ax)   = renderAxiom ax
+renderDecl (DeclDef    df)  = renderLeanDef df
+
+renderLeanDef :: LeanDef -> String
+renderLeanDef (LeanDef name params body) =
+  "def " ++ name
+  ++ " " ++ unwords [ "(" ++ p ++ " : Prop)" | p <- params ]
+  ++ " : Prop := " ++ renderLeanExpr body
 
 renderAxiom :: LeanAxiom -> String
 renderAxiom (LeanAxiom name ty) =

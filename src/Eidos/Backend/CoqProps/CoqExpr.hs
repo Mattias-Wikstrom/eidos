@@ -15,6 +15,8 @@ module Eidos.Backend.CoqProps.CoqExpr
     CoqDoc (..)
   , CoqBlock (..)
   , CoqDecl (..)
+    -- * Definitions
+  , CoqDef (..)
     -- * Axioms
   , CoqAxiom (..)
     -- * Expression language
@@ -53,7 +55,19 @@ data CoqDecl
   = DeclComment  String    -- ^ @(* comment *)@
   | DeclBlankLine           -- ^ empty line
   | DeclAxiom    CoqAxiom  -- ^ @Axiom name : body.@
+  | DeclDef      CoqDef    -- ^ @Definition name (p : Prop) … : Prop := body.@
   deriving (Eq, Show)
+
+-- ---------------------------------------------------------------------------
+-- Definitions
+-- ---------------------------------------------------------------------------
+
+-- | A @Definition@ statement: a named function with all-@Prop@ parameters and body.
+data CoqDef = CoqDef
+  { coqDefName   :: String
+  , coqDefParams :: [String]   -- ^ Parameter names; each has type @Prop@.
+  , coqDefBody   :: CoqExpr
+  } deriving (Eq, Show)
 
 -- ---------------------------------------------------------------------------
 -- Axioms
@@ -108,9 +122,11 @@ collectUsedAbbrevNames :: CoqDoc -> [String]
 collectUsedAbbrevNames doc =
   nub [ n | blk  <- coqDocBlocks doc
            , decl <- blockDecls blk
-           , DeclAxiom ax <- [decl]
-           , n <- exprAbbrevs (axiomType ax) ]
+           , n   <- declAbbrevs decl ]
   where
+    declAbbrevs (DeclAxiom ax) = exprAbbrevs (axiomType ax)
+    declAbbrevs (DeclDef   df) = exprAbbrevs (coqDefBody df)
+    declAbbrevs _              = []
     knownAbbrevs :: [String]
     knownAbbrevs = map IR.abbrevName IR.allAbbrevDefs
 
@@ -190,6 +206,13 @@ renderDecl :: CoqDecl -> String
 renderDecl DeclBlankLine    = ""
 renderDecl (DeclComment c)  = "(* " ++ c ++ " *)"
 renderDecl (DeclAxiom ax)   = renderAxiom ax
+renderDecl (DeclDef    df)  = renderCoqDef df
+
+renderCoqDef :: CoqDef -> String
+renderCoqDef (CoqDef name params body) =
+  "Definition " ++ name
+  ++ " " ++ unwords [ "(" ++ p ++ " : Prop)" | p <- params ]
+  ++ " : Prop := " ++ renderCoqExpr body ++ "."
 
 renderAxiom :: CoqAxiom -> String
 renderAxiom (CoqAxiom name ty) =

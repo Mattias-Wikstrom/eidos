@@ -38,7 +38,7 @@ import qualified Eidos.IR as IR
 import qualified Eidos.Pipeline as PL
 import           Eidos.Pipeline.AxiomSet
 import           Eidos.Backend.CoqProps.CoqExpr
-import           Eidos.Backend.CoqProps.MkAxiomSets (theoryBlocks, axBodyToCoq)
+import           Eidos.Backend.CoqProps.MkAxiomSets (theoryBlocks, axBodyToCoq, mereoExprToCoq)
 import           Data.List (intercalate, sortOn)
 import qualified Data.Set as Set
 
@@ -69,10 +69,14 @@ renderAxiomSetsToDecls opts = concatMap renderOne
     renderOne as_ =
       let commentDecls = [ DeclComment (subjectPathComment (asPath as_)) | optAddGroupComments opts ]
           tagDecls     = [ DeclComment (tagSetComment (asTags as_))      | optAddTagComments opts ]
-          axDecls      = map (DeclAxiom . renderAxiom) (asAxioms as_)
+          axDecls      = map renderOneDecl (asAxioms as_)
       in DeclBlankLine : commentDecls ++ tagDecls ++ axDecls
 
-    renderAxiom (name, body) = CoqAxiom name (axBodyToCoq body)
+    -- | Render a single (name, body) pair as either a DeclDef or DeclAxiom.
+    renderOneDecl (name, ABDef params mereoBody) =
+      DeclDef $ CoqDef name params (mereoExprToCoq mereoBody)
+    renderOneDecl (name, body) =
+      DeclAxiom (CoqAxiom name (axBodyToCoq body))
 
 subjectPathComment :: SubjectPath -> String
 subjectPathComment = unwords . map show

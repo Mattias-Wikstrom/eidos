@@ -20,6 +20,7 @@ import qualified Eidos.IR as IR
 import qualified Eidos.Pipeline as PL
 import qualified Eidos.Pipeline.SortBounds as SB
 import qualified Eidos.Pipeline.FunctionFacts as FF
+import qualified Eidos.Pipeline.MereologicalOpDefs as MOD
 import           Eidos.Pipeline.AxiomSet
 
 -- ---------------------------------------------------------------------------
@@ -98,7 +99,8 @@ tSOL        = [TagFunction, TagSOLFunction, TagDecl]
 -- | Build the complete list of 'AxiomSet' values for one theory.
 mkAxiomSets :: PL.PreparedTheory -> [AxiomSet]
 mkAxiomSets pt = concat
-  [ headerAxiomSets
+  [ mereologicalOpDefAxiomSets
+  , headerAxiomSets
   , userSortLimitAxiomSets
   , productSortLimitAxiomSets
   , relProductSortLimitAxiomSets
@@ -220,6 +222,17 @@ mkAxiomSets pt = concat
     [ f | f <- IR.theoryFacts theory
         , IR.factCategory (IR.factKind f) == IR.FCImplicitMerge
         ]
+
+  -- -------------------------------------------------------------------------
+  -- 0. Per-theory definitions of the five built-in mereological operations.
+  --    These are emitted as def/Definition (not axiom/Axiom) by backends.
+  -- -------------------------------------------------------------------------
+  mereologicalOpDefAxiomSets :: [AxiomSet]
+  mereologicalOpDefAxiomSets = map mkOpDef (PL.ptMereologicalOpDefs pt)
+    where
+      mkOpDef entry =
+        axiomSet [SGlobal] (tags [TagMereologicalOpDef])
+          [(MOD.modDefName entry, ABDef (MOD.modParams entry) (MOD.modBody entry))]
 
   -- -------------------------------------------------------------------------
   -- 1. Header: U/P (and optionally D) limit objects
