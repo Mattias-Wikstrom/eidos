@@ -32,13 +32,14 @@ set -euo pipefail
 TARGETS=(
   "lean_using_props:--lean_using_props::lean"
   "coq_using_props:--coq_using_props::v"
+  "mereological:--mereological::mereo.theory"
 )
 
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
 SIMPLE_THEORIES_DIR="simple_theories"
-ANNOTATION_FLAGS="--comment-groups --comment-tags"
+ANNOTATION_FLAGS=""
 FILTER_TARGETS=""
 SINGLE_DIR=""
 DRY_RUN=false
