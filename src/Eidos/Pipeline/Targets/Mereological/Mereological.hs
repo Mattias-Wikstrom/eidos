@@ -300,7 +300,7 @@ renderMereoExprWith nm expr = go expr
     go (IR.MAbbrevApp n args) =
       n ++ "(" ++ L.intercalate ", " (map go args) ++ ")"
     go (IR.MBoundedSum v lo hi body) =
-      "Σ " ++ v ++ " ∈ [" ++ go lo ++ ", " ++ go hi ++ "]. " ++ go body
+      "Σ " ++ v ++ " : 𝕌 (IsWithinRange(" ++ v ++ ", " ++ go lo ++ ", " ++ go hi ++ ") ⇒ " ++ go body ++ ")"
 
 -- | Convenience: render without an entity name map (for abbreviation bodies).
 renderMereoExpr :: IR.MereoExpr -> String
