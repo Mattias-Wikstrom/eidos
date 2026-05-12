@@ -31,6 +31,8 @@ library
                     , Eidos.Pipeline.Targets.CoqProps.CoqExpr
                     , Eidos.Pipeline.Targets.CoqProps.MkAxiomSets
                     , Eidos.Pipeline.Targets.CoqProps.CoqProps
+                    , Eidos.Pipeline.Targets.Mereological.MereoExpr
+                    , Eidos.Pipeline.Targets.Mereological.MkAxiomSets
                     , Eidos.Pipeline.Targets.Mereological.Mereological
                     , Eidos.Pipeline.IRProcessing.SortBounds
                     , Eidos.Pipeline.InvokePipeline

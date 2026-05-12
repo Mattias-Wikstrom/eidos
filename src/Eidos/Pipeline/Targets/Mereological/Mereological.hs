@@ -8,6 +8,9 @@ import qualified Eidos.Pipeline.FromSyntax.IR as IR
 import qualified Eidos.Pipeline.IRProcessing.MereologicalOpDefs as MOD
 import qualified Eidos.Pipeline.PipelineCore as PC
 import qualified Eidos.Pipeline.IRProcessing.SortBounds as SB
+import           Eidos.Pipeline.Targets.Mereological.MereoExpr
+import           Eidos.Pipeline.Targets.Mereological.MkAxiomSets
+                   (irMereoExprToMereo, abbrevBodyToMereo)
 
 -- ---------------------------------------------------------------------------
 -- Name-prefix constants
@@ -49,7 +52,7 @@ maxSuffix = "_Max"
 -- | Maps internal entity names to their mereological output names.
 -- Functions and relations receive 'fnPrefix'; mereological objects receive
 -- 'obPrefix'.  Special bound variables (@𝕌#min@ etc.) are handled
--- separately by 'rewriteSpecialVar'.
+-- separately by 'MkAxiomSets.rewriteSpecialVar'.
 type NameMap = Map.Map String String
 
 buildNameMap :: IR.Theory -> NameMap
@@ -86,7 +89,7 @@ exportToMereological prepared =
     [ "{" ]
     ++ mkSignatureSection th nameMap
     ++ [","]
-    ++ mkAbbreviationsSection prepared defs
+    ++ mkAbbreviationsSection prepared nameMap defs
     ++ [","]
     ++ mkAxiomsSection prepared nameMap
     ++ ["}"]
@@ -114,8 +117,6 @@ mkSignatureSection th _nameMap =
   -- User sort bounds: S_Min, S_Max  (already uppercase, no prefix needed)
   ++ concatMap mkSortLimits userSorts
   -- Functions: Fn_f : 𝕌 → … → 𝕌  (one 𝕌 per argument plus one for result)
-  -- Note: multi-argument functions produce a curried arrow type here.
-  -- Eidos SOL functions are single-argument; multi-arg is a known limitation.
   ++ map mkFunctionDecl userFunctions
   -- Relations: Fn_R : 𝕌 → … → 𝕌
   ++ map mkRelationDecl userRelations
@@ -150,7 +151,6 @@ mkSignatureSection th _nameMap =
       , "    " ++ IR.sortName s ++ maxSuffix ++ " : 𝕌;"
       ]
 
-    -- Emit one 𝕌 per argument plus one for the result.
     mkFunctionDecl f =
       let arity = length (IR.funcArgSorts f)
       in "    " ++ fnPrefix ++ IR.funcName f ++ " : "
@@ -168,14 +168,14 @@ mkSignatureSection th _nameMap =
 -- Abbreviations section
 -- ---------------------------------------------------------------------------
 
-mkAbbreviationsSection :: PC.PreparedTheory -> [MOD.MereoOpDefEntry] -> [String]
-mkAbbreviationsSection prepared defs =
+mkAbbreviationsSection :: PC.PreparedTheory -> NameMap -> [MOD.MereoOpDefEntry] -> [String]
+mkAbbreviationsSection prepared nameMap defs =
   [ "  abbreviations {" ]
   ++ map ("    " ++) (map renderBaseAbbrevDef baseAbbrevs)
   ++ map ("    " ++) (map renderDef defs)
   ++ [ "  }" ]
   where
-    baseAbbrevs = usedBaseAbbrevDefs prepared defs
+    baseAbbrevs = usedBaseAbbrevDefs prepared nameMap defs
 
 -- ---------------------------------------------------------------------------
 -- Axioms section
@@ -189,9 +189,6 @@ mkAxiomsSection prepared nameMap =
   where
     facts = IR.theoryFacts (PC.ptTheory prepared)
 
-    -- All user-written facts (assertions, plain facts, and metafacts in the
-    -- input) all become metafacts in the mereological output, just as they
-    -- all become axioms in the Lean/Coq output.
     userTranslatedFacts =
       [ f | f <- facts
           , IR.factCategory (IR.factKind f) == IR.FCMereologicalTranslation
@@ -200,19 +197,20 @@ mkAxiomsSection prepared nameMap =
               , IR.FSTranslationOfAssertion
               , IR.FSTranslationOfMetafact ] ]
     metafactUserLines =
-      [ "mf" ++ show idx ++ " : " ++ renderMereoExprWith nameMap me ++ ";"
+      [ "mf" ++ show idx ++ " : "
+          ++ renderMereoExpr (irMereoExprToMereo nameMap me) ++ ";"
       | (idx, f) <- zip [1 :: Int ..] userTranslatedFacts
       , Just me <- [IR.factMereoExpr f] ]
 
-    -- Sort bounds
     sortBoundLines =
-      [ rewriteAxiomName nm ++ " : " ++ renderMereoExprWith nameMap me ++ ";"
+      [ rewriteAxiomName nm ++ " : "
+          ++ renderMereoExpr (irMereoExprToMereo nameMap me) ++ ";"
       | e <- PC.ptSortBounds prepared
       , (nm, me) <- SB.sbeAxioms e ]
 
-    -- Sort ordering
     sortOrderLines =
-      [ rewriteAxiomName nm ++ " : " ++ renderMereoExprWith nameMap me ++ ";"
+      [ rewriteAxiomName nm ++ " : "
+          ++ renderMereoExpr (irMereoExprToMereo nameMap me) ++ ";"
       | e <- PC.ptSortOrder prepared
       , (nm, me) <- SB.soeAxioms e ]
 
@@ -229,8 +227,8 @@ mkAxiomsSection prepared nameMap =
 -- Used base abbreviation definitions
 -- ---------------------------------------------------------------------------
 
-usedBaseAbbrevDefs :: PC.PreparedTheory -> [MOD.MereoOpDefEntry] -> [IR.AbbrevDef]
-usedBaseAbbrevDefs prepared defs =
+usedBaseAbbrevDefs :: PC.PreparedTheory -> NameMap -> [MOD.MereoOpDefEntry] -> [IR.AbbrevDef]
+usedBaseAbbrevDefs prepared nameMap defs =
   [ ad
   | ad <- IR.allAbbrevDefs
   , IR.abbrevName ad `elem` closure
@@ -238,8 +236,10 @@ usedBaseAbbrevDefs prepared defs =
   where
     facts = IR.theoryFacts (PC.ptTheory prepared)
     seedNames =
-      concatMap (IR.collectUsedAbbrevNames . MOD.modBody) defs
-      ++ concat [ IR.collectUsedAbbrevNames me
+      -- Abbreviations used in per-theory op definitions
+      concatMap (collectUsedAbbrevNames . abbrevBodyToMereo . MOD.modBody) defs
+      -- Abbreviations used in translated facts (structural nodes included)
+      ++ concat [ collectUsedAbbrevNames (irMereoExprToMereo nameMap me)
                 | f <- facts
                 , Just me <- [IR.factMereoExpr f] ]
     closure = closeOverAbbrevDeps (L.nub seedNames)
@@ -253,7 +253,7 @@ closeOverAbbrevDeps seed = go (L.nub seed)
               [ n
               | ad <- IR.allAbbrevDefs
               , IR.abbrevName ad `elem` acc
-              , n <- IR.collectUsedAbbrevNames (IR.abbrevBody ad)
+              , n <- collectUsedAbbrevNames (abbrevBodyToMereo (IR.abbrevBody ad))
               ]
           acc' = L.nub (acc ++ next)
       in if length acc' == length acc then acc else go acc'
@@ -262,80 +262,25 @@ closeOverAbbrevDeps seed = go (L.nub seed)
 -- Rendering abbreviation definitions
 -- ---------------------------------------------------------------------------
 
--- | Render a compiler-internal abbreviation definition.
--- Bodies use only parameter names and special vars (𝕌#min etc.),
--- never entity names, so no entity name map is needed here.
 renderBaseAbbrevDef :: IR.AbbrevDef -> String
 renderBaseAbbrevDef ad =
   IR.abbrevName ad
     ++ "(" ++ L.intercalate ", " (IR.abbrevParams ad) ++ ") := "
-    ++ renderMereoExpr (IR.abbrevBody ad)
+    ++ renderMereoExpr (abbrevBodyToMereo (IR.abbrevBody ad))
     ++ ";"
 
--- | Render a per-theory mereological operation definition.
 renderDef :: MOD.MereoOpDefEntry -> String
 renderDef def =
   MOD.modOpName def
     ++ "(" ++ L.intercalate ", " (MOD.modParams def) ++ ") := "
-    ++ renderMereoExpr (MOD.modBody def)
+    ++ renderMereoExpr (abbrevBodyToMereo (MOD.modBody def))
     ++ ";"
 
 -- ---------------------------------------------------------------------------
--- MereoExpr rendering
+-- Axiom name rewriting
 -- ---------------------------------------------------------------------------
 
--- | Render a 'IR.MereoExpr' using a theory-level name map for variable
--- rewriting.  Pass 'Map.empty' (or use 'renderMereoExpr') when the
--- expression contains only parameter names and special vars.
-renderMereoExprWith :: NameMap -> IR.MereoExpr -> String
-renderMereoExprWith nm expr = go expr
-  where
-    go (IR.MSum a b)     = "(" ++ go a ++ " + " ++ go b ++ ")"
-    go (IR.MProd a b)    = "(" ++ go a ++ " × " ++ go b ++ ")"
-    go (IR.MDiff a b)    = "(" ++ go a ++ " - " ++ go b ++ ")"
-    go (IR.MRevDiff a b) = "(" ++ go a ++ " ⇒ " ++ go b ++ ")"
-    go (IR.MSymDiff a b) = "(" ++ go a ++ " ∸ " ++ go b ++ ")"
-    go (IR.MVar x)       = rewriteVar nm x
-    go IR.MZero          = "0"
-    go (IR.MAbbrevApp n args) =
-      n ++ "(" ++ L.intercalate ", " (map go args) ++ ")"
-    go (IR.MBoundedSum v lo hi body) =
-      "Σ " ++ v ++ " : 𝕌 (IsWithinRange(" ++ v ++ ", " ++ go lo ++ ", " ++ go hi ++ ") ⇒ " ++ go body ++ ")"
-
--- | Convenience: render without an entity name map (for abbreviation bodies).
-renderMereoExpr :: IR.MereoExpr -> String
-renderMereoExpr = renderMereoExprWith Map.empty
-
--- | Rewrite a variable name: entity name map takes priority, then
--- special-var rules, then the name is left unchanged.
-rewriteVar :: NameMap -> String -> String
-rewriteVar nameMap n =
-  case Map.lookup n nameMap of
-    Just newName -> newName
-    Nothing      -> rewriteSpecialVar n
-
--- | Rewrite built-in and sort-bound special variable names.
--- Handles @𝕌#min@ → @Univ_Min@, the general @X#min@ → @X_Min@ pattern,
--- and the Unicode-prefix sorts (@ℙ@, @𝔻@).
-rewriteSpecialVar :: String -> String
-rewriteSpecialVar n = case n of
-  "𝕌#min" -> univPrefix ++ minSuffix
-  "𝕌#max" -> univPrefix ++ maxSuffix
-  "ℙ#min" -> propPrefix ++ minSuffix
-  "ℙ#max" -> propPrefix ++ maxSuffix
-  "𝔻#min" -> domPrefix  ++ minSuffix
-  "𝔻#max" -> domPrefix  ++ maxSuffix
-  _ | Just base <- stripHashSuffix "#min" n -> base ++ minSuffix
-    | Just base <- stripHashSuffix "#max" n -> base ++ maxSuffix
-  _ -> n
-  where
-    stripHashSuffix suf str =
-      let (front, back) = splitAt (length str - length suf) str
-      in if back == suf then Just front else Nothing
-
--- | Rewrite Unicode-prefixed axiom names.
--- Applies the same Unicode→ASCII prefix substitutions used for variables
--- so that axiom names like @𝕌_ordering@ become @Univ_ordering@.
+-- | Rewrite Unicode-prefixed axiom names to ASCII output form.
 rewriteAxiomName :: String -> String
 rewriteAxiomName n
   | Just rest <- L.stripPrefix "𝕌" n = univPrefix ++ rest
