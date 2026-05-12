@@ -68,9 +68,16 @@ renderAxiomSetsToDecls opts = concatMap renderOne
 
     rewriteBounded (LBoundedForall var lo hi body)
       | optUseBoundedForallSyntax opts =
-          LApp (LVar "bforall")
-            [ LVar var, LVar lo, LVar hi, rewriteBounded body ]
+          LApp (LVar "bforall") [ LVar var, LVar lo, LVar hi, rewriteBounded body ]
       | otherwise = LBoundedForall var lo hi (rewriteBounded body)
+    rewriteBounded (LForallIndividuals var lo hi body)
+      | optUseBoundedForallSyntax opts =
+          LApp (LVar "bforall") [ LVar var, LVar lo, LVar hi, rewriteBounded body ]
+      | otherwise = LForallIndividuals var lo hi (rewriteBounded body)
+    rewriteBounded (LBoundedExists var lo hi body) =
+      LBoundedExists var lo hi (rewriteBounded body)
+    rewriteBounded (LExistsIndividuals var lo hi body) =
+      LExistsIndividuals var lo hi (rewriteBounded body)
     rewriteBounded (LImpl a b) = LImpl (rewriteBounded a) (rewriteBounded b)
     rewriteBounded (LConj a b) = LConj (rewriteBounded a) (rewriteBounded b)
     rewriteBounded (LDisj a b) = LDisj (rewriteBounded a) (rewriteBounded b)

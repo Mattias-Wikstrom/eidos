@@ -12,6 +12,7 @@ module Eidos.Pipeline.Targets.Mereological.MkAxiomSets
   , abbrevBodyToMereo
   ) where
 
+import           Data.Char (isLower)
 import qualified Data.Map.Strict as Map
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
 import           Eidos.Pipeline.Targets.Mereological.MereoExpr
@@ -39,6 +40,9 @@ rewriteVar nm n = case Map.lookup n nm of
 
 -- | Rewrite built-in and sort-bound special variable names to output form.
 --   @𝕌#min@ → @Univ_Min@, @ℙ#max@ → @Pr_Max@, @S#min@ → @S_Min@, etc.
+--   Unrecognised names that start with a lowercase ASCII letter are prefixed
+--   with @Var_@ (e.g. @x@ → @Var_x@) to satisfy the Eidos syntax requirement
+--   that object names begin with an uppercase letter.
 rewriteSpecialVar :: String -> String
 rewriteSpecialVar n = case n of
   "𝕌#min" -> "Univ" ++ minSuffix
@@ -49,11 +53,27 @@ rewriteSpecialVar n = case n of
   "𝔻#max" -> "Dom"  ++ maxSuffix
   _ | Just base <- stripHashSuffix "#min" n -> base ++ minSuffix
     | Just base <- stripHashSuffix "#max" n -> base ++ maxSuffix
+  (c:_) | isLower c -> "Var_" ++ n
   _ -> n
   where
     stripHashSuffix suf str =
       let (front, back) = splitAt (length str - length suf) str
       in if back == suf then Just front else Nothing
+
+-- ---------------------------------------------------------------------------
+-- Quantifier constructor selector
+-- ---------------------------------------------------------------------------
+
+-- | Select the appropriate 'MereoExpr' bounded-quantifier constructor based on
+-- the @isExists@ and @isIndividual@ flags from 'IR.MBoundedSum'.
+mkBoundedQuantifier
+  :: Bool   -- ^ isExists
+  -> Bool   -- ^ isIndividual
+  -> String -> String -> String -> MereoExpr -> MereoExpr
+mkBoundedQuantifier False False = MBoundedSum
+mkBoundedQuantifier False True  = MSumOfIndividuals
+mkBoundedQuantifier True  False = MBoundedProduct
+mkBoundedQuantifier True  True  = MProductOfIndividuals
 
 -- ---------------------------------------------------------------------------
 -- IR.MereoExpr → MereoExpr
@@ -64,12 +84,14 @@ rewriteSpecialVar n = case n of
 --
 -- Mereological operations pass through unchanged.  The special cases are:
 --
--- * 'IR.MBoundedSum': when lo and hi are both simple 'IR.MVar' nodes, the
---   compact 'MBoundedForall' structural node is used.  Otherwise the bounds
---   check is emitted as an explicit 'MAbbrevApp' \"IsWithinBounds\" and the
---   Σ-quantifier structure is preserved via the general 'MBoundedForall' with
---   rendered lo\/hi name strings.  (Complex lo\/hi are not expected in
---   practice; sort bounds are always simple named variables.)
+-- * 'IR.MBoundedSum': the @isExists@ and @isIndividual@ flags select one of
+--   'MBoundedSum', 'MSumOfIndividuals', 'MBoundedProduct', or
+--   'MProductOfIndividuals'.  When lo and hi are both simple 'IR.MVar' nodes
+--   names are kept as strings; otherwise lo\/hi are rendered eagerly as a
+--   string fallback.  (Complex lo\/hi are not expected in practice.)
+--
+-- * Lowercase bound-variable names (individuals) are automatically prefixed
+--   with @Var_@ via 'rewriteSpecialVar' so the output is valid Eidos syntax.
 --
 -- * 'IR.MAbbrevApp' \"ProjectIntoInterval\": lifted to 'MProjectIntoInterval'.
 irMereoExprToMereo :: NameMap -> IR.MereoExpr -> MereoExpr
@@ -85,19 +107,15 @@ irMereoExprToMereo nm = go
     go (IR.MAbbrevApp "ProjectIntoInterval" [x, lo, hi]) =
       MProjectIntoInterval (go x) (go lo) (go hi)
     go (IR.MAbbrevApp n args) = MAbbrevApp n (map go args)
-    go (IR.MBoundedSum var lo hi body) =
-      case (lo, hi) of
+    go (IR.MBoundedSum isEx isInd var lo hi body) =
+      let var'  = rewriteSpecialVar var  -- applies Var_ prefix for lowercase names
+          mk    = mkBoundedQuantifier isEx isInd
+          body' = go body
+      in case (lo, hi) of
         (IR.MVar loName, IR.MVar hiName) ->
-          MBoundedForall var
-            (rewriteVar nm loName) (rewriteVar nm hiName)
-            (go body)
+          mk var' (rewriteVar nm loName) (rewriteVar nm hiName) body'
         _ ->
-          -- lo or hi is a complex expression; render it via MAbbrevApp so
-          -- the abbreviation is still collected, and wrap in MBoundedForall
-          -- using the rendered-string fallback.
-          MBoundedForall var
-            (renderMereoExpr (go lo)) (renderMereoExpr (go hi))
-            (go body)
+          mk var' (renderMereoExpr (go lo)) (renderMereoExpr (go hi)) body'
 
 -- | Translate an 'IR.MereoExpr' that is the body of a compiler-internal
 -- abbreviation definition.  No entity-name rewriting is needed — the body

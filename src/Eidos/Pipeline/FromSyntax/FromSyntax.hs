@@ -1124,11 +1124,12 @@ mereologicalTranslation th fact = case factKind fact of
 wrapFreeVarsMereo :: [ResolvedVarDecl] -> MereoExpr -> MereoExpr
 wrapFreeVarsMereo [] body = body
 wrapFreeVarsMereo (vd:rest) body =
-  let varN = resolvedVarName vd
-      sn   = sortName (resolvedVarSort vd)
-      lo   = MVar (sn ++ "#min")
-      hi   = MVar (sn ++ "#max")
-  in MBoundedSum varN lo hi (wrapFreeVarsMereo rest body)
+  let varN   = resolvedVarName vd
+      sn     = sortName (resolvedVarSort vd)
+      lo     = MVar (sn ++ "#min")
+      hi     = MVar (sn ++ "#max")
+      isInd  = not (resolvedVarIsSet vd)
+  in MBoundedSum False isInd varN lo hi (wrapFreeVarsMereo rest body)
 
 wrapAsFact :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
 wrapAsFact th freeVars expr =
@@ -1191,14 +1192,15 @@ quantifiedToMereo (ResolvedQuantified qs atomic) =
 
 quantifierToMereo :: ResolvedQuantifier -> MereoExpr -> MereoExpr
 quantifierToMereo q body =
-  let (vd, _isExists) = case q of
+  let (vd, isExists) = case q of
         ResolvedQForall vd' -> (vd', False)
         ResolvedQExists vd' -> (vd', True)
-      varN = resolvedVarName vd
-      sn   = sortName (resolvedVarSort vd)
-      lo   = MVar (sn ++ "#min")
-      hi   = MVar (sn ++ "#max")
-  in MBoundedSum varN lo hi body
+      varN  = resolvedVarName vd
+      sn    = sortName (resolvedVarSort vd)
+      lo    = MVar (sn ++ "#min")
+      hi    = MVar (sn ++ "#max")
+      isInd = not (resolvedVarIsSet vd)
+  in MBoundedSum isExists isInd varN lo hi body
 
 atomicToMereo :: ResolvedAtomicProp -> MereoExpr
 atomicToMereo (ResolvedAtomicConstant ref) = MVar (resolvedConstRefName ref)
@@ -1285,27 +1287,30 @@ baseTermToMereo bt = case bt of
     let operand = termToMereo (resolvedGSPOperand gsp)
     in case resolvedGSPVar gsp of
          Left vd ->
-           let varN = resolvedVarName vd
-               sn   = sortName (resolvedVarSort vd)
-               lo   = MVar (sn ++ "#min")
-               hi   = MVar (sn ++ "#max")
-           in MBoundedSum varN lo hi operand
+           let varN  = resolvedVarName vd
+               sn    = sortName (resolvedVarSort vd)
+               lo    = MVar (sn ++ "#min")
+               hi    = MVar (sn ++ "#max")
+               isInd = not (resolvedVarIsSet vd)
+           in MBoundedSum False isInd varN lo hi operand
          Right bareVar ->
-           MBoundedSum bareVar MZero MZero operand
+           MBoundedSum False False bareVar MZero MZero operand
   ResolvedBTSetComprehension sc ->
     let vd   = resolvedSCVar sc
         varN = resolvedVarName vd
         sn   = sortName (resolvedVarSort vd)
         lo   = MVar (sn ++ "#min")
         hi   = MVar (sn ++ "#max")
-    in MBoundedSum varN lo hi (propExprToMereo (resolvedSCBody sc))
+        isInd = not (resolvedVarIsSet vd)
+    in MBoundedSum False isInd varN lo hi (propExprToMereo (resolvedSCBody sc))
   ResolvedBTDescription desc ->
     let vd   = resolvedDescVar desc
         varN = resolvedVarName vd
         sn   = sortName (resolvedVarSort vd)
         lo   = MVar (sn ++ "#min")
         hi   = MVar (sn ++ "#max")
-    in MBoundedSum varN lo hi (propExprToMereo (resolvedDescBody desc))
+        isInd = not (resolvedVarIsSet vd)
+    in MBoundedSum False isInd varN lo hi (propExprToMereo (resolvedDescBody desc))
 
 translatePropExpr :: Theory -> ResolvedPropExpr -> ResolvedPropExpr
 translatePropExpr th (ResolvedPropBicond left rests) =

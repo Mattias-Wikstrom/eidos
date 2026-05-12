@@ -87,6 +87,17 @@ axBodyToLean (PA.ABFuncEq l r)   = LEq (LVar l) (LVar r)
 -- Note: 'IR.MZero' translates to Lean's @True@, not to @ℙ_Min@.
 -- @ℙ_Min@ is the minimum of the ℙ sort and must be referenced explicitly
 -- via @MVar \"ℙ#min\"@.  Using 'MZero' to represent @ℙ_Min@ is incorrect.
+-- | Select the appropriate Lean bounded-quantifier constructor based on
+-- the @isExists@ and @isIndividual@ flags from 'IR.MBoundedSum'.
+mkLeanBoundedQuantifier
+  :: Bool  -- ^ isExists
+  -> Bool  -- ^ isIndividual
+  -> String -> String -> String -> LeanExpr -> LeanExpr
+mkLeanBoundedQuantifier False False = LBoundedForall
+mkLeanBoundedQuantifier False True  = LForallIndividuals
+mkLeanBoundedQuantifier True  False = LBoundedExists
+mkLeanBoundedQuantifier True  True  = LExistsIndividuals
+
 mereoExprToLean :: IR.MereoExpr -> LeanExpr
 mereoExprToLean (IR.MSum a b)     = LConj   (mereoExprToLean a) (mereoExprToLean b)
 mereoExprToLean (IR.MProd a b)    = LDisj   (mereoExprToLean a) (mereoExprToLean b)
@@ -99,11 +110,18 @@ mereoExprToLean (IR.MAbbrevApp "ProjectIntoInterval" [x, lo, hi]) =
   LProjectIntoInterval (mereoExprToLean x) (mereoExprToLean lo) (mereoExprToLean hi)
 mereoExprToLean (IR.MAbbrevApp name args) =
   LApp (LVar name) (map mereoExprToLean args)
-mereoExprToLean (IR.MBoundedSum var lo hi body) =
+mereoExprToLean (IR.MBoundedSum isEx isInd var lo hi body) =
   case (lo, hi) of
     (IR.MVar loName, IR.MVar hiName) ->
-      LBoundedForall var (resolveName loName) (resolveName hiName) (mereoExprToLean body)
+      let lo' = resolveName loName
+          hi' = resolveName hiName
+          b   = mereoExprToLean body
+          mk  = mkLeanBoundedQuantifier isEx isInd
+      in mk var lo' hi' b
     _ ->
-      LForallKw var LProp
-        (LImpl (LApp (LVar "IsWithinBounds") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
-               (mereoExprToLean body))
+      let boundAbbrev = if isInd then "IsIndividual" else "IsWithinBounds"
+          kw          = if isEx  then LExists else LForallKw
+          connector   = LImpl
+      in kw var LProp
+           (connector (LApp (LVar boundAbbrev) [mereoExprToLean lo, mereoExprToLean hi, LVar var])
+                      (mereoExprToLean body))

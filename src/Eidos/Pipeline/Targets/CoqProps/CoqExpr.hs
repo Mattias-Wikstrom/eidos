@@ -110,6 +110,19 @@ data CoqExpr
   | CBoundedForall String String String CoqExpr
     -- ^ @CBoundedForall var lo hi body@ renders as
     --   @forall var : Prop, (IsWithinBounds lo hi var) -> body@.
+    --   Universal quantification over a set variable.
+  | CForallIndividuals String String String CoqExpr
+    -- ^ @CForallIndividuals var lo hi body@ renders as
+    --   @forall var : Prop, (IsIndividual lo hi var) -> body@.
+    --   Universal quantification over an individual.
+  | CBoundedExists String String String CoqExpr
+    -- ^ @CBoundedExists var lo hi body@ renders as
+    --   @exists var : Prop, (IsWithinBounds lo hi var) -> body@.
+    --   Existential quantification over a set variable.
+  | CExistsIndividuals String String String CoqExpr
+    -- ^ @CExistsIndividuals var lo hi body@ renders as
+    --   @exists var : Prop, (IsIndividual lo hi var) -> body@.
+    --   Existential quantification over an individual.
   | CProjectIntoInterval CoqExpr CoqExpr CoqExpr
     -- ^ @ProjectIntoInterval x lo hi@
   deriving (Eq, Show)
@@ -142,7 +155,10 @@ collectUsedAbbrevNames doc =
     exprAbbrevs (CVar n)
       | n `elem` knownAbbrevs         = [n]
       | otherwise                     = []
-    exprAbbrevs (CBoundedForall _ _ _ b) = "IsWithinBounds" : exprAbbrevs b
+    exprAbbrevs (CBoundedForall      _ _ _ b) = "IsWithinBounds" : exprAbbrevs b
+    exprAbbrevs (CForallIndividuals  _ _ _ b) = "IsIndividual"   : exprAbbrevs b
+    exprAbbrevs (CBoundedExists      _ _ _ b) = "IsWithinBounds" : exprAbbrevs b
+    exprAbbrevs (CExistsIndividuals  _ _ _ b) = "IsIndividual"   : exprAbbrevs b
     exprAbbrevs (CIsWithinBounds _ _ _)  = ["IsWithinBounds"]
     exprAbbrevs (CIsIndividual _ _ _)    = ["IsIndividual"]
     exprAbbrevs (CProjectIntoInterval x lo hi) =
@@ -179,7 +195,7 @@ abbrevBodyToCoq (IR.MVar n)       = CVar n
 abbrevBodyToCoq IR.MZero          = CVar "True"
 abbrevBodyToCoq (IR.MAbbrevApp name args) =
   CApp (CVar name) (map abbrevBodyToCoq args)
-abbrevBodyToCoq (IR.MBoundedSum var lo hi body) =
+abbrevBodyToCoq (IR.MBoundedSum _isEx _isInd var lo hi body) =
   CForall var CProp
     (CImpl (CApp (CVar "IsWithinBounds") [abbrevBodyToCoq lo, abbrevBodyToCoq hi, CVar var])
            (abbrevBodyToCoq body))
@@ -223,7 +239,10 @@ parenArg e = case e of
   CForall        {} -> "(" ++ renderCoqExpr e ++ ")"
   CExists        {} -> "(" ++ renderCoqExpr e ++ ")"
   CEq            {} -> "(" ++ renderCoqExpr e ++ ")"
-  CBoundedForall {} -> "(" ++ renderCoqExpr e ++ ")"
+  CBoundedForall{}     -> "(" ++ renderCoqExpr e ++ ")"
+  CForallIndividuals{} -> "(" ++ renderCoqExpr e ++ ")"
+  CBoundedExists{}     -> "(" ++ renderCoqExpr e ++ ")"
+  CExistsIndividuals{} -> "(" ++ renderCoqExpr e ++ ")"
   _                 -> renderCoqExpr e
 
 renderCoqExpr :: CoqExpr -> String
@@ -253,8 +272,16 @@ renderCoqExpr (CIsIndividual lo v hi) =
   "(IsIndividual " ++ lo ++ " " ++ hi ++ " " ++ v ++ ")"
 renderCoqExpr (CBoundedForall var lo hi body) =
   "forall " ++ var ++ " : Prop, "
-    ++ renderCoqExpr (CIsWithinBounds lo var hi)
-    ++ " -> " ++ renderCoqExpr body
+    ++ renderCoqExpr (CIsWithinBounds lo var hi) ++ " -> " ++ renderCoqExpr body
+renderCoqExpr (CForallIndividuals var lo hi body) =
+  "forall " ++ var ++ " : Prop, "
+    ++ renderCoqExpr (CIsIndividual lo var hi) ++ " -> " ++ renderCoqExpr body
+renderCoqExpr (CBoundedExists var lo hi body) =
+  "exists " ++ var ++ " : Prop, "
+    ++ renderCoqExpr (CIsWithinBounds lo var hi) ++ " -> " ++ renderCoqExpr body
+renderCoqExpr (CExistsIndividuals var lo hi body) =
+  "exists " ++ var ++ " : Prop, "
+    ++ renderCoqExpr (CIsIndividual lo var hi) ++ " -> " ++ renderCoqExpr body
 renderCoqExpr (CProjectIntoInterval x lo hi) =
   "(ProjectIntoInterval "
     ++ renderCoqExpr x ++ " "

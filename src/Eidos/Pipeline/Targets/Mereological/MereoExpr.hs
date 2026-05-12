@@ -53,9 +53,18 @@ data MereoExpr
   | MIsIndividual String String String
     -- ^ @MIsIndividual lo var hi@ renders as @IsIndividual(lo, hi, var)@.
     --   Guards first-order (individual) quantification.
-  | MBoundedForall String String String MereoExpr
-    -- ^ @MBoundedForall var lo hi body@ renders as
-    --   @Σ var : 𝕌 (IsWithinBounds(lo, hi, var) ⇒ body)@.
+  | MBoundedSum String String String MereoExpr
+    -- ^ @MBoundedSum var lo hi body@ — universal quantification over a set variable.
+    --   Renders as @Σ var : 𝕌 (IsWithinBounds(lo, hi, var) ⇒ body)@.
+  | MSumOfIndividuals String String String MereoExpr
+    -- ^ @MSumOfIndividuals var lo hi body@ — universal quantification over an individual.
+    --   Renders as @Σ var : 𝕌 (IsIndividual(lo, hi, var) ⇒ body)@.
+  | MBoundedProduct String String String MereoExpr
+    -- ^ @MBoundedProduct var lo hi body@ — existential quantification over a set variable.
+    --   Renders as @Π var : 𝕌 (IsWithinBounds(lo, hi, var) + body)@.
+  | MProductOfIndividuals String String String MereoExpr
+    -- ^ @MProductOfIndividuals var lo hi body@ — existential quantification over an individual.
+    --   Renders as @Π var : 𝕌 (IsIndividual(lo, hi, var) + body)@.
   | MProjectIntoInterval MereoExpr MereoExpr MereoExpr
     -- ^ @ProjectIntoInterval(x, lo, hi)@
   deriving (Eq, Show)
@@ -67,7 +76,8 @@ data MereoExpr
 -- | Collect the names of compiler-internal abbreviations used anywhere in the
 -- expression.  Only names present in 'IR.allAbbrevDefs' are returned, plus the
 -- abbreviations implied by the structural nodes ('MIsWithinBounds',
--- 'MIsIndividual', 'MBoundedForall', 'MProjectIntoInterval').
+-- 'MIsIndividual', 'MBoundedSum', 'MSumOfIndividuals', 'MBoundedProduct',
+-- 'MProductOfIndividuals', 'MProjectIntoInterval').
 -- The result is de-duplicated.
 collectUsedAbbrevNames :: MereoExpr -> [String]
 collectUsedAbbrevNames e = nub (go e)
@@ -86,7 +96,10 @@ collectUsedAbbrevNames e = nub (go e)
       | otherwise                   = concatMap go args
     go (MIsWithinBounds _ _ _)      = ["IsWithinBounds"]
     go (MIsIndividual _ _ _)        = ["IsIndividual"]
-    go (MBoundedForall _ _ _ body)  = "IsWithinBounds" : go body
+    go (MBoundedSum        _ _ _ body) = "IsWithinBounds"  : go body
+    go (MSumOfIndividuals  _ _ _ body) = "IsIndividual"    : go body
+    go (MBoundedProduct    _ _ _ body) = "IsWithinBounds"  : go body
+    go (MProductOfIndividuals _ _ _ body) = "IsIndividual" : go body
     go (MProjectIntoInterval x lo hi) =
       "ProjectIntoInterval" : go x ++ go lo ++ go hi
 
@@ -107,9 +120,13 @@ renderMereoExpr = go
       "IsWithinBounds(" ++ lo ++ ", " ++ hi ++ ", " ++ var ++ ")"
     go (MIsIndividual lo var hi) =
       "IsIndividual(" ++ lo ++ ", " ++ hi ++ ", " ++ var ++ ")"
-    go (MBoundedForall var lo hi body) =
-      "Σ " ++ var ++ " : 𝕌 ("
-        ++ go (MIsWithinBounds lo var hi)
-        ++ " ⇒ " ++ go body ++ ")"
+    go (MBoundedSum var lo hi body) =
+      "Σ " ++ var ++ " : 𝕌 (" ++ go (MIsWithinBounds lo var hi) ++ " ⇒ " ++ go body ++ ")"
+    go (MSumOfIndividuals var lo hi body) =
+      "Σ " ++ var ++ " : 𝕌 (" ++ go (MIsIndividual lo var hi)   ++ " ⇒ " ++ go body ++ ")"
+    go (MBoundedProduct var lo hi body) =
+      "Π " ++ var ++ " : 𝕌 (" ++ go (MIsWithinBounds lo var hi) ++ " + " ++ go body ++ ")"
+    go (MProductOfIndividuals var lo hi body) =
+      "Π " ++ var ++ " : 𝕌 (" ++ go (MIsIndividual lo var hi)   ++ " + " ++ go body ++ ")"
     go (MProjectIntoInterval x lo hi) =
       "ProjectIntoInterval(" ++ go x ++ ", " ++ go lo ++ ", " ++ go hi ++ ")"

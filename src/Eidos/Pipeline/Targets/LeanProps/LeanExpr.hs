@@ -130,6 +130,19 @@ data LeanExpr
   | LBoundedForall String String String LeanExpr
     -- ^ @LBoundedForall var lo hi body@ renders as
     --   @forall var : Prop, (IsWithinBounds lo hi var) → body@.
+    --   Universal quantification over a set variable.
+  | LForallIndividuals String String String LeanExpr
+    -- ^ @LForallIndividuals var lo hi body@ renders as
+    --   @forall var : Prop, (IsIndividual lo hi var) → body@.
+    --   Universal quantification over an individual.
+  | LBoundedExists String String String LeanExpr
+    -- ^ @LBoundedExists var lo hi body@ renders as
+    --   @exists var : Prop, (IsWithinBounds lo hi var) → body@.
+    --   Existential quantification over a set variable.
+  | LExistsIndividuals String String String LeanExpr
+    -- ^ @LExistsIndividuals var lo hi body@ renders as
+    --   @exists var : Prop, (IsIndividual lo hi var) → body@.
+    --   Existential quantification over an individual.
   | LProjectIntoInterval LeanExpr LeanExpr LeanExpr
     -- ^ @ProjectIntoInterval x lo hi@
   deriving (Eq, Show)
@@ -166,7 +179,10 @@ collectUsedAbbrevNames doc =
     exprAbbrevs (LVar n)
       | n `elem` knownAbbrevs         = [n]
       | otherwise                     = []
-    exprAbbrevs (LBoundedForall _ _ _ b) = "IsWithinBounds" : exprAbbrevs b
+    exprAbbrevs (LBoundedForall      _ _ _ b) = "IsWithinBounds" : exprAbbrevs b
+    exprAbbrevs (LForallIndividuals  _ _ _ b) = "IsIndividual"   : exprAbbrevs b
+    exprAbbrevs (LBoundedExists      _ _ _ b) = "IsWithinBounds" : exprAbbrevs b
+    exprAbbrevs (LExistsIndividuals  _ _ _ b) = "IsIndividual"   : exprAbbrevs b
     exprAbbrevs (LIsWithinBounds _ _ _)  = ["IsWithinBounds"]
     exprAbbrevs (LIsIndividual _ _ _)    = ["IsIndividual"]
     exprAbbrevs (LProjectIntoInterval x lo hi) =
@@ -221,7 +237,7 @@ abbrevBodyToLean (IR.MVar n)       = LVar n
 abbrevBodyToLean IR.MZero          = LVar "True"
 abbrevBodyToLean (IR.MAbbrevApp name args) =
   LApp (LVar name) (map abbrevBodyToLean args)
-abbrevBodyToLean (IR.MBoundedSum var lo hi body) =
+abbrevBodyToLean (IR.MBoundedSum _isEx _isInd var lo hi body) =
   LForallKw var LProp
     (LImpl (LApp (LVar "IsWithinBounds") [abbrevBodyToLean lo, abbrevBodyToLean hi, LVar var])
            (abbrevBodyToLean body))
@@ -264,7 +280,10 @@ parenArg e = case e of
   LForallKw  {} -> "(" ++ renderLeanExpr e ++ ")"
   LExists    {} -> "(" ++ renderLeanExpr e ++ ")"
   LEq        {} -> "(" ++ renderLeanExpr e ++ ")"
-  LBoundedForall {} -> "(" ++ renderLeanExpr e ++ ")"
+  LBoundedForall{}     -> "(" ++ renderLeanExpr e ++ ")"
+  LForallIndividuals{} -> "(" ++ renderLeanExpr e ++ ")"
+  LBoundedExists{}     -> "(" ++ renderLeanExpr e ++ ")"
+  LExistsIndividuals{} -> "(" ++ renderLeanExpr e ++ ")"
   _              -> renderLeanExpr e
 
 -- | Render a 'LeanExpr' to a Lean 4 string.
@@ -297,8 +316,16 @@ renderLeanExpr (LIsIndividual lo v hi) =
   "(IsIndividual " ++ lo ++ " " ++ hi ++ " " ++ v ++ ")"
 renderLeanExpr (LBoundedForall var lo hi body) =
   "forall " ++ var ++ " : Prop, "
-    ++ renderLeanExpr (LIsWithinBounds lo var hi)
-    ++ " → " ++ renderLeanExpr body
+    ++ renderLeanExpr (LIsWithinBounds lo var hi) ++ " → " ++ renderLeanExpr body
+renderLeanExpr (LForallIndividuals var lo hi body) =
+  "forall " ++ var ++ " : Prop, "
+    ++ renderLeanExpr (LIsIndividual lo var hi) ++ " → " ++ renderLeanExpr body
+renderLeanExpr (LBoundedExists var lo hi body) =
+  "exists " ++ var ++ " : Prop, "
+    ++ renderLeanExpr (LIsWithinBounds lo var hi) ++ " → " ++ renderLeanExpr body
+renderLeanExpr (LExistsIndividuals var lo hi body) =
+  "exists " ++ var ++ " : Prop, "
+    ++ renderLeanExpr (LIsIndividual lo var hi) ++ " → " ++ renderLeanExpr body
 renderLeanExpr (LProjectIntoInterval x lo hi) =
   "(ProjectIntoInterval "
     ++ renderLeanExpr x ++ " "

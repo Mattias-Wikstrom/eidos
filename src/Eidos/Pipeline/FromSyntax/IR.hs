@@ -158,9 +158,13 @@ data MereoExpr
   | MAbbrevApp String [MereoExpr]
     -- ^ Application of a compiler-internal abbreviation:
     --   IsWithinBounds(lo, hi, x), WrapFact(x, y), etc.
-  | MBoundedSum String MereoExpr MereoExpr MereoExpr
-    -- ^ Bounded mereological sum: ∀ varName ∈ [lo, hi]. body
-    --   Corresponds to bounded universal quantification in logic.
+  | MBoundedSum Bool Bool String MereoExpr MereoExpr MereoExpr
+    -- ^ Bounded quantification: (isExists, isIndividual, varName, lo, hi, body).
+    --   When @isExists = False@, this is universal (∀ varName ∈ [lo, hi]. body).
+    --   When @isExists = True@,  this is existential (∃ varName ∈ [lo, hi]. body).
+    --   @isIndividual = True@ means the variable was declared with @:@ syntax
+    --   (a first-order individual); backends should guard with @IsIndividual@
+    --   rather than @IsWithinBounds@.
   deriving (Show, Eq)
 
 -- ---------------------------------------------------------------------------
@@ -188,8 +192,8 @@ allAbbrevDefs =
       -- (x+lo) × hi
       (MProd (MSum (MVar "x") (MVar "lo")) (MVar "hi"))
   , AbbrevDef "IsIndividual" ["lo", "hi", "x"]
-      -- 0  (vacuously true in the _Props backend)
-      MZero
+      -- (hi⇒x) + (x⇒lo)  — same structure as IsWithinBounds for now
+      (MSum (MRevDiff (MVar "hi") (MVar "x")) (MRevDiff (MVar "x") (MVar "lo")))
   , AbbrevDef "WrapFact" ["x", "y"]
       -- (x+y) ∸ x
       (MSymDiff (MSum (MVar "x") (MVar "y")) (MVar "x"))
@@ -213,7 +217,7 @@ collectUsedAbbrevNames = go
     go (MVar _)              = []
     go MZero                 = []
     go (MAbbrevApp n args)   = n : concatMap go args
-    go (MBoundedSum _ lo hi body) = go lo ++ go hi ++ go body
+    go (MBoundedSum _ _ _ lo hi body) = go lo ++ go hi ++ go body
 
 -- ---------------------------------------------------------------------------
 -- Entity sum type

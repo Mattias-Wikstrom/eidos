@@ -94,6 +94,17 @@ axBodyToCoq (PA.ABFuncEq l r)   = CEq (CVar (resolveName l)) (CVar (resolveName 
 --   MVar n   → CVar (resolveName n)
 --   MAbbrevApp → CApp
 --   MBoundedSum → bounded universal quantification
+-- | Select the appropriate Coq bounded-quantifier constructor based on
+-- the @isExists@ and @isIndividual@ flags from 'IR.MBoundedSum'.
+mkCoqBoundedQuantifier
+  :: Bool  -- ^ isExists
+  -> Bool  -- ^ isIndividual
+  -> String -> String -> String -> CoqExpr -> CoqExpr
+mkCoqBoundedQuantifier False False = CBoundedForall
+mkCoqBoundedQuantifier False True  = CForallIndividuals
+mkCoqBoundedQuantifier True  False = CBoundedExists
+mkCoqBoundedQuantifier True  True  = CExistsIndividuals
+
 mereoExprToCoq :: IR.MereoExpr -> CoqExpr
 mereoExprToCoq (IR.MSum a b)     = CConj   (mereoExprToCoq a) (mereoExprToCoq b)
 mereoExprToCoq (IR.MProd a b)    = CDisj   (mereoExprToCoq a) (mereoExprToCoq b)
@@ -104,7 +115,16 @@ mereoExprToCoq (IR.MVar n)       = CVar (resolveName n)
 mereoExprToCoq IR.MZero          = CVar "True"
 mereoExprToCoq (IR.MAbbrevApp name args) =
   CApp (CVar name) (map mereoExprToCoq args)
-mereoExprToCoq (IR.MBoundedSum var lo hi body) =
-  CForall var CProp
-    (CImpl (CApp (CVar "IsWithinBounds") [mereoExprToCoq lo, mereoExprToCoq hi, CVar var])
-           (mereoExprToCoq body))
+mereoExprToCoq (IR.MBoundedSum isEx isInd var lo hi body) =
+  case (lo, hi) of
+    (IR.MVar loName, IR.MVar hiName) ->
+      let lo' = resolveName loName
+          hi' = resolveName hiName
+          b   = mereoExprToCoq body
+      in mkCoqBoundedQuantifier isEx isInd var lo' hi' b
+    _ ->
+      let boundAbbrev = if isInd then "IsIndividual" else "IsWithinBounds"
+          kw          = if isEx  then CExists else CForall
+      in kw var CProp
+           (CImpl (CApp (CVar boundAbbrev) [mereoExprToCoq lo, mereoExprToCoq hi, CVar var])
+                  (mereoExprToCoq body))
