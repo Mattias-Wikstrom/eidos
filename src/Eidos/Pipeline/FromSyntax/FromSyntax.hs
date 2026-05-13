@@ -8,8 +8,8 @@ module Eidos.Pipeline.FromSyntax.FromSyntax
   ) where
 
 import           Control.Monad        (forM_, when, unless, foldM)
-import           Data.Char            (isUpper)
-import           Data.List            (find, intercalate, isSuffixOf)
+import           Data.Char            (isUpper, isDigit)
+import           Data.List            (find, intercalate, isSuffixOf, isInfixOf)
 import qualified Data.Map.Strict      as Map
 import           Data.Maybe           (fromJust, fromMaybe, mapMaybe)
 import           System.FilePath      (takeDirectory)
@@ -712,9 +712,9 @@ mkSOLFunction th nm k argSorts resSort orig = Function
   , funcName          = nm
   , funcArgSorts      = argSorts
   , funcResSort       = resSort
-  , funcResObject     = mkMereo th MereologicalEntityKindResultOfSOLFunction (nm ++ "#res") resSort orig
+  , funcResObject     = mkMereo th MereologicalEntityKindResultOfSOLFunction (nm ++ "_res") resSort orig
   , funcArgObjects    = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
-                                          (nm ++ "#" ++ show i) s orig) argSorts [1..]
+                                          (nm ++ "_" ++ show i) s orig) argSorts [1..]
   , funcDomain        = Nothing
   , funcArgument      = Nothing
   , funcDirectImage   = Nothing
@@ -738,9 +738,9 @@ mkFOLFunction th nm argSorts resSort orig =
         , sortAssociatedEntity = Just (EntityFunction f)
         , sortReflectedFrom    = Nothing
         }
-      domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "#arg") domSort auxOrig
-      dirImg = mkSOLFunction th (nm ++ "#dir_img") FunctionKindDirectImageFunction [domSort] resSort auxOrig
-      invImg = mkSOLFunction th (nm ++ "#inv_img") FunctionKindInverseImageFunction [resSort] domSort auxOrig
+      domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_arg") domSort auxOrig
+      dirImg = mkSOLFunction th (nm ++ "_dir_img") FunctionKindDirectImageFunction [domSort] resSort auxOrig
+      invImg = mkSOLFunction th (nm ++ "_inv_img") FunctionKindInverseImageFunction [resSort] domSort auxOrig
       f = f0 { funcDomain      = Just domSort
              , funcArgument    = Just domArg
              , funcDirectImage  = Just dirImg
@@ -758,7 +758,7 @@ mkFOLFunction th nm argSorts resSort orig =
         , sortAssociatedEntity = Just (EntityFunction invFn)
         , sortReflectedFrom    = Nothing
         }
-      invArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_inv#arg") invDomSort auxOrig
+      invArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_inv_arg") invDomSort auxOrig
       invFn = inv0 { funcDomain   = Just invDomSort
                    , funcArgument = Just invArg
                    }
@@ -883,8 +883,8 @@ mkRelation th nm argSorts orig =
         , sortAssociatedEntity = Just (EntityRelation rel)
         , sortReflectedFrom    = Nothing
         }
-      domArg   = mkMereo th MereologicalEntityKindIndividual (nm ++ "#arg") domSort orig
-      assocSet = mkMereo th MereologicalEntityKindSet        (nm ++ "#set") (head argSorts) orig
+      domArg   = mkMereo th MereologicalEntityKindIndividual (nm ++ "_arg") domSort orig
+      assocSet = mkMereo th MereologicalEntityKindSet        (nm ++ "_set") (head argSorts) orig
       rel = Relation
         { relOrigin        = orig
         , relKind          = MereologicalEntityKindSet
@@ -893,7 +893,7 @@ mkRelation th nm argSorts orig =
         , relArgSorts      = argSorts
         , relDomain        = domSort
         , relArgObjects    = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
-                                              (nm ++ "#" ++ show i) s orig) argSorts [1..]
+                                              (nm ++ "_" ++ show i) s orig) argSorts [1..]
         , relArgument      = domArg
         , relAssociatedSet = assocSet
         , relReflectedFrom = Nothing
@@ -1078,7 +1078,11 @@ createCanonicalEntity parentTh (EntityRelation r) =
 createCanonicalEntity _ e = e
 
 isInternalName :: String -> Bool
-isInternalName = ('#' `elem`)
+isInternalName n = ('#' `elem` n) || any (`isInfixOf` n) ["_dom","_res","_arg","_set","_dir_img","_inv_img"] || hasNumericSegment n
+  where
+    hasNumericSegment [] = False
+    hasNumericSegment ('_':c:rest) = isDigit c || hasNumericSegment (c:rest)
+    hasNumericSegment (_:rest) = hasNumericSegment rest
 
 entitiesCompatible :: Entity -> Entity -> Bool
 entitiesCompatible (EntitySort s1) (EntitySort s2) =
@@ -1305,7 +1309,7 @@ applySuffixToMereo expr suffix = case suffix of
   ResolvedSuffixCall args ->
     MAbbrevApp (flattenMereoName expr) (map termToMereo args)
   ResolvedSuffixSpecialOp op ->
-    MVar (flattenMereoName expr ++ "#" ++ op)
+    MVar (flattenMereoName expr ++ "_" ++ op)
 
 flattenMereoName :: MereoExpr -> String
 flattenMereoName (MVar n) = n
