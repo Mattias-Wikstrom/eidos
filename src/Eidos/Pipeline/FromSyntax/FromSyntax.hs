@@ -8,8 +8,8 @@ module Eidos.Pipeline.FromSyntax.FromSyntax
   ) where
 
 import           Control.Monad        (forM_, when, unless, foldM)
-import           Data.Char            (isUpper, isDigit)
-import           Data.List            (find, intercalate, isSuffixOf, isInfixOf)
+import           Data.Char            (isUpper)
+import           Data.List            (find, intercalate, isSuffixOf)
 import qualified Data.Map.Strict      as Map
 import           Data.Maybe           (fromJust, fromMaybe, mapMaybe)
 import           System.FilePath      (takeDirectory)
@@ -938,7 +938,7 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
 
       let th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
 
-      if isImplicit && not (isInternalName name) && not (null transformed)
+      if isImplicit && not (all isInternalEntity transformed) && not (null transformed)
         then if not (null localToSub)
                then foldM (addUnqualified name qualifiedName) th1 localToSub
                else Right $ foldl (\t e -> addEntityToParent t name e) th1 transformed
@@ -1077,12 +1077,16 @@ createCanonicalEntity parentTh (EntityRelation r) =
                    }
 createCanonicalEntity _ e = e
 
-isInternalName :: String -> Bool
-isInternalName n = ('#' `elem` n) || any (`isInfixOf` n) ["_dom","_res","_arg","_set","_dir_img","_inv_img"] || hasNumericSegment n
-  where
-    hasNumericSegment [] = False
-    hasNumericSegment ('_':c:rest) = isDigit c || hasNumericSegment (c:rest)
-    hasNumericSegment (_:rest) = hasNumericSegment rest
+isInternalEntity :: Entity -> Bool
+isInternalEntity (EntitySort s) =
+  sortOrigin s == FromFunction || sortOrigin s == FromRelation
+isInternalEntity (EntityFunction f) =
+  funcOrigin f == FromFunction || funcOrigin f == FromRelation
+isInternalEntity (EntityRelation r) =
+  relOrigin r == FromFunction || relOrigin r == FromRelation
+isInternalEntity (EntityMereological m) =
+  mereoOrigin m == FromFunction || mereoOrigin m == FromRelation
+isInternalEntity _ = False
 
 entitiesCompatible :: Entity -> Entity -> Bool
 entitiesCompatible (EntitySort s1) (EntitySort s2) =
