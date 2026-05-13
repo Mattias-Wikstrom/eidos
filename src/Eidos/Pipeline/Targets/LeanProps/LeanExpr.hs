@@ -275,6 +275,10 @@ parenArg e = case e of
 renderLeanExpr :: LeanExpr -> String
 renderLeanExpr LProp =
   "Prop"
+renderLeanExpr LTop =
+  "⊤"
+renderLeanExpr LBot =
+  "⊥"
 renderLeanExpr (LVar n) =
   n
 renderLeanExpr (LApp f args) =

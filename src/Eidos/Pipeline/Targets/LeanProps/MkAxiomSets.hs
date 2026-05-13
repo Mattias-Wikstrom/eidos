@@ -24,7 +24,7 @@ module Eidos.Pipeline.Targets.LeanProps.MkAxiomSets
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
 import qualified Eidos.Pipeline.IRProcessing.AxiomSet as PA
 import           Eidos.Pipeline.IRProcessing.MkAxiomSets (theoryBlocks)
-import           Eidos.Pipeline.Targets.LeanProps.LeanExpr
+import           Eidos.Pipeline.Targets.LeanProps.LeanExpr hiding (renderLeanDoc)
 
 -- ---------------------------------------------------------------------------
 -- Name-resolution helpers (Lean naming conventions)
