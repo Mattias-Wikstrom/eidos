@@ -26,6 +26,7 @@ module Eidos.Pipeline.Targets.LeanProps.LeanExpr
   , LeanExpr (..)
     -- * Rendering
   , renderLeanDocWith
+  , renderLeanDoc
   , renderLeanExpr
   , collectUsedAbbrevNames
   ) where
@@ -217,6 +218,10 @@ renderLeanDocWith renderAbbrev doc =
         ] ++ abbrevLines ++ [ "" | not (null abbrevLines) ]
   in unlines preamble
   ++ concatMap renderBlock (leanDocBlocks doc)
+
+-- | Render a 'LeanDoc' with the default abbreviation renderer.
+renderLeanDoc :: LeanDoc -> String
+renderLeanDoc = renderLeanDocWith IR.renderAbbrevDef
 
 renderBlock :: LeanBlock -> String
 renderBlock blk
