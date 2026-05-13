@@ -255,7 +255,7 @@ theorySortBoundEntries opts theory = concat
     invImgWitnessBounds = concatMap mkForFunc multiArgFol
       where
         mkForFunc f =
-          let fN     = IR.funcName f ++ "_inv_img"
+          let fN     = IR.funcName f ++ "#inv_img"
               argN   = fN ++ "_arg"
               resN   = fN ++ "_res"
               dom    = maybe (error "SortBounds: no domain sort") id (IR.funcDomain f)

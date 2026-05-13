@@ -58,8 +58,8 @@ domMaxName f = sanitizeName (IR.sortName dom) ++ maxSuffix
   where dom = maybe (error "no domain sort") id (IR.funcDomain f)
 
 dirImgName, invImgName :: IR.Function -> String
-dirImgName f = IR.funcName f ++ "_dir_img"
-invImgName f = IR.funcName f ++ "_inv_img"
+dirImgName f = IR.funcName f ++ "#dir_img"
+invImgName f = IR.funcName f ++ "#inv_img"
 
 piName :: IR.Function -> Int -> String
 piName f k = IR.funcName f ++ "_pi_" ++ show k
@@ -311,7 +311,7 @@ mkAxiomSets pt = concat
         in if n == 0 then ABDeclProp else ABDeclFunc n
 
   -- -------------------------------------------------------------------------
-  -- 5. Image function declarations: f_dir_img, f_inv_img
+  -- 5. Image function declarations: f#dir_img, f#inv_img
   -- -------------------------------------------------------------------------
   imageFunctionDeclAxiomSets :: [AxiomSet]
   imageFunctionDeclAxiomSets = concatMap mkImgDecls multiArgFolFunctions
@@ -453,7 +453,7 @@ mkAxiomSets pt = concat
             ]
 
   -- -------------------------------------------------------------------------
-  -- 15. Inverse image witness declarations: f_inv_img_arg, f_inv_img_res
+  -- 15. Inverse image witness declarations: f#inv_img_arg, f#inv_img_res
   -- -------------------------------------------------------------------------
   invImgWitnessDeclAxiomSets :: [AxiomSet]
   invImgWitnessDeclAxiomSets = concatMap mkWitnesses multiArgFolFunctions
