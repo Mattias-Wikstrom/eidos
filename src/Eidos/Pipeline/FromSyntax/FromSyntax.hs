@@ -1353,7 +1353,7 @@ baseTermToMereo bt = case bt of
         lo   = MVar (sn ++ minSuffix)
         hi   = MVar (sn ++ maxSuffix)
         isInd = not (resolvedVarIsSet vd)
-    in MBoundedSum False isInd varN lo hi (propExprToMereo (resolvedSCBody sc))
+    in MBoundedSum False isInd varN lo hi (MRevDiff (propExprToMereo (resolvedSCBody sc)) (MVar varN))
   ResolvedBTDescription desc ->
     let vd   = resolvedDescVar desc
         varN = resolvedVarName vd
@@ -1361,7 +1361,7 @@ baseTermToMereo bt = case bt of
         lo   = MVar (sn ++ minSuffix)
         hi   = MVar (sn ++ maxSuffix)
         isInd = not (resolvedVarIsSet vd)
-    in MBoundedSum False isInd varN lo hi (propExprToMereo (resolvedDescBody desc))
+    in MBoundedSum False isInd varN lo hi (MRevDiff (propExprToMereo (resolvedDescBody desc)) (MVar varN))
 
 translatePropExpr :: Theory -> ResolvedPropExpr -> ResolvedPropExpr
 translatePropExpr th (ResolvedPropBicond left rests) =
