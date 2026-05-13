@@ -58,6 +58,7 @@ axBodyToLean (PA.ABDeclFunc 0)   = LProp
 axBodyToLean (PA.ABDeclFunc n)   = LImpl LProp (axBodyToLean (PA.ABDeclFunc (n - 1)))
 axBodyToLean (PA.ABMereo e)      = mereoExprToLean e
 axBodyToLean (PA.ABFuncEq l r)   = LEq (LVar l) (LVar r)
+axBodyToLean (PA.ABDef _ body)   = mereoExprToLean body
 
 -- ---------------------------------------------------------------------------
 -- MereoExpr → LeanExpr
