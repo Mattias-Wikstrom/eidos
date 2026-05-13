@@ -613,8 +613,15 @@ createTheory parentMaybe name isRefl =
       domain   = mkSort th SortKindDomain   "𝔻" InEveryTheory
       prop     = mkSort th SortKindProp     "ℙ" InEveryTheory
 
-      truth   = mkMereo th MereologicalEntityKindProposition "⊤" prop InEveryTheory
-      falsity = mkMereo th MereologicalEntityKindProposition "⊥" prop InEveryTheory
+      -- ⊤ and ⊥ are keyword aliases for the ℙ-sort bounds.
+      -- They are registered under their keyword names so that source-level
+      -- lookups for "⊤" / "⊥" succeed, and their 'mereoAlias' field causes
+      -- 'resolveEntityAlias' to dereference to the canonical sort-limit entity.
+      -- No separate equality fact is needed; the alias IS the relation.
+      truth   = (mkMereo th MereologicalEntityKindProposition "⊤" prop InEveryTheory)
+                  { mereoAlias = Just (EntityMereological (sortMin prop)) }
+      falsity = (mkMereo th MereologicalEntityKindProposition "⊥" prop InEveryTheory)
+                  { mereoAlias = Just (EntityMereological (sortMax prop)) }
 
       mkBinSOL sym = mkSOLFunction th sym FunctionKindMereologicalOperation
                        [universe, universe] universe InEveryTheory
@@ -631,10 +638,10 @@ createTheory parentMaybe name isRefl =
       builtinsByName = Map.fromListWith (++)
         [ (entityName e, [e]) | e <- builtins ]
 
-      builtinFacts =
-        [ mkSortLimitFact (theoryTruth th)   "=" (sortMin prop)
-        , mkSortLimitFact (theoryFalsity th) "=" (sortMax prop)
-        ]
+      builtinFacts = []
+        -- The ⊤ = ℙ_Min and ⊥ = ℙ_Max relationships are encoded directly
+        -- via 'mereoAlias' on the truth/falsity entities; no equality fact
+        -- is needed.
 
   in th
 
@@ -671,6 +678,7 @@ mkSort th k nm orig =
         , mereoSort          = s
         , mereoLimitForSort  = Just s
         , mereoReflectedFrom = Nothing
+        , mereoAlias         = Nothing
         }
       sMax = MereologicalObject
         { mereoKind          = MereologicalEntityKindUpperLimitForSort
@@ -680,6 +688,7 @@ mkSort th k nm orig =
         , mereoSort          = s
         , mereoLimitForSort  = Just s
         , mereoReflectedFrom = Nothing
+        , mereoAlias         = Nothing
         }
   in s
 
@@ -692,6 +701,7 @@ mkMereo th k nm s orig = MereologicalObject
   , mereoSort          = s
   , mereoLimitForSort  = Nothing
   , mereoReflectedFrom = Nothing
+  , mereoAlias         = Nothing
   }
 
 mkSOLFunction :: Theory -> String -> EntityKind -> [Sort] -> Sort -> Origin -> Function
@@ -1494,7 +1504,7 @@ lookupEntity th nm =
   in case parts of
     [] -> Left "Empty name"
     [single] -> case Map.lookup single (theoryObjectsByName th) of
-      Just [e]  -> Right e
+      Just [e]  -> Right (resolveEntityAlias e)
       Just (_:_) -> Left $ "Ambiguous name: '" ++ single ++ "'"
       Nothing   -> Left $ "Unknown reference: '" ++ nm ++ "'"
     (first:rest) ->
@@ -1535,9 +1545,19 @@ entityToExprType (EntityFunction f) =
 entityToExprType (EntityRelation r)    = RelationClass (length (relArgSorts r))
 entityToExprType (EntityMereological m) =
   case mereoKind m of
-    MereologicalEntityKindIndividual -> IndividualClass
-    MereologicalEntityKindSet        -> RelationClass 1
+    MereologicalEntityKindIndividual  -> IndividualClass
+    MereologicalEntityKindSet         -> RelationClass 1
     MereologicalEntityKindProposition -> PropositionClass
+    -- Sort-limit objects (ℙ_Min, ℙ_Max) are propositions; limits of other
+    -- sorts (e.g. 𝕌_Min) are plain mereological objects.
+    MereologicalEntityKindLowerLimitForSort ->
+      maybe OtherMereologicalClass
+            (\s -> if isPropSort s then PropositionClass else OtherMereologicalClass)
+            (mereoLimitForSort m)
+    MereologicalEntityKindUpperLimitForSort ->
+      maybe OtherMereologicalClass
+            (\s -> if isPropSort s then PropositionClass else OtherMereologicalClass)
+            (mereoLimitForSort m)
     _ -> OtherMereologicalClass
 entityToExprType (EntityTheory _) = TheoryClass
 
@@ -1840,46 +1860,31 @@ resolveSuffix th ctx (acc, ty) suffix = case suffix of
 resolveConstantRef :: Theory -> VarContext -> ConstantRef -> Either BuildError ResolvedConstantRef
 resolveConstantRef th ctx (ConstantRef specs ref) = do
   let path = map theoryRefName specs
-  case ref of
-    "⊤" -> do
-      -- ⊤ means propositional truth = the ℙ-sort lower-bound (ℙ_Min).
-      -- We resolve to sortMin (theoryProp sub) rather than theoryTruth sub
-      -- because theoryTruth is a separate entity named "⊤" that is never
-      -- emitted as an axiom; sortMin is the entity whose name ("ℙ_Min")
-      -- actually appears in the generated output.
-      let mo     = lookupInPath th path (sortMin . theoryProp)
-          entity = EntityMereological mo
-          name   = if null path then mereoName mo
-                   else entityFullyQualifiedName entity
-      return (ResolvedConstantRef name entity PropositionClass)
-    "⊥" -> do
-      -- ⊥ means propositional falsity = the ℙ-sort upper-bound (ℙ_Max).
-      let mo     = lookupInPath th path (sortMax . theoryProp)
-          entity = EntityMereological mo
-          name   = if null path then mereoName mo
-                   else entityFullyQualifiedName entity
-      return (ResolvedConstantRef name entity PropositionClass)
-    _ -> do
-      let mbVar = if null path then lookupVarContext ctx ref else Nothing
-      case mbVar of
-        Just rvd -> do
-          let ty = if resolvedVarIsSet rvd
-                   then RelationClass 1
-                   else case sortKind (resolvedVarSort rvd) of
-                          SortKindProp     -> PropositionClass
-                          SortKindUniverse -> OtherMereologicalClass
-                          _                -> IndividualClass
-          return (ResolvedConstantRef ref
-                    (EntityMereological (mkMereo th MereologicalEntityKindIndividual ref (resolvedVarSort rvd) FromSignature))
-                    ty)
-        Nothing -> do
-          entity <- lookupEntityInPath th path ref
-          let ty   = entityToExprType entity
-              -- For cross-theory references qualify the name with the entity's
-              -- FQN; for same-theory lookups the local name is correct.
-              name = if null path then ref
-                     else entityFullyQualifiedName entity
-          return (ResolvedConstantRef name entity ty)
+  let mbVar = if null path then lookupVarContext ctx ref else Nothing
+  case mbVar of
+    Just rvd -> do
+      -- Bound variable: not a theory entity, use the source name as-is.
+      let ty = if resolvedVarIsSet rvd
+               then RelationClass 1
+               else case sortKind (resolvedVarSort rvd) of
+                      SortKindProp     -> PropositionClass
+                      SortKindUniverse -> OtherMereologicalClass
+                      _                -> IndividualClass
+      return (ResolvedConstantRef ref
+                (EntityMereological (mkMereo th MereologicalEntityKindIndividual ref (resolvedVarSort rvd) FromSignature))
+                ty)
+    Nothing -> do
+      -- Theory entity (including keywords ⊤ and ⊥, which carry a mereoAlias
+      -- that lookupEntity dereferences automatically to the canonical
+      -- sort-limit entity).
+      entity <- lookupEntityInPath th path ref
+      let ty   = entityToExprType entity
+          -- For local lookups, use the entity's own name (after alias
+          -- resolution this may differ from 'ref', e.g. "⊤" → "ℙ_Min").
+          -- For cross-theory lookups, use the fully-qualified name.
+          name = if null path then entityName entity
+                 else entityFullyQualifiedName entity
+      return (ResolvedConstantRef name entity ty)
 
 -- ---------------------------------------------------------------------------
 -- Term pair validation

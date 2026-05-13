@@ -337,6 +337,11 @@ data MereologicalObject = MereologicalObject
   , mereoSort         :: Sort
   , mereoLimitForSort :: Maybe Sort
   , mereoReflectedFrom :: Maybe Theory   -- ^ Just originalTheory when this is a reflected copy
+  , mereoAlias        :: Maybe Entity
+    -- ^ When set, this object is an alias for another entity.  Any lookup
+    -- that finds this object should dereference to the alias target via
+    -- 'resolveEntityAlias'.  Used for built-in keywords such as @⊤@ and
+    -- @⊥@ which alias the ℙ-sort lower and upper bounds respectively.
   }
 
 instance Show MereologicalObject where
@@ -789,6 +794,18 @@ entityFullyQualifiedName e =
       case theoryParent th of
         Nothing  -> nm
         Just par -> qualifyWithAncestors par (theoryName th ++ "." ++ nm)
+
+-- | Follow alias links until reaching a non-alias entity.
+--
+-- Only 'EntityMereological' values carry aliases ('mereoAlias').  All other
+-- entity variants are returned unchanged.  Chains longer than one step are
+-- supported but are not expected in practice.
+resolveEntityAlias :: Entity -> Entity
+resolveEntityAlias e@(EntityMereological mo) =
+  case mereoAlias mo of
+    Nothing     -> e
+    Just target -> resolveEntityAlias target
+resolveEntityAlias e = e
 
 -- ---------------------------------------------------------------------------
 -- Flexible entity search  (inspired by the Go version's bit-flag lookup)
