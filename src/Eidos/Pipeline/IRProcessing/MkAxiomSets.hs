@@ -784,7 +784,8 @@ theoryBlocks pt =
   childBlocks ++ [rootBlock]
   where
     theory      = PL.ptTheory pt
-    rootBlock   = (IR.theoryFullyQualifiedName theory, mkAxiomSets pt)
+    rootFqn     = IR.theoryFullyQualifiedName theory
+    rootBlock   = (if null rootFqn then "__main__" else rootFqn, mkAxiomSets pt)
     childBlocks = concatMap subBlocks (IR.theorySubtheories theory)
 
     subBlocks :: IR.Theory -> [(String, [AxiomSet])]

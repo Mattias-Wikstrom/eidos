@@ -1145,9 +1145,11 @@ wrapAsFact th freeVars expr =
 
 wrapAsAssertion :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
 wrapAsAssertion th freeVars expr =
-  let body = wrapFreeVarsMereo freeVars (propExprToMereo (translatePropExpr th expr))
-      pMin = MVar (sortName (theoryProp th) ++ minSuffix)
+  let pMin = MVar (sortName (theoryProp th) ++ minSuffix)
       pMax = MVar (sortName (theoryProp th) ++ maxSuffix)
+      -- Assertions may contain '¬'; pass pMax as the negation bottom so that
+      -- '¬A' translates to 'A ⇒ ℙ_Max' (propositional falsehood).
+      body = wrapFreeVarsMereo freeVars (propExprToMereoNb pMax (translatePropExpr th expr))
   in MAbbrevApp "WrapAssertion" [pMin, pMax, body]
 
 wrapAsMetafact :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
@@ -1161,35 +1163,68 @@ wrapAsMetafact th freeVars expr =
 --
 -- Expects a ResolvedPropExpr whose operators have already been swapped to
 -- their mereological equivalents by translatePropExpr (i.e. + × - ⇒ ∸).
+--
+-- The 'Nb' variants take an explicit "negation bottom" ('nb'): the MereoExpr
+-- that stands for propositional falsehood.  'negToMereoNb' translates '¬A'
+-- as 'MRevDiff A nb'.
+--
+-- Assertions pass 'pMax' (ℙ_Max) as 'nb' so that '¬A' correctly becomes
+-- 'A ⇒ ℙ_Max' (i.e. A → ⊥).
+-- Facts and metafacts — which should not contain negation — use 'MZero'
+-- via the plain wrappers, preserving the old safe-default behaviour.
 -- ---------------------------------------------------------------------------
 
+propExprToMereoNb :: MereoExpr -> ResolvedPropExpr -> MereoExpr
+propExprToMereoNb nb (ResolvedPropBicond left rests) =
+  foldl MSymDiff (rightImplToMereoNb nb left)
+                 (map (rightImplToMereoNb nb . resolvedPropRestRight) rests)
+
+rightImplToMereoNb :: MereoExpr -> ResolvedRightImpl -> MereoExpr
+rightImplToMereoNb nb (ResolvedRightImpl left Nothing) = leftImplToMereoNb nb left
+rightImplToMereoNb nb (ResolvedRightImpl left (Just (_, right))) =
+  MRevDiff (leftImplToMereoNb nb left) (rightImplToMereoNb nb right)
+
+leftImplToMereoNb :: MereoExpr -> ResolvedLeftImpl -> MereoExpr
+leftImplToMereoNb nb (ResolvedLeftImpl left []) = disjToMereoNb nb left
+leftImplToMereoNb nb (ResolvedLeftImpl left rests) =
+  foldl MDiff (disjToMereoNb nb left) (map (disjToMereoNb nb . resolvedLirRight) rests)
+
+disjToMereoNb :: MereoExpr -> ResolvedDisj -> MereoExpr
+disjToMereoNb nb (ResolvedDisj left []) = conjToMereoNb nb left
+disjToMereoNb nb (ResolvedDisj left rests) =
+  foldl MProd (conjToMereoNb nb left) (map (conjToMereoNb nb . resolvedDisjRestRight) rests)
+
+conjToMereoNb :: MereoExpr -> ResolvedConj -> MereoExpr
+conjToMereoNb nb (ResolvedConj left []) = negToMereoNb nb left
+conjToMereoNb nb (ResolvedConj left rests) =
+  foldl MSum (negToMereoNb nb left) (map (negToMereoNb nb . resolvedConjRestRight) rests)
+
+-- | Translate a negation node.
+-- 'ResolvedNegNot inner' becomes 'inner ⇒ nb' (mereological implication to
+-- the negation bottom).  'ResolvedNegChild' is a non-negated quantified expr.
+negToMereoNb :: MereoExpr -> ResolvedNeg -> MereoExpr
+negToMereoNb nb (ResolvedNegNot inner) = MRevDiff (negToMereoNb nb inner) nb
+negToMereoNb _  (ResolvedNegChild q)  = quantifiedToMereo q
+
+-- | Backward-compat wrappers: use MZero as the negation bottom.
+-- Facts and metafacts should not contain negation; MZero is the safe default.
 propExprToMereo :: ResolvedPropExpr -> MereoExpr
-propExprToMereo (ResolvedPropBicond left rests) =
-  foldl MSymDiff (rightImplToMereo left) (map (rightImplToMereo . resolvedPropRestRight) rests)
+propExprToMereo = propExprToMereoNb MZero
 
 rightImplToMereo :: ResolvedRightImpl -> MereoExpr
-rightImplToMereo (ResolvedRightImpl left Nothing) = leftImplToMereo left
-rightImplToMereo (ResolvedRightImpl left (Just (_, right))) =
-  MRevDiff (leftImplToMereo left) (rightImplToMereo right)
+rightImplToMereo = rightImplToMereoNb MZero
 
 leftImplToMereo :: ResolvedLeftImpl -> MereoExpr
-leftImplToMereo (ResolvedLeftImpl left []) = disjToMereo left
-leftImplToMereo (ResolvedLeftImpl left rests) =
-  foldl MDiff (disjToMereo left) (map (disjToMereo . resolvedLirRight) rests)
+leftImplToMereo = leftImplToMereoNb MZero
 
 disjToMereo :: ResolvedDisj -> MereoExpr
-disjToMereo (ResolvedDisj left []) = conjToMereo left
-disjToMereo (ResolvedDisj left rests) =
-  foldl MProd (conjToMereo left) (map (conjToMereo . resolvedDisjRestRight) rests)
+disjToMereo = disjToMereoNb MZero
 
 conjToMereo :: ResolvedConj -> MereoExpr
-conjToMereo (ResolvedConj left []) = negToMereo left
-conjToMereo (ResolvedConj left rests) =
-  foldl MSum (negToMereo left) (map (negToMereo . resolvedConjRestRight) rests)
+conjToMereo = conjToMereoNb MZero
 
 negToMereo :: ResolvedNeg -> MereoExpr
-negToMereo (ResolvedNegNot _)   = MZero  -- negation is invalid in facts; MZero as safe default
-negToMereo (ResolvedNegChild q) = quantifiedToMereo q
+negToMereo = negToMereoNb MZero
 
 quantifiedToMereo :: ResolvedQuantified -> MereoExpr
 quantifiedToMereo (ResolvedQuantified [] atomic) = atomicToMereo atomic
