@@ -94,7 +94,7 @@ mereoExprToLean (IR.MDiff a b)    = LImpl   (mereoExprToLean b) (mereoExprToLean
 mereoExprToLean (IR.MRevDiff a b) = LImpl   (mereoExprToLean a) (mereoExprToLean b)
 mereoExprToLean (IR.MSymDiff a b) = LBicond (mereoExprToLean a) (mereoExprToLean b)
 mereoExprToLean (IR.MVar n)       = LVar (resolveName n)
-mereoExprToLean IR.MZero          = LVar "ERROR"
+mereoExprToLean IR.MZero          = LTop
 mereoExprToLean (IR.MAbbrevApp "ProjectIntoInterval" [x, lo, hi]) =
   LProjectIntoInterval (mereoExprToLean x) (mereoExprToLean lo) (mereoExprToLean hi)
 mereoExprToLean (IR.MAbbrevApp name args) =

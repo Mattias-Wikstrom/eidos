@@ -98,6 +98,10 @@ data CoqExpr
     -- ^ @A /\ B@
   | CDisj CoqExpr CoqExpr
     -- ^ @A \/ B@
+  | CTop
+    -- ^ ⊤
+  | CBot
+    -- ^ ⊥
   | CBicond CoqExpr CoqExpr
     -- ^ @A <-> B@
   | CForall String CoqExpr CoqExpr
@@ -195,7 +199,7 @@ abbrevBodyToCoq (IR.MDiff a b)    = CImpl   (abbrevBodyToCoq b) (abbrevBodyToCoq
 abbrevBodyToCoq (IR.MRevDiff a b) = CImpl   (abbrevBodyToCoq a) (abbrevBodyToCoq b)
 abbrevBodyToCoq (IR.MSymDiff a b) = CBicond (abbrevBodyToCoq a) (abbrevBodyToCoq b)
 abbrevBodyToCoq (IR.MVar n)       = CVar n
-abbrevBodyToCoq IR.MZero          = CVar "True"
+abbrevBodyToCoq IR.MZero          = CTop
 abbrevBodyToCoq (IR.MAbbrevApp name args) =
   CApp (CVar name) (map abbrevBodyToCoq args)
 abbrevBodyToCoq (IR.MBoundedSum var lo hi body) =

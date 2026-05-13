@@ -95,7 +95,7 @@ mereoExprToCoq (IR.MDiff a b)    = CImpl   (mereoExprToCoq b) (mereoExprToCoq a)
 mereoExprToCoq (IR.MRevDiff a b) = CImpl   (mereoExprToCoq a) (mereoExprToCoq b)
 mereoExprToCoq (IR.MSymDiff a b) = CBicond (mereoExprToCoq a) (mereoExprToCoq b)
 mereoExprToCoq (IR.MVar n)       = CVar (resolveName n)
-mereoExprToCoq IR.MZero          = CVar "True"
+mereoExprToCoq IR.MZero          = CTop
 mereoExprToCoq (IR.MAbbrevApp name args) =
   CApp (CVar name) (map mereoExprToCoq args)
 mereoExprToCoq (IR.MProductOfIndividuals var lo hi body) =

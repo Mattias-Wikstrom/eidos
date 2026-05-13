@@ -110,6 +110,10 @@ data LeanExpr
     -- ^ @A ∧ B@
   | LDisj LeanExpr LeanExpr
     -- ^ @A ∨ B@
+  | LTop
+    -- ^ ⊤
+  | LBot
+    -- ^ ⊥
   | LBicond LeanExpr LeanExpr
     -- ^ @A ↔ B@
   | LForall String LeanExpr LeanExpr
@@ -236,7 +240,7 @@ abbrevBodyToLean (IR.MDiff a b)    = LImpl   (abbrevBodyToLean b) (abbrevBodyToL
 abbrevBodyToLean (IR.MRevDiff a b) = LImpl   (abbrevBodyToLean a) (abbrevBodyToLean b)
 abbrevBodyToLean (IR.MSymDiff a b) = LBicond (abbrevBodyToLean a) (abbrevBodyToLean b)
 abbrevBodyToLean (IR.MVar n)       = LVar n
-abbrevBodyToLean IR.MZero          = LVar "True"
+abbrevBodyToLean IR.MZero          = LTop
 abbrevBodyToLean (IR.MAbbrevApp name args) =
   LApp (LVar name) (map abbrevBodyToLean args)
 abbrevBodyToLean (IR.MBoundedSum var lo hi body) =
