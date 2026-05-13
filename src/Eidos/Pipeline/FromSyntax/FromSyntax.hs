@@ -1725,10 +1725,11 @@ resolveBaseTerm th ctx bt = case bt of
   BTEvaluationInTheory (EvaluationInTheory tnames operand) -> do
     let path = map AST.theoryName tnames
     subTh <- findSubtheoryByPath th path
-    resolved <- resolvePropExpr subTh emptyVarContext operand
+    resolved <- qualifyPropExprConstants <$> resolvePropExpr subTh emptyVarContext operand
+    let resolvedTy = maybe PropositionClass resolvedTermType (termIfPlain resolved)
     return (ResolvedBTEvaluationInTheory
               (ResolvedEvaluationInTheory path subTh resolved),
-            PropositionClass)
+            resolvedTy)
 
   BTProjectionToSort (ProjectionToSort sexpr operand) -> do
     s  <- lookupSortByExpr th sexpr
@@ -2069,3 +2070,50 @@ containsNegationInBase (ResolvedBTProjectionToInterval pti) =
   containsNegationInTerm (resolvedPTIOperand pti)
 containsNegationInBase (ResolvedBTGeneralizedSumOrProduct gsp) =
   containsNegationInTerm (resolvedGSPOperand gsp)
+
+-- | Rewrites resolved constant references to use their fully-qualified entity names.
+-- This is used for <<theory>>(...) so that references are explicitly anchored to
+-- the chosen subtheory in generated backend output.
+qualifyPropExprConstants :: ResolvedPropExpr -> ResolvedPropExpr
+qualifyPropExprConstants (ResolvedPropBicond l rs) =
+  ResolvedPropBicond (goRightImpl l) (map goPropRest rs)
+  where
+    goPropRest (ResolvedPropRest op r) = ResolvedPropRest op (goRightImpl r)
+    goRightImpl (ResolvedRightImpl li mr) =
+      ResolvedRightImpl (goLeftImpl li) (fmap (\(op, r) -> (op, goRightImpl r)) mr)
+    goLeftImpl (ResolvedLeftImpl d rs') =
+      ResolvedLeftImpl (goDisj d) (map (\(ResolvedLeftImplRest op d') -> ResolvedLeftImplRest op (goDisj d')) rs')
+    goDisj (ResolvedDisj c rs') =
+      ResolvedDisj (goConj c) (map (\(ResolvedDisjRest op c') -> ResolvedDisjRest op (goConj c')) rs')
+    goConj (ResolvedConj n rs') =
+      ResolvedConj (goNeg n) (map (\(ResolvedConjRest op n') -> ResolvedConjRest op (goNeg n')) rs')
+    goNeg (ResolvedNegNot n) = ResolvedNegNot (goNeg n)
+    goNeg (ResolvedNegChild q) = ResolvedNegChild (goQuantified q)
+    goQuantified (ResolvedQuantified qs a) = ResolvedQuantified qs (goAtomic a)
+    goAtomic (ResolvedAtomicTermPair tp) = ResolvedAtomicTermPair (goTermPair tp)
+    goAtomic (ResolvedAtomicConstant ref) = ResolvedAtomicConstant (qualifyConst ref)
+    goTermPair (ResolvedTermPair lt rs' ty) = ResolvedTermPair (goTerm lt) (map goRFT rs') ty
+    goRFT (ResolvedRelationFollowedByTerm p op ms rt) =
+      ResolvedRelationFollowedByTerm p op ms (goTerm rt)
+    goTerm (ResolvedTerm f rs' ty) = ResolvedTerm (goFactor f) (map goOFF rs') ty
+    goOFF (ResolvedOperationFollowedByFactor p op rf) =
+      ResolvedOperationFollowedByFactor p op (goFactor rf)
+    goFactor (ResolvedFactor bt sfx ty) = ResolvedFactor (goBase bt) sfx ty
+    goBase (ResolvedBTAtomic cr) = ResolvedBTAtomic (qualifyConst cr)
+    goBase (ResolvedBTPropParen p) = ResolvedBTPropParen (qualifyPropExprConstants p)
+    goBase (ResolvedBTTermParen t) = ResolvedBTTermParen (goTerm t)
+    goBase (ResolvedBTSingleton t) = ResolvedBTSingleton (goTerm t)
+    goBase (ResolvedBTEvaluationInTheory (ResolvedEvaluationInTheory p sub inner)) =
+      ResolvedBTEvaluationInTheory (ResolvedEvaluationInTheory p sub (qualifyPropExprConstants inner))
+    goBase (ResolvedBTProjectionToSort (ResolvedProjectionToSort s t)) =
+      ResolvedBTProjectionToSort (ResolvedProjectionToSort s (goTerm t))
+    goBase (ResolvedBTProjectionToInterval (ResolvedProjectionToInterval lo hi t)) =
+      ResolvedBTProjectionToInterval (ResolvedProjectionToInterval (goTerm lo) (goTerm hi) (goTerm t))
+    goBase (ResolvedBTGeneralizedSumOrProduct (ResolvedGeneralizedSumOrProduct sym v t)) =
+      ResolvedBTGeneralizedSumOrProduct (ResolvedGeneralizedSumOrProduct sym v (goTerm t))
+    goBase (ResolvedBTSetComprehension (ResolvedSetComprehension v p)) =
+      ResolvedBTSetComprehension (ResolvedSetComprehension v (qualifyPropExprConstants p))
+    goBase (ResolvedBTDescription (ResolvedDescription v p)) =
+      ResolvedBTDescription (ResolvedDescription v (qualifyPropExprConstants p))
+
+    qualifyConst cr = cr { resolvedConstRefName = entityFullyQualifiedName (resolvedConstEntity cr) }
