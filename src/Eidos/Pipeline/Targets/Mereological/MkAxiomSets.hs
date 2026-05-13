@@ -13,6 +13,7 @@ module Eidos.Pipeline.Targets.Mereological.MkAxiomSets
   ) where
 
 import           Data.Char (isLower)
+import           Data.List (stripPrefix)
 import qualified Data.Map.Strict as Map
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
 import           Eidos.Pipeline.Targets.Mereological.MereoExpr
@@ -27,10 +28,6 @@ type NameMap = Map.Map String String
 -- Name-resolution helpers
 -- ---------------------------------------------------------------------------
 
-minSuffix, maxSuffix :: String
-minSuffix = "_Min"
-maxSuffix = "_Max"
-
 -- | Rewrite an IR variable name using the entity name map, falling back to
 -- the special-var rules for built-in bound names (e.g. @\"ℙ_Min\"@).
 rewriteVar :: NameMap -> String -> String
@@ -38,30 +35,27 @@ rewriteVar nm n = case Map.lookup n nm of
   Just out -> out
   Nothing  -> rewriteSpecialVar n
 
--- | Rewrite built-in and sort-bound special variable names to output form.
+-- | Rewrite built-in sort names to ASCII output form by replacing their
+-- Unicode prefix, then handle lowercase variable names.
 --
--- The built-in sort limits are mapped to their ASCII output names:
---   @𝕌_Min@ → @Univ_Min@, @𝕌_Max@ → @Univ_Max@,
---   @ℙ_Min@ → @Pr_Min@,   @ℙ_Max@ → @Pr_Max@,
---   @𝔻_Min@ → @Dom_Min@,  @𝔻_Max@ → @Dom_Max@.
--- User-sort limits (e.g. @MySort_Min@) start with an uppercase letter and
--- fall through to the identity case.
+-- The Unicode prefixes of the three built-in sorts are substituted:
+--   @𝕌…@ → @Univ…@,  @ℙ…@ → @Pr…@,  @𝔻…@ → @Dom…@.
+-- This replacement is suffix-agnostic: @𝕌_Min@, @𝕌_Max@, @𝕌_foo@, etc.
+-- are all handled correctly regardless of the naming convention in use.
+-- User-sort limits (e.g. @MySort_Min@) start with an uppercase ASCII letter
+-- and fall through to the identity case.
 --
 -- Unrecognised names that start with a lowercase ASCII letter AND contain no
 -- underscores are prefixed with @Var_@ (e.g. @x@ → @Var_x@) to satisfy the
 -- Eidos syntax requirement that object names begin with an uppercase letter.
--- Names that contain underscores (e.g. function-domain sort limits like
--- @f_dom_Min@) pass through unchanged since they are already in output form.
+-- Names containing underscores (e.g. @f_dom_Min@) pass through unchanged.
 rewriteSpecialVar :: String -> String
-rewriteSpecialVar n = case n of
-  "𝕌_Min" -> "Univ_Min"
-  "𝕌_Max" -> "Univ_Max"
-  "ℙ_Min" -> "Pr_Min"
-  "ℙ_Max" -> "Pr_Max"
-  "𝔻_Min" -> "Dom_Min"
-  "𝔻_Max" -> "Dom_Max"
-  (c:_) | isLower c, '_' `notElem` n -> "Var_" ++ n
-  _ -> n
+rewriteSpecialVar n
+  | Just rest <- stripPrefix "𝕌" n = "Univ" ++ rest
+  | Just rest <- stripPrefix "ℙ"  n = "Pr"   ++ rest
+  | Just rest <- stripPrefix "𝔻"  n = "Dom"  ++ rest
+  | (c:_) <- n, isLower c, '_' `notElem` n = "Var_" ++ n
+  | otherwise = n
 
 -- ---------------------------------------------------------------------------
 -- Quantifier constructor selector
