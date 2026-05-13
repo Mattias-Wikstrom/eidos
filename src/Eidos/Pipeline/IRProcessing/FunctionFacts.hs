@@ -90,8 +90,9 @@ sMin, sMax :: IR.Sort -> IR.MereoExpr
 sMin s = IR.MVar (IR.mereoName (IR.sortMin s))
 sMax s = IR.MVar (IR.mereoName (IR.sortMax s))
 
+-- TODO: Give this function a better name
 bounded :: String -> IR.Sort -> IR.MereoExpr -> IR.MereoExpr
-bounded v s body = IR.MBoundedSum False False v (sMin s) (sMax s) body
+bounded v s body = IR.MBoundedSum v (sMin s) (sMax s) body
 
 domSort :: IR.Function -> IR.Sort
 domSort f = maybe (error "FunctionFacts: function has no domain sort") id (IR.funcDomain f)

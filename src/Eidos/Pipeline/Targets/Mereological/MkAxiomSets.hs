@@ -104,15 +104,44 @@ irMereoExprToMereo nm = go
     go (IR.MAbbrevApp "ProjectIntoInterval" [x, lo, hi]) =
       MProjectIntoInterval (go x) (go lo) (go hi)
     go (IR.MAbbrevApp n args) = MAbbrevApp n (map go args)
-    go (IR.MBoundedSum isEx isInd var lo hi body) =
+    go (IR.MBoundedSum var lo hi body) =
       let var'  = rewriteSpecialVar var  -- applies Var_ prefix for lowercase names
-          mk    = mkBoundedQuantifier isEx isInd
+          mk    = mkBoundedQuantifier False False
           body' = go body
       in case (lo, hi) of
         (IR.MVar loName, IR.MVar hiName) ->
           mk var' (rewriteVar nm loName) (rewriteVar nm hiName) body'
         _ ->
           mk var' (renderMereoExpr (go lo)) (renderMereoExpr (go hi)) body'
+    go (IR.MBoundedProduct var lo hi body) =
+      let var'  = rewriteSpecialVar var  -- applies Var_ prefix for lowercase names
+          mk    = mkBoundedQuantifier True False
+          body' = go body
+      in case (lo, hi) of
+        (IR.MVar loName, IR.MVar hiName) ->
+          mk var' (rewriteVar nm loName) (rewriteVar nm hiName) body'
+        _ ->
+          mk var' (renderMereoExpr (go lo)) (renderMereoExpr (go hi)) body'
+    go (IR.MSumOfIndividuals var lo hi body) =
+      let var'  = rewriteSpecialVar var  -- applies Var_ prefix for lowercase names
+          mk    = mkBoundedQuantifier False True
+          body' = go body
+      in case (lo, hi) of
+        (IR.MVar loName, IR.MVar hiName) ->
+          mk var' (rewriteVar nm loName) (rewriteVar nm hiName) body'
+        _ ->
+          mk var' (renderMereoExpr (go lo)) (renderMereoExpr (go hi)) body'
+    go (IR.MProductOfIndividuals var lo hi body) =
+      let var'  = rewriteSpecialVar var  -- applies Var_ prefix for lowercase names
+          mk    = mkBoundedQuantifier True True
+          body' = go body
+      in case (lo, hi) of
+        (IR.MVar loName, IR.MVar hiName) ->
+          mk var' (rewriteVar nm loName) (rewriteVar nm hiName) body'
+        _ ->
+          mk var' (renderMereoExpr (go lo)) (renderMereoExpr (go hi)) body'
+
+
 
 -- | Translate an 'IR.MereoExpr' that is the body of a compiler-internal
 -- abbreviation definition.  No entity-name rewriting is needed — the body

@@ -239,9 +239,21 @@ abbrevBodyToLean (IR.MVar n)       = LVar n
 abbrevBodyToLean IR.MZero          = LVar "True"
 abbrevBodyToLean (IR.MAbbrevApp name args) =
   LApp (LVar name) (map abbrevBodyToLean args)
-abbrevBodyToLean (IR.MBoundedSum _isEx _isInd var lo hi body) =
+abbrevBodyToLean (IR.MBoundedSum var lo hi body) =
   LForallKw var LProp
     (LImpl (LApp (LVar "IsWithinBounds") [abbrevBodyToLean lo, abbrevBodyToLean hi, LVar var])
+           (abbrevBodyToLean body))
+abbrevBodyToLean (IR.MBoundedProduct var lo hi body) =
+  LExists var LProp
+    (LConj (LApp (LVar "IsWithinBounds") [abbrevBodyToLean lo, abbrevBodyToLean hi, LVar var])
+           (abbrevBodyToLean body))
+abbrevBodyToLean (IR.MSumOfIndividuals var lo hi body) =
+  LForallKw var LProp
+    (LImpl (LApp (LVar "IsIndividual") [abbrevBodyToLean lo, abbrevBodyToLean hi, LVar var])
+           (abbrevBodyToLean body))
+abbrevBodyToLean (IR.MProductOfIndividuals var lo hi body) =
+  LExists var LProp
+    (LConj (LApp (LVar "IsIndividual") [abbrevBodyToLean lo, abbrevBodyToLean hi, LVar var])
            (abbrevBodyToLean body))
 
 renderBlock :: LeanBlock -> String

@@ -94,23 +94,52 @@ mereoExprToLean (IR.MDiff a b)    = LImpl   (mereoExprToLean b) (mereoExprToLean
 mereoExprToLean (IR.MRevDiff a b) = LImpl   (mereoExprToLean a) (mereoExprToLean b)
 mereoExprToLean (IR.MSymDiff a b) = LBicond (mereoExprToLean a) (mereoExprToLean b)
 mereoExprToLean (IR.MVar n)       = LVar (resolveName n)
-mereoExprToLean IR.MZero          = LVar "True"
+mereoExprToLean IR.MZero          = LVar "ERROR"
 mereoExprToLean (IR.MAbbrevApp "ProjectIntoInterval" [x, lo, hi]) =
   LProjectIntoInterval (mereoExprToLean x) (mereoExprToLean lo) (mereoExprToLean hi)
 mereoExprToLean (IR.MAbbrevApp name args) =
   LApp (LVar name) (map mereoExprToLean args)
-mereoExprToLean (IR.MBoundedSum isEx isInd var lo hi body) =
+mereoExprToLean (IR.MBoundedSum var lo hi body) =
   case (lo, hi) of
     (IR.MVar loName, IR.MVar hiName) ->
       let lo' = resolveName loName
           hi' = resolveName hiName
           b   = mereoExprToLean body
-          mk  = mkLeanBoundedQuantifier isEx isInd
-      in mk var lo' hi' b
+      in LBoundedForall var lo' hi' b
     _ ->
-      let boundAbbrev = if isInd then "IsIndividual" else "IsWithinBounds"
-          kw          = if isEx  then LExists else LForallKw
-          connector   = LImpl
-      in kw var LProp
-           (connector (LApp (LVar boundAbbrev) [mereoExprToLean lo, mereoExprToLean hi, LVar var])
+      LForallKw var LProp
+           (LImpl (LApp (LVar "IsWithinBounds") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
+                      (mereoExprToLean body))
+mereoExprToLean (IR.MBoundedProduct var lo hi body) =
+  case (lo, hi) of
+    (IR.MVar loName, IR.MVar hiName) ->
+      let lo' = resolveName loName
+          hi' = resolveName hiName
+          b   = mereoExprToLean body
+      in LBoundedExists var lo' hi' b
+    _ ->
+      LExists var LProp
+           (LImpl (LApp (LVar "IsWithinBounds") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
+                      (mereoExprToLean body))
+mereoExprToLean (IR.MSumOfIndividuals var lo hi body) =
+  case (lo, hi) of
+    (IR.MVar loName, IR.MVar hiName) ->
+      let lo' = resolveName loName
+          hi' = resolveName hiName
+          b   = mereoExprToLean body
+      in LForallIndividuals var lo' hi' b
+    _ ->
+      LForallKw var LProp
+           (LImpl (LApp (LVar "IsIndividual") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
+                      (mereoExprToLean body))
+mereoExprToLean (IR.MProductOfIndividuals var lo hi body) =
+  case (lo, hi) of
+    (IR.MVar loName, IR.MVar hiName) ->
+      let lo' = resolveName loName
+          hi' = resolveName hiName
+          b   = mereoExprToLean body
+      in LExistsIndividuals var lo' hi' b
+    _ ->
+      LExists var LProp
+           (LImpl (LApp (LVar "IsIndividual") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
                       (mereoExprToLean body))

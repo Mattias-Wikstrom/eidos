@@ -198,9 +198,21 @@ abbrevBodyToCoq (IR.MVar n)       = CVar n
 abbrevBodyToCoq IR.MZero          = CVar "True"
 abbrevBodyToCoq (IR.MAbbrevApp name args) =
   CApp (CVar name) (map abbrevBodyToCoq args)
-abbrevBodyToCoq (IR.MBoundedSum _isEx _isInd var lo hi body) =
+abbrevBodyToCoq (IR.MBoundedSum var lo hi body) =
   CForall var CProp
     (CImpl (CApp (CVar "IsWithinBounds") [abbrevBodyToCoq lo, abbrevBodyToCoq hi, CVar var])
+           (abbrevBodyToCoq body))
+abbrevBodyToCoq (IR.MBoundedProduct var lo hi body) =
+  CExists var CProp
+    (CConj (CApp (CVar "IsWithinBounds") [abbrevBodyToCoq lo, abbrevBodyToCoq hi, CVar var])
+           (abbrevBodyToCoq body))
+abbrevBodyToCoq (IR.MSumOfIndividuals var lo hi body) =
+  CForall var CProp
+    (CImpl (CApp (CVar "IsIndividual") [abbrevBodyToCoq lo, abbrevBodyToCoq hi, CVar var])
+           (abbrevBodyToCoq body))
+abbrevBodyToCoq (IR.MProductOfIndividuals var lo hi body) =
+  CExists var CProp
+    (CConj (CApp (CVar "IsIndividual") [abbrevBodyToCoq lo, abbrevBodyToCoq hi, CVar var])
            (abbrevBodyToCoq body))
 
 -- | Sanitize a dotted FQN to a valid flat Coq module identifier.

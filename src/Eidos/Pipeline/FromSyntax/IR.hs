@@ -158,13 +158,18 @@ data MereoExpr
   | MAbbrevApp String [MereoExpr]
     -- ^ Application of a compiler-internal abbreviation:
     --   IsWithinBounds(lo, hi, x), WrapFact(x, y), etc.
-  | MBoundedSum Bool Bool String MereoExpr MereoExpr MereoExpr
+    -- | MBoundedSum Bool Bool String MereoExpr MereoExpr MereoExpr
     -- ^ Bounded quantification: (isExists, isIndividual, varName, lo, hi, body).
     --   When @isExists = False@, this is universal (∀ varName ∈ [lo, hi]. body).
     --   When @isExists = True@,  this is existential (∃ varName ∈ [lo, hi]. body).
     --   @isIndividual = True@ means the variable was declared with @:@ syntax
     --   (a first-order individual); backends should guard with @IsIndividual@
     --   rather than @IsWithinBounds@.
+  | MBoundedSum String MereoExpr MereoExpr MereoExpr
+  | MBoundedProduct String MereoExpr MereoExpr MereoExpr
+  | MSumOfIndividuals String MereoExpr MereoExpr MereoExpr
+  | MProductOfIndividuals String MereoExpr MereoExpr MereoExpr
+  
   deriving (Show, Eq)
 
 -- ---------------------------------------------------------------------------
@@ -217,7 +222,10 @@ collectUsedAbbrevNames = go
     go (MVar _)              = []
     go MZero                 = []
     go (MAbbrevApp n args)   = n : concatMap go args
-    go (MBoundedSum _ _ _ lo hi body) = go lo ++ go hi ++ go body
+    go (MBoundedSum _ lo hi body) = go lo ++ go hi ++ go body
+    go (MBoundedProduct _ lo hi body) = go lo ++ go hi ++ go body
+    go (MSumOfIndividuals _ lo hi body) = go lo ++ go hi ++ go body
+    go (MProductOfIndividuals _ lo hi body) = go lo ++ go hi ++ go body
 
 -- ---------------------------------------------------------------------------
 -- Entity sum type

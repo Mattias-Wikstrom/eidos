@@ -1145,7 +1145,7 @@ wrapFreeVarsMereo (vd:rest) body =
       lo     = MVar (sn ++ minSuffix)
       hi     = MVar (sn ++ maxSuffix)
       isInd  = not (resolvedVarIsSet vd)
-  in MBoundedSum False isInd varN lo hi (wrapFreeVarsMereo rest body)
+  in if isInd then (MSumOfIndividuals varN lo hi (wrapFreeVarsMereo rest body)) else (MBoundedSum varN lo hi (wrapFreeVarsMereo rest body))
 
 wrapAsFact :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
 wrapAsFact th freeVars expr =
@@ -1251,7 +1251,8 @@ quantifierToMereo q body =
       lo    = MVar (sn ++ minSuffix)
       hi    = MVar (sn ++ maxSuffix)
       isInd = not (resolvedVarIsSet vd)
-  in MBoundedSum isExists isInd varN lo hi body
+  in if isExists then (if isInd then MProductOfIndividuals varN lo hi body else MBoundedProduct varN lo hi body)
+    else (if isInd then MSumOfIndividuals varN lo hi body else MBoundedSum varN lo hi body)
 
 atomicToMereo :: ResolvedAtomicProp -> MereoExpr
 atomicToMereo (ResolvedAtomicConstant ref) = MVar (resolvedConstRefName ref)
@@ -1343,9 +1344,9 @@ baseTermToMereo bt = case bt of
                lo    = MVar (sn ++ minSuffix)
                hi    = MVar (sn ++ maxSuffix)
                isInd = not (resolvedVarIsSet vd)
-           in MBoundedSum False isInd varN lo hi operand
+           in if isInd then MSumOfIndividuals varN lo hi operand else MBoundedSum varN lo hi operand
          Right bareVar ->
-           MBoundedSum False False bareVar MZero MZero operand
+           MBoundedSum bareVar MZero MZero operand
   ResolvedBTSetComprehension sc ->
     let vd   = resolvedSCVar sc
         varN = resolvedVarName vd
@@ -1353,7 +1354,8 @@ baseTermToMereo bt = case bt of
         lo   = MVar (sn ++ minSuffix)
         hi   = MVar (sn ++ maxSuffix)
         isInd = not (resolvedVarIsSet vd)
-    in MBoundedSum False isInd varN lo hi (MRevDiff (propExprToMereo (resolvedSCBody sc)) (MVar varN))
+    in if isInd then MSumOfIndividuals varN lo hi (MRevDiff (propExprToMereo (resolvedSCBody sc)) (MVar varN))
+      else MBoundedSum varN lo hi (MRevDiff (propExprToMereo (resolvedSCBody sc)) (MVar varN))
   ResolvedBTDescription desc ->
     let vd   = resolvedDescVar desc
         varN = resolvedVarName vd
@@ -1361,7 +1363,8 @@ baseTermToMereo bt = case bt of
         lo   = MVar (sn ++ minSuffix)
         hi   = MVar (sn ++ maxSuffix)
         isInd = not (resolvedVarIsSet vd)
-    in MBoundedSum False isInd varN lo hi (MRevDiff (propExprToMereo (resolvedDescBody desc)) (MVar varN))
+    in if isInd then MSumOfIndividuals varN lo hi (MRevDiff (propExprToMereo (resolvedDescBody desc)) (MVar varN))
+      else MBoundedSum varN lo hi (MRevDiff (propExprToMereo (resolvedDescBody desc)) (MVar varN))
 
 translatePropExpr :: Theory -> ResolvedPropExpr -> ResolvedPropExpr
 translatePropExpr th (ResolvedPropBicond left rests) =
