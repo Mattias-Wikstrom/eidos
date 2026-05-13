@@ -311,7 +311,7 @@ mkAxiomSets pt = concat
         in if n == 0 then ABDeclProp else ABDeclFunc n
 
   -- -------------------------------------------------------------------------
-  -- 5. Image function declarations: f#dir_img, f#inv_img
+  -- 5. Image function declarations: f_dir_img, f_inv_img
   -- -------------------------------------------------------------------------
   imageFunctionDeclAxiomSets :: [AxiomSet]
   imageFunctionDeclAxiomSets = concatMap mkImgDecls multiArgFolFunctions
@@ -453,7 +453,7 @@ mkAxiomSets pt = concat
             ]
 
   -- -------------------------------------------------------------------------
-  -- 15. Inverse image witness declarations: f#inv_img_arg, f#inv_img_res
+  -- 15. Inverse image witness declarations: f_inv_img_arg, f_inv_img_res
   -- -------------------------------------------------------------------------
   invImgWitnessDeclAxiomSets :: [AxiomSet]
   invImgWitnessDeclAxiomSets = concatMap mkWitnesses multiArgFolFunctions

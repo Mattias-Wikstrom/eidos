@@ -261,7 +261,7 @@ theoryFunctionFactEntries theory = concat
           in FunctionFactEntry (FFCImageAdjunction fN) [(fN ++ "_image_adjunction", qX)]
 
     -- -----------------------------------------------------------------------
-    -- 28. Decomposition axioms: f = f#dir_img ∘ f_tuple
+    -- 28. Decomposition axioms: f = f_dir_img ∘ f_tuple
     -- -----------------------------------------------------------------------
     decompositions = map mkDecomp multiArgFol
       where
