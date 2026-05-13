@@ -113,8 +113,8 @@ extractSorts th =
   , not (isInternalSort s)
   ]
   where
-    isInternalSort s = 
-      any (`isInfixOf` IR.sortName s) ["#dom", "#res"] ||
+    isInternalSort s =
+      any (`isInfixOf` IR.sortName s) ["_dom", "#res"] ||
       IR.sortKind s == IR.SortKindProduct
 
 extractFunctions :: IR.Theory -> [FunctionExport]

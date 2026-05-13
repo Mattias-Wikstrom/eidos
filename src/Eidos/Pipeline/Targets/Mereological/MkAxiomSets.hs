@@ -32,33 +32,36 @@ minSuffix = "_Min"
 maxSuffix = "_Max"
 
 -- | Rewrite an IR variable name using the entity name map, falling back to
--- the special-var rules for built-in bound names (e.g. @\"ℙ#min\"@).
+-- the special-var rules for built-in bound names (e.g. @\"ℙ_Min\"@).
 rewriteVar :: NameMap -> String -> String
 rewriteVar nm n = case Map.lookup n nm of
   Just out -> out
   Nothing  -> rewriteSpecialVar n
 
 -- | Rewrite built-in and sort-bound special variable names to output form.
---   @𝕌#min@ → @Univ_Min@, @ℙ#max@ → @Pr_Max@, @S#min@ → @S_Min@, etc.
---   Unrecognised names that start with a lowercase ASCII letter are prefixed
---   with @Var_@ (e.g. @x@ → @Var_x@) to satisfy the Eidos syntax requirement
---   that object names begin with an uppercase letter.
+--
+-- The built-in sort limits are mapped to their ASCII output names:
+--   @𝕌_Min@ → @Univ_Min@, @𝕌_Max@ → @Univ_Max@,
+--   @ℙ_Min@ → @Pr_Min@,   @ℙ_Max@ → @Pr_Max@,
+--   @𝔻_Min@ → @Dom_Min@,  @𝔻_Max@ → @Dom_Max@.
+-- User-sort limits (e.g. @MySort_Min@) start with an uppercase letter and
+-- fall through to the identity case.
+--
+-- Unrecognised names that start with a lowercase ASCII letter AND contain no
+-- underscores are prefixed with @Var_@ (e.g. @x@ → @Var_x@) to satisfy the
+-- Eidos syntax requirement that object names begin with an uppercase letter.
+-- Names that contain underscores (e.g. function-domain sort limits like
+-- @f_dom_Min@) pass through unchanged since they are already in output form.
 rewriteSpecialVar :: String -> String
 rewriteSpecialVar n = case n of
-  "𝕌#min" -> "Univ" ++ minSuffix
-  "𝕌#max" -> "Univ" ++ maxSuffix
-  "ℙ#min" -> "Pr"   ++ minSuffix
-  "ℙ#max" -> "Pr"   ++ maxSuffix
-  "𝔻#min" -> "Dom"  ++ minSuffix
-  "𝔻#max" -> "Dom"  ++ maxSuffix
-  _ | Just base <- stripHashSuffix "#min" n -> base ++ minSuffix
-    | Just base <- stripHashSuffix "#max" n -> base ++ maxSuffix
-  (c:_) | isLower c -> "Var_" ++ n
+  "𝕌_Min" -> "Univ_Min"
+  "𝕌_Max" -> "Univ_Max"
+  "ℙ_Min" -> "Pr_Min"
+  "ℙ_Max" -> "Pr_Max"
+  "𝔻_Min" -> "Dom_Min"
+  "𝔻_Max" -> "Dom_Max"
+  (c:_) | isLower c, '_' `notElem` n -> "Var_" ++ n
   _ -> n
-  where
-    stripHashSuffix suf str =
-      let (front, back) = splitAt (length str - length suf) str
-      in if back == suf then Just front else Nothing
 
 -- ---------------------------------------------------------------------------
 -- Quantifier constructor selector

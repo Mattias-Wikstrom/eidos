@@ -159,21 +159,21 @@ mkAxiomSets pt = concat
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
         , IR.mereoKind   m == IR.MereologicalEntityKindIndividual
         , IR.mereoOrigin m == IR.FromSignature
-        , IR.mereoName   m `notElem` [uMinName, uMaxName, "𝕌#min", "𝕌#max"]
+        , IR.mereoName   m `notElem` [uMinName, uMaxName]
         ]
 
   mereoObjects =
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
         , IR.mereoKind   m == IR.MereologicalEntityKindMereological
         , IR.mereoOrigin m == IR.FromSignature
-        , IR.mereoName   m `notElem` [uMinName, uMaxName, "𝕌#min", "𝕌#max"]
+        , IR.mereoName   m `notElem` [uMinName, uMaxName]
         ]
 
   propObjects =
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
         , IR.mereoKind   m == IR.MereologicalEntityKindProposition
         , IR.mereoOrigin m == IR.FromSignature
-        , IR.mereoName   m `notElem` [pMinName, pMaxName, "⊤", "⊥", "ℙ#min", "ℙ#max"]
+        , IR.mereoName   m `notElem` [pMinName, pMaxName, "⊤", "⊥"]
         ]
 
   setObjects =
@@ -637,7 +637,7 @@ mkAxiomSets pt = concat
         let argN = sanitizeName (IR.mereoName (IR.relArgument r))
             dMn  = relDomMinName r
             dMx  = relDomMaxName r
-            pMin = IR.MVar "ℙ#min"
+            pMin = IR.MVar pMinName
         in axiomSet [SSet (IR.relName r)] (tags tSet)
              [ (argN, ABDeclProp)
              , (argN ++ minSuffixForAxiomNames,
@@ -761,20 +761,9 @@ mkAxiomSets pt = concat
 
       resolveName :: String -> String
       resolveName n = case n of
-        "⊤"     -> pMinName
-        "⊥"     -> pMaxName
-        "ℙ#min" -> pMinName
-        "ℙ#max" -> pMaxName
-        "𝕌#min" -> uMinName
-        "𝕌#max" -> uMaxName
-        other
-          | Just base <- stripSuffix "#min" other -> sanitizeName base ++ minSuffix
-          | Just base <- stripSuffix "#max" other -> sanitizeName base ++ maxSuffix
-          | otherwise -> sanitizeName other
-        where
-          stripSuffix suffix str =
-            let (front, back) = splitAt (length str - length suffix) str
-            in if back == suffix then Just front else Nothing
+        "⊤" -> pMinName
+        "⊥" -> pMaxName
+        _   -> sanitizeName n
 
 -- ---------------------------------------------------------------------------
 -- Flat post-order block list

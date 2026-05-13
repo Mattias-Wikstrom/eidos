@@ -27,7 +27,7 @@ import qualified Eidos.Pipeline.FromSyntax.IR as IR
 -- | A mereological expression in the output format.
 --
 -- Variables ('MVar') already carry their final output names — name rewriting
--- from IR internal names (e.g. @\"ℙ#min\"@ → @\"Pr_Min\"@) is done during
+-- from IR internal names (e.g. @\"ℙ_Min\"@ → @\"Pr_Min\"@) is done during
 -- the IR→'MereoExpr' translation in 'MkAxiomSets', not during rendering.
 data MereoExpr
   = MSum MereoExpr MereoExpr

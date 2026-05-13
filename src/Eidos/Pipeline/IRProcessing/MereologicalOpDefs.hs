@@ -5,11 +5,11 @@
 -- universe:
 --
 -- @
---   th.plus  (X, Y) := ProjectIntoInterval(X, 𝕌#min, 𝕌#max)  ∧  ProjectIntoInterval(Y, 𝕌#min, 𝕌#max)
---   th.times (X, Y) := ProjectIntoInterval(X, 𝕌#min, 𝕌#max)  ∨  ProjectIntoInterval(Y, 𝕌#min, 𝕌#max)
---   th.minus (X, Y) := ProjectIntoInterval(Y, 𝕌#min, 𝕌#max)  →  ProjectIntoInterval(X, 𝕌#min, 𝕌#max)
---   th.impl  (X, Y) := ProjectIntoInterval(X, 𝕌#min, 𝕌#max)  →  ProjectIntoInterval(Y, 𝕌#min, 𝕌#max)
---   th.bicond(X, Y) := ProjectIntoInterval(X, 𝕌#min, 𝕌#max)  ↔  ProjectIntoInterval(Y, 𝕌#min, 𝕌#max)
+--   th.plus  (X, Y) := ProjectIntoInterval(X, 𝕌_Min, 𝕌_Max)  ∧  ProjectIntoInterval(Y, 𝕌_Min, 𝕌_Max)
+--   th.times (X, Y) := ProjectIntoInterval(X, 𝕌_Min, 𝕌_Max)  ∨  ProjectIntoInterval(Y, 𝕌_Min, 𝕌_Max)
+--   th.minus (X, Y) := ProjectIntoInterval(Y, 𝕌_Min, 𝕌_Max)  →  ProjectIntoInterval(X, 𝕌_Min, 𝕌_Max)
+--   th.impl  (X, Y) := ProjectIntoInterval(X, 𝕌_Min, 𝕌_Max)  →  ProjectIntoInterval(Y, 𝕌_Min, 𝕌_Max)
+--   th.bicond(X, Y) := ProjectIntoInterval(X, 𝕌_Min, 𝕌_Max)  ↔  ProjectIntoInterval(Y, 𝕌_Min, 𝕌_Max)
 -- @
 --
 -- Note that the +, × and − on the right-hand side of each definition are the
@@ -44,7 +44,7 @@ data MereoOpDefEntry = MereoOpDefEntry
   , modBody    :: IR.MereoExpr
     -- ^ Body of the definition, expressed using 'IR.MAbbrevApp'
     --   @\"ProjectIntoInterval\"@ applied to each parameter and the
-    --   theory's universe bounds (@'IR.MVar' \"𝕌#min\"@, @'IR.MVar' \"𝕌#max\"@),
+    --   theory's universe bounds (@'IR.MVar' \"𝕌_Min\"@, @'IR.MVar' \"𝕌_Max\"@),
     --   combined with the appropriate raw mereological constructor.
   } deriving (Show)
 
@@ -54,13 +54,13 @@ data MereoOpDefEntry = MereoOpDefEntry
 
 -- | Generate the five mereological-op definition entries for a theory.
 --
--- The entries are the same for every theory; the 𝕌#min / 𝕌#max references
--- inside each body are resolved to the theory's own universe bounds when
--- rendered by the backend.
+-- The entries use the theory's actual universe bound mereoNames (𝕌_Min / 𝕌_Max
+-- for the built-in universe, or the corresponding names for a sub-theory's
+-- universe) so that each body refers to the correct sort limit objects.
 theoryMereoOpDefEntries :: IR.Theory -> [MereoOpDefEntry]
-theoryMereoOpDefEntries _theory =
-  let uMin = IR.MVar "𝕌#min"
-      uMax = IR.MVar "𝕌#max"
+theoryMereoOpDefEntries theory =
+  let uMin = IR.MVar (IR.mereoName (IR.sortMin (IR.theoryUniverse theory)))
+      uMax = IR.MVar (IR.mereoName (IR.sortMax (IR.theoryUniverse theory)))
       proj v = IR.MAbbrevApp "ProjectIntoInterval" [IR.MVar v, uMin, uMax]
   in
   [ MereoOpDefEntry

@@ -81,7 +81,7 @@ sanitize = map (\c -> if c == '#' then '_' else c)
 
 -- | Build the axiom list for one object given its (IR-level) names.
 -- @obj@ is the IR object name (e.g. @\"f#res\"@); @lo@ and @hi@ are IR names
--- for the lower/upper sort bounds (e.g. @\"S#min\"@, @\"S#max\"@).
+-- for the lower/upper sort bounds (e.g. @\"S_Min\"@, @\"S_Max\"@).
 -- The resulting axiom names are Lean-safe (sanitized).
 mkAxioms :: SortBoundOptions -> String -> String -> String -> [(String, IR.MereoExpr)]
 mkAxioms opts obj lo hi
@@ -153,7 +153,7 @@ theorySortBoundEntries opts theory = concat
       | IR.EntityMereological m <- IR.theoryObjects theory
       , IR.mereoKind   m == IR.MereologicalEntityKindMereological
       , IR.mereoOrigin m == IR.FromSignature
-      , IR.mereoName   m `notElem` [uniMinName, uniMaxName, "𝕌#min", "𝕌#max"]
+      , IR.mereoName   m `notElem` [uniMinName, uniMaxName]
       ]
 
     -- -----------------------------------------------------------------------
@@ -166,7 +166,7 @@ theorySortBoundEntries opts theory = concat
       | IR.EntityMereological m <- IR.theoryObjects theory
       , IR.mereoKind   m == IR.MereologicalEntityKindIndividual
       , IR.mereoOrigin m == IR.FromSignature
-      , IR.mereoName   m `notElem` [uniMinName, uniMaxName, "𝕌#min", "𝕌#max"]
+      , IR.mereoName   m `notElem` [uniMinName, uniMaxName]
       ]
 
     -- -----------------------------------------------------------------------
@@ -177,7 +177,7 @@ theorySortBoundEntries opts theory = concat
       | IR.EntityMereological m <- IR.theoryObjects theory
       , IR.mereoKind   m == IR.MereologicalEntityKindProposition
       , IR.mereoOrigin m == IR.FromSignature
-      , IR.mereoName   m `notElem` [pMinName, pMaxName, "⊤", "⊥", "ℙ#min", "ℙ#max"]
+      , IR.mereoName   m `notElem` [pMinName, pMaxName, "⊤", "⊥"]
       ]
 
     -- -----------------------------------------------------------------------

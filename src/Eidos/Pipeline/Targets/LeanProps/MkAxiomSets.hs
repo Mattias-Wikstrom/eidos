@@ -27,28 +27,17 @@ import           Eidos.Pipeline.Targets.LeanProps.LeanExpr
 -- Name-resolution helpers (Lean naming conventions)
 -- ---------------------------------------------------------------------------
 
-minSuffix, maxSuffix :: String
-minSuffix = "_Min"
-maxSuffix = "_Max"
-
 sanitizeName :: String -> String
 sanitizeName = map (\c -> if c == '#' then '_' else c)
 
--- | Map IR-internal symbolic names to their Lean identifiers.
+-- | Map IR names to their Lean identifiers.
 --
--- This is the only place in the Lean backend that knows about the IR naming
--- conventions (e.g. @\"ℙ#min\"@ → @\"ℙ_Min\"@).  The rest of the backend
--- works with opaque 'LeanExpr' values.
+-- Sort limit objects already carry names like @\"ℙ_Min\"@ / @\"𝕌_Max\"@ after
+-- the naming convention change in 'FromSyntax', so no suffix mangling is
+-- needed here.  'sanitizeName' still replaces any remaining @\'#\'@ characters
+-- (e.g. in function-internal names like @\"f#res\"@, @\"f#1\"@) with @\'_\'@.
 resolveName :: String -> String
-resolveName n = case n of
-  other
-    | Just base <- stripSuffix "#min" other -> sanitizeName base ++ minSuffix
-    | Just base <- stripSuffix "#max" other -> sanitizeName base ++ maxSuffix
-    | otherwise -> sanitizeName other
-  where
-    stripSuffix suffix str =
-      let (front, back) = splitAt (length str - length suffix) str
-      in if back == suffix then Just front else Nothing
+resolveName = sanitizeName
 
 -- ---------------------------------------------------------------------------
 -- AxiomBody → LeanExpr
@@ -86,7 +75,7 @@ axBodyToLean (PA.ABFuncEq l r)   = LEq (LVar l) (LVar r)
 --
 -- Note: 'IR.MZero' translates to Lean's @True@, not to @ℙ_Min@.
 -- @ℙ_Min@ is the minimum of the ℙ sort and must be referenced explicitly
--- via @MVar \"ℙ#min\"@.  Using 'MZero' to represent @ℙ_Min@ is incorrect.
+-- via @MVar \"ℙ_Min\"@.  Using 'MZero' to represent @ℙ_Min@ is incorrect.
 -- | Select the appropriate Lean bounded-quantifier constructor based on
 -- the @isExists@ and @isIndividual@ flags from 'IR.MBoundedSum'.
 mkLeanBoundedQuantifier

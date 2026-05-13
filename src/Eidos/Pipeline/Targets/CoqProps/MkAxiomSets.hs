@@ -22,10 +22,6 @@ import           Eidos.Pipeline.Targets.CoqProps.CoqExpr
 -- Name-resolution helpers (Coq naming conventions)
 -- ---------------------------------------------------------------------------
 
-minSuffix, maxSuffix :: String
-minSuffix = "_Min"
-maxSuffix = "_Max"
-
 -- | Sanitize an IR name for use as a Coq identifier.
 --
 -- Coq accepts Unicode /letters/ (categories L*, M*) but not math-symbol
@@ -54,17 +50,14 @@ sanitizeName = concatMap sanitizeChar
           '⊥'  -> "Bot"
           _    -> "_"
 
--- | Map IR-internal symbolic names to their Coq identifiers.
+-- | Map IR names to their Coq identifiers.
+--
+-- Sort limit objects already carry names like @\"ℙ_Min\"@ / @\"𝕌_Max\"@ after
+-- the naming convention change in 'FromSyntax', so no suffix mangling is
+-- needed here.  'sanitizeName' still replaces remaining non-alphanumeric
+-- characters (e.g. @\'#\'@ in @\"f#res\"@) with underscores or expansions.
 resolveName :: String -> String
-resolveName n = case n of
-  other
-    | Just base <- stripSuffix "#min" other -> sanitizeName base ++ minSuffix
-    | Just base <- stripSuffix "#max" other -> sanitizeName base ++ maxSuffix
-    | otherwise -> sanitizeName other
-  where
-    stripSuffix suffix str =
-      let (front, back) = splitAt (length str - length suffix) str
-      in if back == suffix then Just front else Nothing
+resolveName = sanitizeName
 
 -- ---------------------------------------------------------------------------
 -- AxiomBody → CoqExpr

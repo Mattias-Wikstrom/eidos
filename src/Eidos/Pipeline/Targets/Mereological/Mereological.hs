@@ -51,7 +51,7 @@ maxSuffix = "_Max"
 
 -- | Maps internal entity names to their mereological output names.
 -- Functions and relations receive 'fnPrefix'; mereological objects receive
--- 'obPrefix'.  Special bound variables (@𝕌#min@ etc.) are handled
+-- 'obPrefix'.  Special bound variables (@𝕌_Min@ etc.) are handled
 -- separately by 'MkAxiomSets.rewriteSpecialVar'.
 type NameMap = Map.Map String String
 

@@ -84,57 +84,57 @@ main = hspec $ do
   -- ── Gap 1 & 5: sort-limit metafacts ────────────────────────────────────
   describe "Gap 1+5: sort-limit metafacts" $ do
 
-    it "emits ℙ#max ≤ S#min for a user sort S" $ do
+    it "emits ℙ_Max ≤ S_Min for a user sort S" $ do
       th <- buildStr "{ signature { sort S; } }"
-      hasLimit th "ℙ#max" "≤" "S#min" `shouldBe` True
+      hasLimit th "ℙ_Max" "≤" "S_Min" `shouldBe` True
 
-    it "emits 𝕌#min ≤ S#min for a user sort S" $ do
+    it "emits 𝕌_Min ≤ S_Min for a user sort S" $ do
       th <- buildStr "{ signature { sort S; } }"
-      hasLimit th "𝕌#min" "≤" "S#min" `shouldBe` True
+      hasLimit th "𝕌_Min" "≤" "S_Min" `shouldBe` True
 
-    it "emits S#max ≤ 𝕌#max for a user sort S" $ do
+    it "emits S_Max ≤ 𝕌_Max for a user sort S" $ do
       th <- buildStr "{ signature { sort S; } }"
-      hasLimit th "S#max" "≤" "𝕌#max" `shouldBe` True
+      hasLimit th "S_Max" "≤" "𝕌_Max" `shouldBe` True
 
-    it "emits subsort min/max facts: T#min = S#min and T#max ≤ S#max" $ do
+    it "emits subsort min/max facts: T_Min = S_Min and T_Max ≤ S_Max" $ do
       th <- buildStr "{ signature { sort S; T subsort S; } }"
-      hasLimit th "T#min" "=" "S#min" `shouldBe` True
-      hasLimit th "T#max" "≤" "S#max" `shouldBe` True
+      hasLimit th "T_Min" "=" "S_Min" `shouldBe` True
+      hasLimit th "T_Max" "≤" "S_Max" `shouldBe` True
 
-    it "emits quotient min/max facts: S#min ≤ T#min and T#max = S#max" $ do
+    it "emits quotient min/max facts: S_Min ≤ T_Min and T_Max = S_Max" $ do
       th <- buildStr "{ signature { sort S; T quotient S; } }"
-      hasLimit th "S#min" "≤" "T#min" `shouldBe` True
-      hasLimit th "T#max" "=" "S#max" `shouldBe` True
+      hasLimit th "S_Min" "≤" "T_Min" `shouldBe` True
+      hasLimit th "T_Max" "=" "S_Max" `shouldBe` True
 
     it "emits subquotient min/max facts" $ do
       th <- buildStr "{ signature { sort S; T subquotient S; } }"
-      hasLimit th "S#min" "≤" "T#min" `shouldBe` True
-      hasLimit th "T#max" "≤" "S#max" `shouldBe` True
+      hasLimit th "S_Min" "≤" "T_Min" `shouldBe` True
+      hasLimit th "T_Max" "≤" "S_Max" `shouldBe` True
 
   -- ── Gap 2: sort min/max as entities ────────────────────────────────────
   describe "Gap 2: sort min/max objects as entities" $ do
 
-    it "registers S#min and S#max as entities in theoryObjects" $ do
+    it "registers S_Min and S_Max as entities in theoryObjects" $ do
       th <- buildStr "{ signature { sort S; } }"
-      entityNames th `shouldSatisfy` elem "S#min"
-      entityNames th `shouldSatisfy` elem "S#max"
+      entityNames th `shouldSatisfy` elem "S_Min"
+      entityNames th `shouldSatisfy` elem "S_Max"
 
-    it "registers 𝕌#min and 𝕌#max as entities (built-in universe)" $ do
+    it "registers 𝕌_Min and 𝕌_Max as entities (built-in universe)" $ do
       th <- buildStr "{}"
-      entityNames th `shouldSatisfy` elem "𝕌#min"
-      entityNames th `shouldSatisfy` elem "𝕌#max"
+      entityNames th `shouldSatisfy` elem "𝕌_Min"
+      entityNames th `shouldSatisfy` elem "𝕌_Max"
 
-    it "registers ℙ#min and ℙ#max as entities (built-in prop)" $ do
+    it "registers ℙ_Min and ℙ_Max as entities (built-in prop)" $ do
       th <- buildStr "{}"
-      entityNames th `shouldSatisfy` elem "ℙ#min"
-      entityNames th `shouldSatisfy` elem "ℙ#max"
+      entityNames th `shouldSatisfy` elem "ℙ_Min"
+      entityNames th `shouldSatisfy` elem "ℙ_Max"
 
-    it "S#min is a MereologicalObject of kind LowerLimitForSort" $ do
+    it "S_Min is a MereologicalObject of kind LowerLimitForSort" $ do
       th <- buildStr "{ signature { sort S; } }"
-      case lookupByName th "S#min" of
+      case lookupByName th "S_Min" of
         Just (EntityMereological m) ->
           mereoKind m `shouldBe` MereologicalEntityKindLowerLimitForSort
-        _ -> fail "S#min not found or wrong entity type"
+        _ -> fail "S_Min not found or wrong entity type"
 
   -- ── Gap 3: FOL inverse function ────────────────────────────────────────
   describe "Gap 3: FOL function inverse" $ do
@@ -154,7 +154,7 @@ main = hspec $ do
       th <- buildStr "{ signature { sort S; sort T; f : S → T; } }"
       case (lookupByName th "f", lookupByName th "f_inv") of
         (Just (EntityFunction f), Just (EntityFunction inv)) ->
-          sortName (funcResSort inv) `shouldBe` "f#dom"   -- Changed from "T#dom"
+          sortName (funcResSort inv) `shouldBe` "f_dom"
         _ -> fail "f or f_inv not found"
 
   -- ── Gap 4: direct/inverse image functions ──────────────────────────────
@@ -689,15 +689,15 @@ main = hspec $ do
       -- No user assertions were written, so assertion list should be empty
       length assertionFacts `shouldBe` 0
 
-    it "item3: merge fact for single implicit sub has form 'S#min = sub.S#min'" $ do
+    it "item3: merge fact for single implicit sub has form 'S_Min = sub.S_Min'" $ do
       th <- buildStr [r|{
         subtheories { implicit {
           sub: { signature { sort S; } }
         }}
       }|]
       let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
-      -- Sorts generate #min and #max bound merge facts
-      mergeFacts `shouldSatisfy` any (mergeFactMentions "S#min" "sub.S#min")
+      -- Sorts generate _Min and _Max bound merge facts
+      mergeFacts `shouldSatisfy` any (mergeFactMentions "S_Min" "sub.S_Min")
 
     it "item3: two implicit subs each get their own merge equality fact" $ do
       th <- buildStr [r|{
@@ -706,8 +706,8 @@ main = hspec $ do
         }}
       }|]
       let mergeFacts = filter (\f -> factKind f == FactKindImplicitMerge) (theoryFacts th)
-      mergeFacts `shouldSatisfy` any (mergeFactMentions "S#min" "sub1.S#min")
-      mergeFacts `shouldSatisfy` any (mergeFactMentions "S#min" "sub2.S#min")
+      mergeFacts `shouldSatisfy` any (mergeFactMentions "S_Min" "sub1.S_Min")
+      mergeFacts `shouldSatisfy` any (mergeFactMentions "S_Min" "sub2.S_Min")
 
     it "item3: unqualified name is always the LHS of the merge fact" $ do
       th <- buildStr [r|{
@@ -719,23 +719,23 @@ main = hspec $ do
       -- The LHS of every merge fact must NOT contain a dot (i.e. unqualified)
       mergeFacts `shouldSatisfy` all mergeFactLhsIsUnqualified
 
-    -- Item 4: internal #-names never leak as unqualified
-    it "item4: implicit sub's S#min does not appear unqualified in parent" $ do
+    -- Item 4: sort-limit names never leak as unqualified
+    it "item4: implicit sub's S_Min does not appear unqualified in parent" $ do
       th <- buildStr [r|{
         subtheories { implicit {
           sub: { signature { sort S; } }
         }}
       }|]
-      Map.lookup "S#min" (theoryObjectsByName th) `shouldSatisfy` isNothing
-      Map.lookup "S#max" (theoryObjectsByName th) `shouldSatisfy` isNothing
+      Map.lookup "S_Min" (theoryObjectsByName th) `shouldSatisfy` isNothing
+      Map.lookup "S_Max" (theoryObjectsByName th) `shouldSatisfy` isNothing
 
-    it "item4: implicit sub's S#min appears only as sub.S#min" $ do
+    it "item4: implicit sub's S_Min appears only as sub.S_Min" $ do
       th <- buildStr [r|{
         subtheories { implicit {
           sub: { signature { sort S; } }
         }}
       }|]
-      Map.lookup "sub.S#min" (theoryObjectsByName th) `shouldSatisfy` maybe False (not . null)
+      Map.lookup "sub.S_Min" (theoryObjectsByName th) `shouldSatisfy` maybe False (not . null)
 
     it "item4: function image helpers do not leak unqualified" $ do
       th <- buildStr [r|{
