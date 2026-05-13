@@ -1842,16 +1842,19 @@ resolveConstantRef th ctx (ConstantRef specs ref) = do
   let path = map theoryRefName specs
   case ref of
     "⊤" -> do
-      let mo     = lookupInPath th path theoryTruth
+      -- ⊤ means propositional truth = the ℙ-sort lower-bound (ℙ_Min).
+      -- We resolve to sortMin (theoryProp sub) rather than theoryTruth sub
+      -- because theoryTruth is a separate entity named "⊤" that is never
+      -- emitted as an axiom; sortMin is the entity whose name ("ℙ_Min")
+      -- actually appears in the generated output.
+      let mo     = lookupInPath th path (sortMin . theoryProp)
           entity = EntityMereological mo
-          -- For cross-theory references use the FQN; for local references use
-          -- the actual entity name (e.g. "ℙ_Min") rather than the Eidos
-          -- syntax keyword "⊤".
           name   = if null path then mereoName mo
                    else entityFullyQualifiedName entity
       return (ResolvedConstantRef name entity PropositionClass)
     "⊥" -> do
-      let mo     = lookupInPath th path theoryFalsity
+      -- ⊥ means propositional falsity = the ℙ-sort upper-bound (ℙ_Max).
+      let mo     = lookupInPath th path (sortMax . theoryProp)
           entity = EntityMereological mo
           name   = if null path then mereoName mo
                    else entityFullyQualifiedName entity
