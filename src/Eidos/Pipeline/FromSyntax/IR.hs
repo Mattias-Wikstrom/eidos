@@ -49,8 +49,8 @@ data EntityKind
   | MereologicalEntityKindIndividual            -- ^ An individual element of a sort
   | MereologicalEntityKindSet                   -- ^ A set of individuals
   | MereologicalEntityKindProposition           -- ^ A proposition (lives in ℙ)
-  | MereologicalEntityKindUpperLimitForSort      -- ^ The S_Max limit object for sort S
-  | MereologicalEntityKindLowerLimitForSort      -- ^ The S_Min limit object for sort S
+  | MereologicalEntityKindUpperLimitForSort      -- ^ The S#max limit object for sort S
+  | MereologicalEntityKindLowerLimitForSort      -- ^ The S#min limit object for sort S
   | MereologicalEntityKindResultOfSOLFunction    -- ^ The f#res result object of an SOL function
   | MereologicalEntityKindArgumentOfSOLFunction  -- ^ The f#N argument object of an SOL function
   deriving (Show, Eq)
@@ -152,7 +152,7 @@ data MereoExpr
   | MSymDiff MereoExpr MereoExpr
     -- ^ Symmetric difference: x ∸ y  (→ biconditional ↔)
   | MVar     String
-    -- ^ Named object: a sort bound (𝕌_Min), proposition (⊤), variable, etc.
+    -- ^ Named object: a sort bound (𝕌#min), proposition (⊤), variable, etc.
   | MZero
     -- ^ Mereological zero 0  (→ True in _Props backends)
   | MAbbrevApp String [MereoExpr]
@@ -278,11 +278,11 @@ data SortRelationship
   = NotRelational
     -- ^ A regular (non-relational) sort declaration.
   | SubSort
-    -- ^ Declared with @subsort@: child_Min = parent_Min, child_Max ≤ parent_Max
+    -- ^ Declared with @subsort@: child#min = parent#min, child#max ≤ parent#max
   | Quotient
-    -- ^ Declared with @quotient@: parent_Min ≤ child_Min, child_Max = parent_Max
+    -- ^ Declared with @quotient@: parent#min ≤ child#min, child#max = parent#max
   | SubQuotient
-    -- ^ Declared with @subquotient@: parent_Min ≤ child_Min, child_Max ≤ parent_Max
+    -- ^ Declared with @subquotient@: parent#min ≤ child#min, child#max ≤ parent#max
   deriving (Show, Eq)
 
 data Sort = Sort
@@ -449,7 +449,7 @@ data EntityClass
   | RelationClass Int         -- arity (1 for sets, n for n-ary relations)
   | IndividualClass
   | PropositionClass
-  | OtherMereologicalClass    -- e.g., S_Min, S_Max, function argument/result objects
+  | OtherMereologicalClass    -- e.g., S#min, S#max, function argument/result objects
   | TheoryClass
   deriving (Eq, Show)
 

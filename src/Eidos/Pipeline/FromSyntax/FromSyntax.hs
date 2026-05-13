@@ -638,6 +638,12 @@ createTheory parentMaybe name isRefl =
 
   in th
 
+minSuffix :: String
+minSuffix = "_Min"
+
+maxSuffix :: String
+maxSuffix = "_Max"
+
 -- ---------------------------------------------------------------------------
 -- Smart constructors for IR entities
 -- ---------------------------------------------------------------------------
@@ -661,7 +667,7 @@ mkSort th k nm orig =
         { mereoKind          = MereologicalEntityKindLowerLimitForSort
         , mereoOrigin        = orig
         , mereoTheory        = th
-        , mereoName          = nm ++ "_Min"
+        , mereoName          = nm ++ minSuffix
         , mereoSort          = s
         , mereoLimitForSort  = Just s
         , mereoReflectedFrom = Nothing
@@ -670,7 +676,7 @@ mkSort th k nm orig =
         { mereoKind          = MereologicalEntityKindUpperLimitForSort
         , mereoOrigin        = orig
         , mereoTheory        = th
-        , mereoName          = nm ++ "_Max"
+        , mereoName          = nm ++ maxSuffix
         , mereoSort          = s
         , mereoLimitForSort  = Just s
         , mereoReflectedFrom = Nothing
@@ -715,8 +721,8 @@ mkFOLFunction th nm argSorts resSort orig =
         { sortKind             = SortKindProduct
         , sortTheory           = th
         , sortOrigin           = auxOrig
-        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_dom_Min") domSort auxOrig
-        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_dom_Max") domSort auxOrig
+        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_dom" ++ minSuffix) domSort auxOrig
+        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_dom" ++ maxSuffix) domSort auxOrig
         , sortName             = nm ++ "_dom"
         , sortComponentSorts   = argSorts
         , sortAssociatedEntity = Just (EntityFunction f)
@@ -735,8 +741,8 @@ mkFOLFunction th nm argSorts resSort orig =
         { sortKind             = SortKindProduct
         , sortTheory           = th
         , sortOrigin           = auxOrig
-        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_inv_dom_Min") invDomSort auxOrig
-        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_inv_dom_Max") invDomSort auxOrig
+        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_inv_dom" ++ minSuffix) invDomSort auxOrig
+        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_inv_dom" ++ maxSuffix) invDomSort auxOrig
         , sortName             = nm ++ "_inv_dom"
         , sortComponentSorts   = [resSort]
         , sortAssociatedEntity = Just (EntityFunction invFn)
@@ -860,8 +866,8 @@ mkRelation th nm argSorts orig =
         { sortKind             = SortKindProduct
         , sortTheory           = th
         , sortOrigin           = orig
-        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_dom_Min") domSort orig
-        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_dom_Max") domSort orig
+        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_dom" ++ minSuffix) domSort orig
+        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_dom" ++ maxSuffix) domSort orig
         , sortName             = nm ++ "_dom"
         , sortComponentSorts   = argSorts
         , sortAssociatedEntity = Just (EntityRelation rel)
@@ -993,12 +999,12 @@ addMergeEqualityFacts th lhsName lhsEntity rhsName rhsEntity =
 
     mergePairs
       | isSort lhsEntity =
-          [ (lhsName ++ "_Min", rhsWithLeaf (lhsName ++ "_Min"))
-          , (lhsName ++ "_Max", rhsWithLeaf (lhsName ++ "_Max"))
+          [ (lhsName ++ "_Min", rhsWithLeaf (lhsName ++ minSuffix))
+          , (lhsName ++ "_Max", rhsWithLeaf (lhsName ++ maxSuffix))
           ]
       | otherwise = case lhsName of
-          "⊤" -> [("ℙ_Min", rhsWithLeaf "ℙ_Min")]
-          "⊥" -> [("ℙ_Max", rhsWithLeaf "ℙ_Max")]
+          "⊤" -> [("ℙ" ++ minSuffix, rhsWithLeaf "ℙ" ++ minSuffix)]
+          "⊥" -> [("ℙ" ++ maxSuffix, rhsWithLeaf "ℙ" ++ maxSuffix)]
           _   -> [(lhsName, rhsName)]
 
     isSort (EntitySort _) = True
@@ -1126,8 +1132,8 @@ wrapFreeVarsMereo [] body = body
 wrapFreeVarsMereo (vd:rest) body =
   let varN   = resolvedVarName vd
       sn     = sortName (resolvedVarSort vd)
-      lo     = MVar (sn ++ "_Min")
-      hi     = MVar (sn ++ "_Max")
+      lo     = MVar (sn ++ minSuffix)
+      hi     = MVar (sn ++ maxSuffix)
       isInd  = not (resolvedVarIsSet vd)
   in MBoundedSum False isInd varN lo hi (wrapFreeVarsMereo rest body)
 
@@ -1140,8 +1146,8 @@ wrapAsFact th freeVars expr =
 wrapAsAssertion :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
 wrapAsAssertion th freeVars expr =
   let body = wrapFreeVarsMereo freeVars (propExprToMereo (translatePropExpr th expr))
-      pMin = MVar (sortName (theoryProp th) ++ "_Min")
-      pMax = MVar (sortName (theoryProp th) ++ "_Max")
+      pMin = MVar (sortName (theoryProp th) ++ minSuffix)
+      pMax = MVar (sortName (theoryProp th) ++ maxSuffix)
   in MAbbrevApp "WrapAssertion" [pMin, pMax, body]
 
 wrapAsMetafact :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
@@ -1197,8 +1203,8 @@ quantifierToMereo q body =
         ResolvedQExists vd' -> (vd', True)
       varN  = resolvedVarName vd
       sn    = sortName (resolvedVarSort vd)
-      lo    = MVar (sn ++ "_Min")
-      hi    = MVar (sn ++ "_Max")
+      lo    = MVar (sn ++ minSuffix)
+      hi    = MVar (sn ++ maxSuffix)
       isInd = not (resolvedVarIsSet vd)
   in MBoundedSum isExists isInd varN lo hi body
 
@@ -1274,8 +1280,8 @@ baseTermToMereo bt = case bt of
   ResolvedBTProjectionToSort pts ->
     MAbbrevApp "ProjectIntoInterval"
       [ termToMereo (resolvedPTOperand pts)
-      , MVar (sortName (resolvedPTSort pts) ++ "_Min")
-      , MVar (sortName (resolvedPTSort pts) ++ "_Max")
+      , MVar (sortName (resolvedPTSort pts) ++ minSuffix)
+      , MVar (sortName (resolvedPTSort pts) ++ maxSuffix)
       ]
   ResolvedBTProjectionToInterval pti ->
     MAbbrevApp "ProjectIntoInterval"
@@ -1289,8 +1295,8 @@ baseTermToMereo bt = case bt of
          Left vd ->
            let varN  = resolvedVarName vd
                sn    = sortName (resolvedVarSort vd)
-               lo    = MVar (sn ++ "_Min")
-               hi    = MVar (sn ++ "_Max")
+               lo    = MVar (sn ++ minSuffix)
+               hi    = MVar (sn ++ maxSuffix)
                isInd = not (resolvedVarIsSet vd)
            in MBoundedSum False isInd varN lo hi operand
          Right bareVar ->
@@ -1299,16 +1305,16 @@ baseTermToMereo bt = case bt of
     let vd   = resolvedSCVar sc
         varN = resolvedVarName vd
         sn   = sortName (resolvedVarSort vd)
-        lo   = MVar (sn ++ "_Min")
-        hi   = MVar (sn ++ "_Max")
+        lo   = MVar (sn ++ minSuffix)
+        hi   = MVar (sn ++ maxSuffix)
         isInd = not (resolvedVarIsSet vd)
     in MBoundedSum False isInd varN lo hi (propExprToMereo (resolvedSCBody sc))
   ResolvedBTDescription desc ->
     let vd   = resolvedDescVar desc
         varN = resolvedVarName vd
         sn   = sortName (resolvedVarSort vd)
-        lo   = MVar (sn ++ "_Min")
-        hi   = MVar (sn ++ "_Max")
+        lo   = MVar (sn ++ minSuffix)
+        hi   = MVar (sn ++ maxSuffix)
         isInd = not (resolvedVarIsSet vd)
     in MBoundedSum False isInd varN lo hi (propExprToMereo (resolvedDescBody desc))
 
