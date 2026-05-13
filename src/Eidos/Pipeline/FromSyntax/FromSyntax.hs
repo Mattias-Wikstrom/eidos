@@ -1726,9 +1726,10 @@ resolveBaseTerm th ctx bt = case bt of
     let path = map AST.theoryName tnames
     subTh <- findSubtheoryByPath th path
     resolved <- qualifyPropExprConstants <$> resolvePropExpr subTh emptyVarContext operand
+    let resolvedTy = maybe PropositionClass resolvedTermType (termIfPlain resolved)
     return (ResolvedBTEvaluationInTheory
               (ResolvedEvaluationInTheory path subTh resolved),
-            PropositionClass)
+            resolvedTy)
 
   BTProjectionToSort (ProjectionToSort sexpr operand) -> do
     s  <- lookupSortByExpr th sexpr
