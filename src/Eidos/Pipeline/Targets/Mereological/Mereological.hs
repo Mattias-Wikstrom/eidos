@@ -41,10 +41,6 @@ fnPrefix = "Fn_"
 obPrefix :: String
 obPrefix = "Ob_"
 
-minSuffix, maxSuffix :: String
-minSuffix = "_Min"
-maxSuffix = "_Max"
-
 -- ---------------------------------------------------------------------------
 -- Entity name map
 -- ---------------------------------------------------------------------------
@@ -105,16 +101,16 @@ exportToMereological prepared =
 mkSignatureSection :: IR.Theory -> NameMap -> [String]
 mkSignatureSection th _nameMap =
   [ "  signature {" ]
-  -- Built-in universe bounds (𝕌_Min / 𝕌_Max → Univ_Min / Univ_Max)
-  ++ [ "    " ++ univPrefix ++ minSuffix ++ " : 𝕌;" ]
-  ++ [ "    " ++ univPrefix ++ maxSuffix ++ " : 𝕌;" ]
-  -- Built-in proposition bounds (ℙ_Min / ℙ_Max → Pr_Min / Pr_Max)
-  ++ [ "    " ++ propPrefix ++ minSuffix ++ " : 𝕌;" ]
-  ++ [ "    " ++ propPrefix ++ maxSuffix ++ " : 𝕌;" ]
-  -- Domain sort bounds (𝔻_Min / 𝔻_Max → Dom_Min / Dom_Max), if used
-  ++ [ "    " ++ domPrefix ++ minSuffix ++ " : 𝕌;" | IR.theoryUsesDomain th ]
-  ++ [ "    " ++ domPrefix ++ maxSuffix ++ " : 𝕌;" | IR.theoryUsesDomain th ]
-  -- User sort bounds: S_Min, S_Max  (already uppercase, no prefix needed)
+  -- Built-in universe bounds
+  ++ [ "    " ++ rewriteAxiomName (IR.mereoName (IR.sortMin (IR.theoryUniverse th))) ++ " : 𝕌;" ]
+  ++ [ "    " ++ rewriteAxiomName (IR.mereoName (IR.sortMax (IR.theoryUniverse th))) ++ " : 𝕌;" ]
+  -- Built-in proposition bounds
+  ++ [ "    " ++ rewriteAxiomName (IR.mereoName (IR.sortMin (IR.theoryProp th))) ++ " : 𝕌;" ]
+  ++ [ "    " ++ rewriteAxiomName (IR.mereoName (IR.sortMax (IR.theoryProp th))) ++ " : 𝕌;" ]
+  -- Domain sort bounds, if used
+  ++ [ "    " ++ rewriteAxiomName (IR.mereoName (IR.sortMin (IR.theoryDomain th))) ++ " : 𝕌;" | IR.theoryUsesDomain th ]
+  ++ [ "    " ++ rewriteAxiomName (IR.mereoName (IR.sortMax (IR.theoryDomain th))) ++ " : 𝕌;" | IR.theoryUsesDomain th ]
+  -- User sort bounds
   ++ concatMap mkSortLimits userSorts
   -- Functions: Fn_f : 𝕌 → … → 𝕌  (one 𝕌 per argument plus one for result)
   ++ map mkFunctionDecl userFunctions
@@ -147,8 +143,8 @@ mkSignatureSection th _nameMap =
                                   , IR.MereologicalEntityKindSet ] ]
 
     mkSortLimits s =
-      [ "    " ++ IR.sortName s ++ minSuffix ++ " : 𝕌;"
-      , "    " ++ IR.sortName s ++ maxSuffix ++ " : 𝕌;"
+      [ "    " ++ IR.mereoName (IR.sortMin s) ++ " : 𝕌;"
+      , "    " ++ IR.mereoName (IR.sortMax s) ++ " : 𝕌;"
       ]
 
     mkFunctionDecl f =
