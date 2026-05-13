@@ -24,7 +24,7 @@ module Eidos.Pipeline.Targets.LeanProps.MkAxiomSets
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
 import qualified Eidos.Pipeline.IRProcessing.AxiomSet as PA
 import           Eidos.Pipeline.IRProcessing.MkAxiomSets (theoryBlocks)
-import           Eidos.Pipeline.Targets.LeanProps.LeanExpr
+import           Eidos.Pipeline.Targets.LeanProps.LeanExpr hiding (renderLeanDoc)
 
 -- ---------------------------------------------------------------------------
 -- Name-resolution helpers (Lean naming conventions)
@@ -58,6 +58,7 @@ axBodyToLean (PA.ABDeclFunc 0)   = LProp
 axBodyToLean (PA.ABDeclFunc n)   = LImpl LProp (axBodyToLean (PA.ABDeclFunc (n - 1)))
 axBodyToLean (PA.ABMereo e)      = mereoExprToLean e
 axBodyToLean (PA.ABFuncEq l r)   = LEq (LVar l) (LVar r)
+axBodyToLean (PA.ABDef _ body)   = mereoExprToLean body
 
 -- ---------------------------------------------------------------------------
 -- MereoExpr → LeanExpr

@@ -739,8 +739,8 @@ mkFOLFunction th nm argSorts resSort orig =
         , sortReflectedFrom    = Nothing
         }
       domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_arg") domSort auxOrig
-      dirImg = mkSOLFunction th (nm ++ "_dir_img") FunctionKindDirectImageFunction [domSort] resSort auxOrig
-      invImg = mkSOLFunction th (nm ++ "_inv_img") FunctionKindInverseImageFunction [resSort] domSort auxOrig
+      dirImg = mkSOLFunction th (nm ++ "#dir_img") FunctionKindDirectImageFunction [domSort] resSort auxOrig
+      invImg = mkSOLFunction th (nm ++ "#inv_img") FunctionKindInverseImageFunction [resSort] domSort auxOrig
       f = f0 { funcDomain      = Just domSort
              , funcArgument    = Just domArg
              , funcDirectImage  = Just dirImg

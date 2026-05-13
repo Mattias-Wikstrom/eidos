@@ -246,9 +246,9 @@ checkRegular body = concatMap checkSection (sections body)
 
     checkQuantifiedRegular ctx (Quantified qs atomic) =
       concatMap (checkQuantifierNoSOL ctx) qs ++
-      checkAtomicNoBottom ctx atomic
+      checkAtomicRegular ctx atomic
 
-    checkAtomicNoBottom ctx (AtomicProp tp) =
+    checkAtomicRegular ctx (AtomicProp tp) =
       checkTermPairForBottom ctx tp ++ checkTPNoComp ctx tp
 
 -- | Coherent logic (.coh)
@@ -319,10 +319,10 @@ checkCoherent body = concatMap checkSection (sections body)
 
     checkQuantifiedCoherent ctx (Quantified qs atomic) =
       concatMap (checkQuantifierNoSOL ctx) qs
-      -- ← REMOVED: checkAtomicNoBottom ctx atomic
-      -- Coherent logic ALLOWS ⊥ (falsity)
-      -- We still need to check the atomic expression for other issues,
-      -- but ⊥ is fine, so we just don't check for it.
+      ++ checkAtomicCoherent ctx atomic
+
+    checkAtomicCoherent ctx (AtomicProp tp) =
+      checkTPNoComp ctx tp
 
       
 -- | First-order logic (.fol)

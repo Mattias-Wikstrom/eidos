@@ -60,10 +60,13 @@ data FunctionFactEntry = FunctionFactEntry
 -- Private name helpers
 -- ---------------------------------------------------------------------------
 
+sanitize :: String -> String
+sanitize = map (\c -> if c == '#' then '_' else c)
+
 invN, dirImgN, invImgN, tupleN, irPredN :: String -> String
 invN    fn = fn ++ "_inv"
-dirImgN fn = fn ++ "_dir_img"
-invImgN fn = fn ++ "_inv_img"
+dirImgN fn = sanitize fn ++ "_dir_img"
+invImgN fn = sanitize fn ++ "_inv_img"
 tupleN  fn = fn ++ "_tuple"
 irPredN fn = "IR_" ++ fn
 

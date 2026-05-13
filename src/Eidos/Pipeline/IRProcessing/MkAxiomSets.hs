@@ -58,8 +58,8 @@ domMaxName f = sanitizeName (IR.sortName dom) ++ maxSuffix
   where dom = maybe (error "no domain sort") id (IR.funcDomain f)
 
 dirImgName, invImgName :: IR.Function -> String
-dirImgName f = IR.funcName f ++ "_dir_img"
-invImgName f = IR.funcName f ++ "_inv_img"
+dirImgName f = sanitizeName (IR.funcName f) ++ "_dir_img"
+invImgName f = sanitizeName (IR.funcName f) ++ "_inv_img"
 
 piName :: IR.Function -> Int -> String
 piName f k = IR.funcName f ++ "_pi_" ++ show k
