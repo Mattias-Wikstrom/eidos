@@ -712,9 +712,9 @@ mkSOLFunction th nm k argSorts resSort orig = Function
   , funcName          = nm
   , funcArgSorts      = argSorts
   , funcResSort       = resSort
-  , funcResObject     = mkMereo th MereologicalEntityKindResultOfSOLFunction (nm ++ "#res") resSort orig
+  , funcResObject     = mkMereo th MereologicalEntityKindResultOfSOLFunction (nm ++ "_res") resSort orig
   , funcArgObjects    = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
-                                          (nm ++ "#" ++ show i) s orig) argSorts [1..]
+                                          (nm ++ "_" ++ show i) s orig) argSorts [1..]
   , funcDomain        = Nothing
   , funcArgument      = Nothing
   , funcDirectImage   = Nothing
@@ -738,9 +738,9 @@ mkFOLFunction th nm argSorts resSort orig =
         , sortAssociatedEntity = Just (EntityFunction f)
         , sortReflectedFrom    = Nothing
         }
-      domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "#arg") domSort auxOrig
-      dirImg = mkSOLFunction th (nm ++ "#dir_img") FunctionKindDirectImageFunction [domSort] resSort auxOrig
-      invImg = mkSOLFunction th (nm ++ "#inv_img") FunctionKindInverseImageFunction [resSort] domSort auxOrig
+      domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_arg") domSort auxOrig
+      dirImg = mkSOLFunction th (nm ++ "_dir_img") FunctionKindDirectImageFunction [domSort] resSort auxOrig
+      invImg = mkSOLFunction th (nm ++ "_inv_img") FunctionKindInverseImageFunction [resSort] domSort auxOrig
       f = f0 { funcDomain      = Just domSort
              , funcArgument    = Just domArg
              , funcDirectImage  = Just dirImg
@@ -758,7 +758,7 @@ mkFOLFunction th nm argSorts resSort orig =
         , sortAssociatedEntity = Just (EntityFunction invFn)
         , sortReflectedFrom    = Nothing
         }
-      invArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_inv#arg") invDomSort auxOrig
+      invArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_inv_arg") invDomSort auxOrig
       invFn = inv0 { funcDomain   = Just invDomSort
                    , funcArgument = Just invArg
                    }
@@ -883,8 +883,8 @@ mkRelation th nm argSorts orig =
         , sortAssociatedEntity = Just (EntityRelation rel)
         , sortReflectedFrom    = Nothing
         }
-      domArg   = mkMereo th MereologicalEntityKindIndividual (nm ++ "#arg") domSort orig
-      assocSet = mkMereo th MereologicalEntityKindSet        (nm ++ "#set") (head argSorts) orig
+      domArg   = mkMereo th MereologicalEntityKindIndividual (nm ++ "_arg") domSort orig
+      assocSet = mkMereo th MereologicalEntityKindSet        (nm ++ "_set") (head argSorts) orig
       rel = Relation
         { relOrigin        = orig
         , relKind          = MereologicalEntityKindSet
@@ -893,7 +893,7 @@ mkRelation th nm argSorts orig =
         , relArgSorts      = argSorts
         , relDomain        = domSort
         , relArgObjects    = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
-                                              (nm ++ "#" ++ show i) s orig) argSorts [1..]
+                                              (nm ++ "_" ++ show i) s orig) argSorts [1..]
         , relArgument      = domArg
         , relAssociatedSet = assocSet
         , relReflectedFrom = Nothing
@@ -938,7 +938,7 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
 
       let th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
 
-      if isImplicit && not (isInternalName name) && not (null transformed)
+      if isImplicit && not (all isInternalEntity transformed) && not (null transformed)
         then if not (null localToSub)
                then foldM (addUnqualified name qualifiedName) th1 localToSub
                else Right $ foldl (\t e -> addEntityToParent t name e) th1 transformed
@@ -1077,8 +1077,16 @@ createCanonicalEntity parentTh (EntityRelation r) =
                    }
 createCanonicalEntity _ e = e
 
-isInternalName :: String -> Bool
-isInternalName = ('#' `elem`)
+isInternalEntity :: Entity -> Bool
+isInternalEntity (EntitySort s) =
+  sortOrigin s == FromFunction || sortOrigin s == FromRelation
+isInternalEntity (EntityFunction f) =
+  funcOrigin f == FromFunction || funcOrigin f == FromRelation
+isInternalEntity (EntityRelation r) =
+  relOrigin r == FromFunction || relOrigin r == FromRelation
+isInternalEntity (EntityMereological m) =
+  mereoOrigin m == FromFunction || mereoOrigin m == FromRelation
+isInternalEntity _ = False
 
 entitiesCompatible :: Entity -> Entity -> Bool
 entitiesCompatible (EntitySort s1) (EntitySort s2) =
@@ -1305,7 +1313,7 @@ applySuffixToMereo expr suffix = case suffix of
   ResolvedSuffixCall args ->
     MAbbrevApp (flattenMereoName expr) (map termToMereo args)
   ResolvedSuffixSpecialOp op ->
-    MVar (flattenMereoName expr ++ "#" ++ op)
+    MVar (flattenMereoName expr ++ "_" ++ op)
 
 flattenMereoName :: MereoExpr -> String
 flattenMereoName (MVar n) = n
