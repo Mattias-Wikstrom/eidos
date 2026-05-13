@@ -120,9 +120,7 @@ mereoExprToLean' resolve = go
                           (go body))
 
 mereoExprToLean :: IR.MereoExpr -> LeanExpr
-mereoExprToLean (IR.MAbbrevApp "ProjectIntoInterval" [x, lo, hi]) =
-  LProjectIntoInterval (mereoExprToLean x) (mereoExprToLean lo) (mereoExprToLean hi)
-mereoExprToLean e = mereoExprToLean' resolveName e
+mereoExprToLean = mereoExprToLean' resolveName
 
 abbrevBodyToLean :: IR.MereoExpr -> LeanExpr
 abbrevBodyToLean = mereoExprToLean' id
