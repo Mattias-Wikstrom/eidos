@@ -16,6 +16,9 @@ module Eidos.Pipeline.Targets.LeanProps.MkAxiomSets
     -- * Lean rendering
   , axBodyToLean
   , mereoExprToLean
+  , abbrevBodyToLean
+  , renderAbbrevDef
+  , renderLeanDoc
   ) where
 
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
@@ -60,86 +63,75 @@ axBodyToLean (PA.ABFuncEq l r)   = LEq (LVar l) (LVar r)
 -- MereoExpr → LeanExpr
 -- ---------------------------------------------------------------------------
 
--- | Translate a 'IR.MereoExpr' to a 'LeanExpr'.
+-- | Translate a 'IR.MereoExpr' to a 'LeanExpr', parameterised over a
+-- name-resolution function.
 --
--- Mereological operations map to propositional connectives:
---   MSum     → LConj   (+ = ∧)
---   MProd    → LDisj   (× = ∨)
---   MDiff    → LImpl   (a - b = b → a)
---   MRevDiff → LImpl   (a ⇒ b = a → b)
---   MSymDiff → LBicond (a ∸ b = a ↔ b)
---   MZero    → True    (absolute lattice bottom = propositional truth)
---   MVar n   → LVar (resolveName n)
---   MAbbrevApp → LApp
---   MBoundedSum → bounded universal quantification
+-- Pass 'resolveName' for theory axiom bodies (theory-specific names need
+-- sanitisation) or 'id' for abbreviation bodies (parameter names like
+-- @"lo"@, @"hi"@ are kept verbatim).
 --
--- Note: 'IR.MZero' translates to Lean's @True@, not to @ℙ_Min@.
--- @ℙ_Min@ is the minimum of the ℙ sort and must be referenced explicitly
--- via @MVar \"ℙ_Min\"@.  Using 'MZero' to represent @ℙ_Min@ is incorrect.
--- | Select the appropriate Lean bounded-quantifier constructor based on
--- the @isExists@ and @isIndividual@ flags from 'IR.MBoundedSum'.
-mkLeanBoundedQuantifier
-  :: Bool  -- ^ isExists
-  -> Bool  -- ^ isIndividual
-  -> String -> String -> String -> LeanExpr -> LeanExpr
-mkLeanBoundedQuantifier False False = LBoundedForall
-mkLeanBoundedQuantifier False True  = LForallIndividuals
-mkLeanBoundedQuantifier True  False = LBoundedExists
-mkLeanBoundedQuantifier True  True  = LExistsIndividuals
+-- Note: the 'IR.MAbbrevApp' @"ProjectIntoInterval"@ special case is NOT
+-- included here; it is added on top by 'mereoExprToLean' so that
+-- 'abbrevBodyToLean' keeps the generic 'LApp' rendering for abbreviation
+-- definitions.
+mereoExprToLean' :: (String -> String) -> IR.MereoExpr -> LeanExpr
+mereoExprToLean' resolve = go
+  where
+    go (IR.MSum a b)     = LConj   (go a) (go b)
+    go (IR.MProd a b)    = LDisj   (go a) (go b)
+    go (IR.MDiff a b)    = LImpl   (go b) (go a)
+    go (IR.MRevDiff a b) = LImpl   (go a) (go b)
+    go (IR.MSymDiff a b) = LBicond (go a) (go b)
+    go (IR.MVar n)       = LVar (resolve n)
+    go IR.MZero          = LTop
+    go (IR.MAbbrevApp name args) =
+      LApp (LVar name) (map go args)
+    go (IR.MBoundedSum var lo hi body) =
+      case (lo, hi) of
+        (IR.MVar loName, IR.MVar hiName) ->
+          LBoundedForall var (resolve loName) (resolve hiName) (go body)
+        _ ->
+          LForallKw var LProp
+               (LImpl (LApp (LVar "IsWithinBounds") [go lo, go hi, LVar var])
+                          (go body))
+    go (IR.MBoundedProduct var lo hi body) =
+      case (lo, hi) of
+        (IR.MVar loName, IR.MVar hiName) ->
+          LBoundedExists var (resolve loName) (resolve hiName) (go body)
+        _ ->
+          LExists var LProp
+               (LImpl (LApp (LVar "IsWithinBounds") [go lo, go hi, LVar var])
+                          (go body))
+    go (IR.MSumOfIndividuals var lo hi body) =
+      case (lo, hi) of
+        (IR.MVar loName, IR.MVar hiName) ->
+          LForallIndividuals var (resolve loName) (resolve hiName) (go body)
+        _ ->
+          LForallKw var LProp
+               (LImpl (LApp (LVar "IsIndividual") [go lo, go hi, LVar var])
+                          (go body))
+    go (IR.MProductOfIndividuals var lo hi body) =
+      case (lo, hi) of
+        (IR.MVar loName, IR.MVar hiName) ->
+          LExistsIndividuals var (resolve loName) (resolve hiName) (go body)
+        _ ->
+          LExists var LProp
+               (LImpl (LApp (LVar "IsIndividual") [go lo, go hi, LVar var])
+                          (go body))
 
 mereoExprToLean :: IR.MereoExpr -> LeanExpr
-mereoExprToLean (IR.MSum a b)     = LConj   (mereoExprToLean a) (mereoExprToLean b)
-mereoExprToLean (IR.MProd a b)    = LDisj   (mereoExprToLean a) (mereoExprToLean b)
-mereoExprToLean (IR.MDiff a b)    = LImpl   (mereoExprToLean b) (mereoExprToLean a)
-mereoExprToLean (IR.MRevDiff a b) = LImpl   (mereoExprToLean a) (mereoExprToLean b)
-mereoExprToLean (IR.MSymDiff a b) = LBicond (mereoExprToLean a) (mereoExprToLean b)
-mereoExprToLean (IR.MVar n)       = LVar (resolveName n)
-mereoExprToLean IR.MZero          = LTop
 mereoExprToLean (IR.MAbbrevApp "ProjectIntoInterval" [x, lo, hi]) =
   LProjectIntoInterval (mereoExprToLean x) (mereoExprToLean lo) (mereoExprToLean hi)
-mereoExprToLean (IR.MAbbrevApp name args) =
-  LApp (LVar name) (map mereoExprToLean args)
-mereoExprToLean (IR.MBoundedSum var lo hi body) =
-  case (lo, hi) of
-    (IR.MVar loName, IR.MVar hiName) ->
-      let lo' = resolveName loName
-          hi' = resolveName hiName
-          b   = mereoExprToLean body
-      in LBoundedForall var lo' hi' b
-    _ ->
-      LForallKw var LProp
-           (LImpl (LApp (LVar "IsWithinBounds") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
-                      (mereoExprToLean body))
-mereoExprToLean (IR.MBoundedProduct var lo hi body) =
-  case (lo, hi) of
-    (IR.MVar loName, IR.MVar hiName) ->
-      let lo' = resolveName loName
-          hi' = resolveName hiName
-          b   = mereoExprToLean body
-      in LBoundedExists var lo' hi' b
-    _ ->
-      LExists var LProp
-           (LImpl (LApp (LVar "IsWithinBounds") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
-                      (mereoExprToLean body))
-mereoExprToLean (IR.MSumOfIndividuals var lo hi body) =
-  case (lo, hi) of
-    (IR.MVar loName, IR.MVar hiName) ->
-      let lo' = resolveName loName
-          hi' = resolveName hiName
-          b   = mereoExprToLean body
-      in LForallIndividuals var lo' hi' b
-    _ ->
-      LForallKw var LProp
-           (LImpl (LApp (LVar "IsIndividual") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
-                      (mereoExprToLean body))
-mereoExprToLean (IR.MProductOfIndividuals var lo hi body) =
-  case (lo, hi) of
-    (IR.MVar loName, IR.MVar hiName) ->
-      let lo' = resolveName loName
-          hi' = resolveName hiName
-          b   = mereoExprToLean body
-      in LExistsIndividuals var lo' hi' b
-    _ ->
-      LExists var LProp
-           (LImpl (LApp (LVar "IsIndividual") [mereoExprToLean lo, mereoExprToLean hi, LVar var])
-                      (mereoExprToLean body))
+mereoExprToLean e = mereoExprToLean' resolveName e
+
+abbrevBodyToLean :: IR.MereoExpr -> LeanExpr
+abbrevBodyToLean = mereoExprToLean' id
+
+renderAbbrevDef :: IR.AbbrevDef -> String
+renderAbbrevDef ad =
+  "def " ++ IR.abbrevName ad
+  ++ " " ++ unwords [ "(" ++ p ++ " : Prop)" | p <- IR.abbrevParams ad ]
+  ++ " : Prop := " ++ renderLeanExpr (abbrevBodyToLean (IR.abbrevBody ad))
+
+renderLeanDoc :: LeanDoc -> String
+renderLeanDoc = renderLeanDocWith renderAbbrevDef

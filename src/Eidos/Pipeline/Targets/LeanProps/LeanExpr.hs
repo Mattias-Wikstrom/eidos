@@ -25,7 +25,7 @@ module Eidos.Pipeline.Targets.LeanProps.LeanExpr
     -- * Expression language
   , LeanExpr (..)
     -- * Rendering
-  , renderLeanDoc
+  , renderLeanDocWith
   , renderLeanExpr
   , collectUsedAbbrevNames
   ) where
@@ -195,7 +195,8 @@ collectUsedAbbrevNames doc =
       "ProjectIntoInterval" : concatMap exprAbbrevs [x, lo, hi]
     exprAbbrevs _                     = []  -- LProp, LVar (non-abbrev)
 
--- | Render a 'LeanDoc' to Lean 4 source text.
+-- | Render a 'LeanDoc' to Lean 4 source text, using the supplied function
+-- to render each compiler-internal abbreviation definition.
 --
 -- Emits the file-level preamble (helper definitions) followed by each
 -- 'LeanBlock'.  Every block is wrapped in @namespace <name> … end <name>@
@@ -203,10 +204,10 @@ collectUsedAbbrevNames doc =
 -- (used only by test helpers; 'theoryBlocks' no longer emits it).
 -- Only abbreviation @def@s that are actually referenced in the document
 -- are emitted.
-renderLeanDoc :: LeanDoc -> String
-renderLeanDoc doc =
+renderLeanDocWith :: (IR.AbbrevDef -> String) -> LeanDoc -> String
+renderLeanDocWith renderAbbrev doc =
   let used       = collectUsedAbbrevNames doc
-      abbrevLines = [ renderAbbrevDef ad
+      abbrevLines = [ renderAbbrev ad
                     | ad <- IR.allAbbrevDefs
                     , IR.abbrevName ad `elem` used ]
       preamble    =
@@ -216,49 +217,6 @@ renderLeanDoc doc =
         ] ++ abbrevLines ++ [ "" | not (null abbrevLines) ]
   in unlines preamble
   ++ concatMap renderBlock (leanDocBlocks doc)
-
--- | Render one compiler-internal abbreviation as a Lean 4 @def@.
--- The body is obtained by translating 'IR.abbrevBody' with 'abbrevBodyToLean'.
-renderAbbrevDef :: IR.AbbrevDef -> String
-renderAbbrevDef ad =
-  "def " ++ IR.abbrevName ad
-  ++ " " ++ unwords [ "(" ++ p ++ " : Prop)" | p <- IR.abbrevParams ad ]
-  ++ " : Prop := " ++ renderLeanExpr (abbrevBodyToLean (IR.abbrevBody ad))
-
--- | Translate a 'IR.MereoExpr' that forms the body of a compiler-internal
--- abbreviation definition into a 'LeanExpr'.
---
--- This differs from the fact-body translator in 'MkAxiomSets' in two ways:
---   * 'MVar' names are kept verbatim (they are abbreviation parameters such as
---     @"lo"@, @"hi"@, @"x"@, not theory-specific sort-bound names).
---   * 'MZero' renders as Lean's @True@ rather than @ℙ_Min@, because here we
---     are building a standalone Lean definition, not a theory assertion.
-abbrevBodyToLean :: IR.MereoExpr -> LeanExpr
-abbrevBodyToLean (IR.MSum a b)     = LConj   (abbrevBodyToLean a) (abbrevBodyToLean b)
-abbrevBodyToLean (IR.MProd a b)    = LDisj   (abbrevBodyToLean a) (abbrevBodyToLean b)
-abbrevBodyToLean (IR.MDiff a b)    = LImpl   (abbrevBodyToLean b) (abbrevBodyToLean a)
-abbrevBodyToLean (IR.MRevDiff a b) = LImpl   (abbrevBodyToLean a) (abbrevBodyToLean b)
-abbrevBodyToLean (IR.MSymDiff a b) = LBicond (abbrevBodyToLean a) (abbrevBodyToLean b)
-abbrevBodyToLean (IR.MVar n)       = LVar n
-abbrevBodyToLean IR.MZero          = LTop
-abbrevBodyToLean (IR.MAbbrevApp name args) =
-  LApp (LVar name) (map abbrevBodyToLean args)
-abbrevBodyToLean (IR.MBoundedSum var lo hi body) =
-  LForallKw var LProp
-    (LImpl (LApp (LVar "IsWithinBounds") [abbrevBodyToLean lo, abbrevBodyToLean hi, LVar var])
-           (abbrevBodyToLean body))
-abbrevBodyToLean (IR.MBoundedProduct var lo hi body) =
-  LExists var LProp
-    (LConj (LApp (LVar "IsWithinBounds") [abbrevBodyToLean lo, abbrevBodyToLean hi, LVar var])
-           (abbrevBodyToLean body))
-abbrevBodyToLean (IR.MSumOfIndividuals var lo hi body) =
-  LForallKw var LProp
-    (LImpl (LApp (LVar "IsIndividual") [abbrevBodyToLean lo, abbrevBodyToLean hi, LVar var])
-           (abbrevBodyToLean body))
-abbrevBodyToLean (IR.MProductOfIndividuals var lo hi body) =
-  LExists var LProp
-    (LConj (LApp (LVar "IsIndividual") [abbrevBodyToLean lo, abbrevBodyToLean hi, LVar var])
-           (abbrevBodyToLean body))
 
 renderBlock :: LeanBlock -> String
 renderBlock blk

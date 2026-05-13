@@ -10,6 +10,9 @@ module Eidos.Pipeline.Targets.CoqProps.MkAxiomSets
     -- * Coq rendering
   , axBodyToCoq
   , mereoExprToCoq
+  , abbrevBodyToCoq
+  , renderAbbrevDef
+  , renderCoqDoc
   ) where
 
 import           Data.Char (isAlphaNum)
@@ -75,70 +78,68 @@ axBodyToCoq (PA.ABFuncEq l r)   = CEq (CVar (resolveName l)) (CVar (resolveName 
 -- MereoExpr → CoqExpr
 -- ---------------------------------------------------------------------------
 
--- | Translate a 'IR.MereoExpr' to a 'CoqExpr'.
+-- | Translate a 'IR.MereoExpr' to a 'CoqExpr', parameterised over a
+-- name-resolution function.
 --
--- Mereological operations map to propositional connectives:
---   MSum     → CConj   (+ = /\)
---   MProd    → CDisj   (× = \/)
---   MDiff    → CImpl   (a - b = b -> a)
---   MRevDiff → CImpl   (a ⇒ b = a -> b)
---   MSymDiff → CBicond (a ∸ b = a <-> b)
---   MZero    → True
---   MVar n   → CVar (resolveName n)
---   MAbbrevApp → CApp
---   MBoundedSum → bounded universal quantification
+-- Pass 'resolveName' for theory axiom bodies (theory-specific names need
+-- sanitisation) or 'id' for abbreviation bodies (parameter names like
+-- @"lo"@, @"hi"@ are kept verbatim).
+mereoExprToCoq' :: (String -> String) -> IR.MereoExpr -> CoqExpr
+mereoExprToCoq' resolve = go
+  where
+    go (IR.MSum a b)     = CConj   (go a) (go b)
+    go (IR.MProd a b)    = CDisj   (go a) (go b)
+    go (IR.MDiff a b)    = CImpl   (go b) (go a)
+    go (IR.MRevDiff a b) = CImpl   (go a) (go b)
+    go (IR.MSymDiff a b) = CBicond (go a) (go b)
+    go (IR.MVar n)       = CVar (resolve n)
+    go IR.MZero          = CTop
+    go (IR.MAbbrevApp name args) =
+      CApp (CVar name) (map go args)
+    go (IR.MProductOfIndividuals var lo hi body) =
+      case (lo, hi) of
+        (IR.MVar loName, IR.MVar hiName) ->
+          CExistsIndividuals var (resolve loName) (resolve hiName) (go body)
+        _ ->
+          CExists var CProp
+               (CConj (CApp (CVar "IsIndividual") [go lo, go hi, CVar var])
+                      (go body))
+    go (IR.MBoundedSum var lo hi body) =
+      case (lo, hi) of
+        (IR.MVar loName, IR.MVar hiName) ->
+          CBoundedForall var (resolve loName) (resolve hiName) (go body)
+        _ ->
+          CForall var CProp
+               (CImpl (CApp (CVar "IsWithinBounds") [go lo, go hi, CVar var])
+                      (go body))
+    go (IR.MSumOfIndividuals var lo hi body) =
+      case (lo, hi) of
+        (IR.MVar loName, IR.MVar hiName) ->
+          CForallIndividuals var (resolve loName) (resolve hiName) (go body)
+        _ ->
+          CForall var CProp
+               (CImpl (CApp (CVar "IsIndividual") [go lo, go hi, CVar var])
+                      (go body))
+    go (IR.MBoundedProduct var lo hi body) =
+      case (lo, hi) of
+        (IR.MVar loName, IR.MVar hiName) ->
+          CBoundedExists var (resolve loName) (resolve hiName) (go body)
+        _ ->
+          CExists var CProp
+               (CConj (CApp (CVar "IsWithinBounds") [go lo, go hi, CVar var])
+                      (go body))
 
 mereoExprToCoq :: IR.MereoExpr -> CoqExpr
-mereoExprToCoq (IR.MSum a b)     = CConj   (mereoExprToCoq a) (mereoExprToCoq b)
-mereoExprToCoq (IR.MProd a b)    = CDisj   (mereoExprToCoq a) (mereoExprToCoq b)
-mereoExprToCoq (IR.MDiff a b)    = CImpl   (mereoExprToCoq b) (mereoExprToCoq a)
-mereoExprToCoq (IR.MRevDiff a b) = CImpl   (mereoExprToCoq a) (mereoExprToCoq b)
-mereoExprToCoq (IR.MSymDiff a b) = CBicond (mereoExprToCoq a) (mereoExprToCoq b)
-mereoExprToCoq (IR.MVar n)       = CVar (resolveName n)
-mereoExprToCoq IR.MZero          = CTop
-mereoExprToCoq (IR.MAbbrevApp name args) =
-  CApp (CVar name) (map mereoExprToCoq args)
-mereoExprToCoq (IR.MProductOfIndividuals var lo hi body) =
-  case (lo, hi) of
-    (IR.MVar loName, IR.MVar hiName) ->
-      let lo' = resolveName loName
-          hi' = resolveName hiName
-          b   = mereoExprToCoq body
-      in CExistsIndividuals var lo' hi' b
-    _ ->
-      CExists var CProp
-           (CConj (CApp (CVar "IsIndividual") [mereoExprToCoq lo, mereoExprToCoq hi, CVar var])
-                  (mereoExprToCoq body))
-mereoExprToCoq (IR.MBoundedSum var lo hi body) =
-  case (lo, hi) of
-    (IR.MVar loName, IR.MVar hiName) ->
-      let lo' = resolveName loName
-          hi' = resolveName hiName
-          b   = mereoExprToCoq body
-      in CBoundedForall var lo' hi' b
-    _ ->
-      CForall var CProp
-           (CImpl (CApp (CVar "IsWithinBounds") [mereoExprToCoq lo, mereoExprToCoq hi, CVar var])
-                  (mereoExprToCoq body))
-mereoExprToCoq (IR.MSumOfIndividuals var lo hi body) =
-  case (lo, hi) of
-    (IR.MVar loName, IR.MVar hiName) ->
-      let lo' = resolveName loName
-          hi' = resolveName hiName
-          b   = mereoExprToCoq body
-      in CForallIndividuals var lo' hi' b
-    _ ->
-      CForall var CProp
-           (CImpl (CApp (CVar "IsIndividual") [mereoExprToCoq lo, mereoExprToCoq hi, CVar var])
-                  (mereoExprToCoq body))
-mereoExprToCoq (IR.MBoundedProduct var lo hi body) =
-  case (lo, hi) of
-    (IR.MVar loName, IR.MVar hiName) ->
-      let lo' = resolveName loName
-          hi' = resolveName hiName
-          b   = mereoExprToCoq body
-      in CBoundedExists var lo' hi' b
-    _ ->
-      CExists var CProp
-           (CConj (CApp (CVar "IsWithinBounds") [mereoExprToCoq lo, mereoExprToCoq hi, CVar var])
-                  (mereoExprToCoq body))
+mereoExprToCoq = mereoExprToCoq' resolveName
+
+abbrevBodyToCoq :: IR.MereoExpr -> CoqExpr
+abbrevBodyToCoq = mereoExprToCoq' id
+
+renderAbbrevDef :: IR.AbbrevDef -> String
+renderAbbrevDef ad =
+  "Definition " ++ IR.abbrevName ad
+  ++ " " ++ unwords [ "(" ++ p ++ " : Prop)" | p <- IR.abbrevParams ad ]
+  ++ " : Prop := " ++ renderCoqExpr (abbrevBodyToCoq (IR.abbrevBody ad)) ++ "."
+
+renderCoqDoc :: CoqDoc -> String
+renderCoqDoc = renderCoqDocWith renderAbbrevDef

@@ -23,7 +23,7 @@ module Eidos.Pipeline.Targets.CoqProps.CoqExpr
     -- * Expression language
   , CoqExpr (..)
     -- * Rendering
-  , renderCoqDoc
+  , renderCoqDocWith
   , renderCoqExpr
   , collectUsedAbbrevNames
   ) where
@@ -172,10 +172,10 @@ collectUsedAbbrevNames doc =
       "ProjectIntoInterval" : concatMap exprAbbrevs [x, lo, hi]
     exprAbbrevs _                     = []
 
-renderCoqDoc :: CoqDoc -> String
-renderCoqDoc doc =
+renderCoqDocWith :: (IR.AbbrevDef -> String) -> CoqDoc -> String
+renderCoqDocWith renderAbbrev doc =
   let used        = collectUsedAbbrevNames doc
-      abbrevLines = [ renderAbbrevDef ad
+      abbrevLines = [ renderAbbrev ad
                     | ad <- IR.allAbbrevDefs
                     , IR.abbrevName ad `elem` used ]
       preamble    =
@@ -185,39 +185,6 @@ renderCoqDoc doc =
         ] ++ abbrevLines ++ [ "" | not (null abbrevLines) ]
   in unlines preamble
   ++ concatMap renderBlock (coqDocBlocks doc)
-
-renderAbbrevDef :: IR.AbbrevDef -> String
-renderAbbrevDef ad =
-  "Definition " ++ IR.abbrevName ad
-  ++ " " ++ unwords [ "(" ++ p ++ " : Prop)" | p <- IR.abbrevParams ad ]
-  ++ " : Prop := " ++ renderCoqExpr (abbrevBodyToCoq (IR.abbrevBody ad)) ++ "."
-
-abbrevBodyToCoq :: IR.MereoExpr -> CoqExpr
-abbrevBodyToCoq (IR.MSum a b)     = CConj   (abbrevBodyToCoq a) (abbrevBodyToCoq b)
-abbrevBodyToCoq (IR.MProd a b)    = CDisj   (abbrevBodyToCoq a) (abbrevBodyToCoq b)
-abbrevBodyToCoq (IR.MDiff a b)    = CImpl   (abbrevBodyToCoq b) (abbrevBodyToCoq a)
-abbrevBodyToCoq (IR.MRevDiff a b) = CImpl   (abbrevBodyToCoq a) (abbrevBodyToCoq b)
-abbrevBodyToCoq (IR.MSymDiff a b) = CBicond (abbrevBodyToCoq a) (abbrevBodyToCoq b)
-abbrevBodyToCoq (IR.MVar n)       = CVar n
-abbrevBodyToCoq IR.MZero          = CTop
-abbrevBodyToCoq (IR.MAbbrevApp name args) =
-  CApp (CVar name) (map abbrevBodyToCoq args)
-abbrevBodyToCoq (IR.MBoundedSum var lo hi body) =
-  CForall var CProp
-    (CImpl (CApp (CVar "IsWithinBounds") [abbrevBodyToCoq lo, abbrevBodyToCoq hi, CVar var])
-           (abbrevBodyToCoq body))
-abbrevBodyToCoq (IR.MBoundedProduct var lo hi body) =
-  CExists var CProp
-    (CConj (CApp (CVar "IsWithinBounds") [abbrevBodyToCoq lo, abbrevBodyToCoq hi, CVar var])
-           (abbrevBodyToCoq body))
-abbrevBodyToCoq (IR.MSumOfIndividuals var lo hi body) =
-  CForall var CProp
-    (CImpl (CApp (CVar "IsIndividual") [abbrevBodyToCoq lo, abbrevBodyToCoq hi, CVar var])
-           (abbrevBodyToCoq body))
-abbrevBodyToCoq (IR.MProductOfIndividuals var lo hi body) =
-  CExists var CProp
-    (CConj (CApp (CVar "IsIndividual") [abbrevBodyToCoq lo, abbrevBodyToCoq hi, CVar var])
-           (abbrevBodyToCoq body))
 
 -- | Sanitize a dotted FQN to a valid flat Coq module identifier.
 sanitizeModuleName :: String -> String

@@ -38,7 +38,7 @@ module Eidos.Pipeline.Targets.LeanProps.LeanProps
 import qualified Eidos.Pipeline.FromSyntax.IR as IR         
 import           Eidos.Pipeline.IRProcessing.AxiomSet
 import           Eidos.Pipeline.Targets.LeanProps.LeanExpr
-import           Eidos.Pipeline.Targets.LeanProps.MkAxiomSets (theoryBlocks, axBodyToLean, mereoExprToLean)
+import           Eidos.Pipeline.Targets.LeanProps.MkAxiomSets (theoryBlocks, axBodyToLean, mereoExprToLean, renderLeanDoc)
 import           Data.List (intercalate, sortOn)
 import qualified Data.Set as Set
 

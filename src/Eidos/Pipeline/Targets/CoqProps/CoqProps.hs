@@ -35,7 +35,7 @@ module Eidos.Pipeline.Targets.CoqProps.CoqProps
 import qualified Eidos.Pipeline.FromSyntax.IR as IR        
 import Eidos.Pipeline.IRProcessing.AxiomSet
 import           Eidos.Pipeline.Targets.CoqProps.CoqExpr
-import           Eidos.Pipeline.Targets.CoqProps.MkAxiomSets (theoryBlocks, axBodyToCoq, mereoExprToCoq)
+import           Eidos.Pipeline.Targets.CoqProps.MkAxiomSets (theoryBlocks, axBodyToCoq, mereoExprToCoq, renderCoqDoc)
 import           Data.List (intercalate, sortOn)
 import qualified Data.Set as Set
 
