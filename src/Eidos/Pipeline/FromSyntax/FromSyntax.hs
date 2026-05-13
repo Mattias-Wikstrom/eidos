@@ -1842,11 +1842,20 @@ resolveConstantRef th ctx (ConstantRef specs ref) = do
   let path = map theoryRefName specs
   case ref of
     "⊤" -> do
-      let mo = lookupInPath th path theoryTruth
-      return (ResolvedConstantRef ref (EntityMereological mo) PropositionClass)
+      let mo     = lookupInPath th path theoryTruth
+          entity = EntityMereological mo
+          -- For cross-theory references use the FQN; for local references use
+          -- the actual entity name (e.g. "ℙ_Min") rather than the Eidos
+          -- syntax keyword "⊤".
+          name   = if null path then mereoName mo
+                   else entityFullyQualifiedName entity
+      return (ResolvedConstantRef name entity PropositionClass)
     "⊥" -> do
-      let mo = lookupInPath th path theoryFalsity
-      return (ResolvedConstantRef ref (EntityMereological mo) PropositionClass)
+      let mo     = lookupInPath th path theoryFalsity
+          entity = EntityMereological mo
+          name   = if null path then mereoName mo
+                   else entityFullyQualifiedName entity
+      return (ResolvedConstantRef name entity PropositionClass)
     _ -> do
       let mbVar = if null path then lookupVarContext ctx ref else Nothing
       case mbVar of
@@ -1862,8 +1871,12 @@ resolveConstantRef th ctx (ConstantRef specs ref) = do
                     ty)
         Nothing -> do
           entity <- lookupEntityInPath th path ref
-          let ty = entityToExprType entity
-          return (ResolvedConstantRef ref entity ty)
+          let ty   = entityToExprType entity
+              -- For cross-theory references qualify the name with the entity's
+              -- FQN; for same-theory lookups the local name is correct.
+              name = if null path then ref
+                     else entityFullyQualifiedName entity
+          return (ResolvedConstantRef name entity ty)
 
 -- ---------------------------------------------------------------------------
 -- Term pair validation
@@ -1992,9 +2005,20 @@ containsNegationInQuantified :: ResolvedQuantified -> Bool
 containsNegationInQuantified (ResolvedQuantified _ atom) =
   containsNegationOrAbsurdityInAtomic atom
 
+-- | True when a 'ResolvedConstantRef' refers to the propositional falsity (⊥).
+-- Uses entity inspection rather than the stored name so that it is robust to
+-- name rewriting that happens during resolution (e.g. cross-theory qualified
+-- names or the replacement of the "⊥" keyword by the real entity name).
+isFalsityRef :: ResolvedConstantRef -> Bool
+isFalsityRef ref = case resolvedConstEntity ref of
+  EntityMereological mo ->
+    mereoKind mo == MereologicalEntityKindUpperLimitForSort
+    && maybe False isPropSort (mereoLimitForSort mo)
+  _ -> False
+
 containsNegationOrAbsurdityInAtomic :: ResolvedAtomicProp -> Bool
 containsNegationOrAbsurdityInAtomic (ResolvedAtomicConstant ref) =
-  resolvedConstRefName ref == "⊥"
+  isFalsityRef ref
 containsNegationOrAbsurdityInAtomic (ResolvedAtomicTermPair tp) =
   containsNegationInTermPair tp
 
@@ -2022,7 +2046,7 @@ containsNegationInFactor (ResolvedFactor base _ _) =
 
 containsNegationInBase :: ResolvedBaseTerm -> Bool
 containsNegationInBase (ResolvedBTAtomic ref) =
-  resolvedConstRefName ref == "⊥"
+  isFalsityRef ref
 containsNegationInBase (ResolvedBTPropParen expr) =
   containsNegationOrAbsurdity expr
 containsNegationInBase (ResolvedBTTermParen term) =
