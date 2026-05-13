@@ -221,7 +221,11 @@ renderLeanDocWith renderAbbrev doc =
 
 -- | Render a 'LeanDoc' with the default abbreviation renderer.
 renderLeanDoc :: LeanDoc -> String
-renderLeanDoc = renderLeanDocWith IR.renderAbbrevDef
+renderLeanDoc = renderLeanDocWith renderDefaultAbbrev
+  where
+    -- Keep this module independent from backend-specific renderers.
+    -- The backend module provides a richer abbreviation printer.
+    renderDefaultAbbrev ad = "def " ++ IR.abbrevName ad ++ " : Prop := True"
 
 renderBlock :: LeanBlock -> String
 renderBlock blk

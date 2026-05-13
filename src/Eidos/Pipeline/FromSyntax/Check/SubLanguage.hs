@@ -246,9 +246,9 @@ checkRegular body = concatMap checkSection (sections body)
 
     checkQuantifiedRegular ctx (Quantified qs atomic) =
       concatMap (checkQuantifierNoSOL ctx) qs ++
-      checkAtomicNoBottom ctx atomic
+      checkAtomicRegular ctx atomic
 
-    checkAtomicNoBottom ctx (AtomicProp tp) =
+    checkAtomicRegular ctx (AtomicProp tp) =
       checkTermPairForBottom ctx tp ++ checkTPNoComp ctx tp
 
 -- | Coherent logic (.coh)
@@ -323,7 +323,6 @@ checkCoherent body = concatMap checkSection (sections body)
 
     checkAtomicCoherent ctx (AtomicProp tp) =
       checkTPNoComp ctx tp
-    checkAtomicCoherent _ _ = []
 
       
 -- | First-order logic (.fol)
