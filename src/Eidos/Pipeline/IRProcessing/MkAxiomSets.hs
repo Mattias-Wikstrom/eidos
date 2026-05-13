@@ -775,14 +775,16 @@ mkAxiomSets pt = concat
 -- Post-order (children before parents) ensures that cross-namespace
 -- references from a parent to a child are always forward-declared.
 --
--- The root theory uses the reserved namespace @\"__main__\"@.
+-- Every theory — including the root — is assigned its
+-- 'IR.theoryFullyQualifiedName' as its namespace identifier, so all output
+-- is wrapped in a @namespace@\/@end@ (or @Module@\/@End@) block.
 -- Reflection subtheories are skipped.
 theoryBlocks :: PL.PreparedTheory -> [(String, [AxiomSet])]
 theoryBlocks pt =
   childBlocks ++ [rootBlock]
   where
     theory      = PL.ptTheory pt
-    rootBlock   = ("__main__", mkAxiomSets pt)
+    rootBlock   = (IR.theoryFullyQualifiedName theory, mkAxiomSets pt)
     childBlocks = concatMap subBlocks (IR.theorySubtheories theory)
 
     subBlocks :: IR.Theory -> [(String, [AxiomSet])]

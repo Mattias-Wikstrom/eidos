@@ -5,8 +5,9 @@
 -- == Document model
 --
 -- A 'CoqDoc' is a sequence of 'CoqBlock' values.  Each block corresponds to
--- exactly one Coq @Module … End@ region (or the file-level scope for the root
--- theory, which uses the reserved name @__main__@).  Blocks are always emitted
+-- exactly one Coq @Module … End@ region.  Every theory — including the root —
+-- is wrapped in its own @Module@.  The reserved name @__main__@ renders at
+-- file scope and is only used by test helpers.  Blocks are always emitted
 -- flat — subtheories are never nested inside their parent's @Module@ block.
 -- Blocks must be ordered so that dependencies are declared before their
 -- dependents (post-order over the subtheory tree).
@@ -42,12 +43,14 @@ data CoqDoc = CoqDoc
 
 -- | One flat @Module … End@ region in the output.
 --
--- 'blockModule' is the Coq module identifier.  The root theory uses the
--- reserved name @\"__main__\"@, rendered at file scope with no @Module@\/@End@
--- wrapper.  Dotted namespace names (e.g. @\"lattice.lower\"@) have their dots
--- replaced with underscores to form a valid Coq identifier.
+-- 'blockModule' is the Coq module identifier.  Every theory — including the
+-- root — uses its 'IR.theoryFullyQualifiedName'.  The reserved name
+-- @\"__main__\"@ is recognised by 'renderBlock' as "render at file scope"
+-- and is only used by test helpers.  Dotted namespace names
+-- (e.g. @\"lattice.lower\"@) have their dots replaced with underscores to
+-- form a valid Coq identifier.
 data CoqBlock = CoqBlock
-  { blockModule :: String      -- ^ @\"__main__\"@ or a dotted FQN
+  { blockModule :: String      -- ^ dotted FQN (or @\"__main__\"@ for test helpers)
   , blockDecls  :: [CoqDecl]
   } deriving (Eq, Show)
 

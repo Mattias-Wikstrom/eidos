@@ -49,9 +49,11 @@ data LeanDoc = LeanDoc
 -- | One flat @namespace … end@ region in the output.
 --
 -- 'blockNamespace' is the Lean 4 namespace identifier for this block.
--- The root theory uses the reserved name @\"__main__\"@, which is rendered
--- at file scope (no @namespace@\/@end@ wrapper).  All other theories use
--- their 'IR.theoryFullyQualifiedName', which may contain dots
+-- Every theory — including the root — uses its 'IR.theoryFullyQualifiedName'
+-- so all blocks get a @namespace@\/@end@ wrapper.  The reserved name
+-- @\"__main__\"@ is recognised by 'renderBlock' as "render at file scope"
+-- and is only used by test helpers that bypass 'theoryBlocks'.
+-- Namespace identifiers may contain dots
 -- (e.g. @\"lattice.lower_semi_lattice.preorder\"@); Lean 4 treats a dotted
 -- name as a single flat namespace identifier, not a nested path.
 data LeanBlock = LeanBlock
@@ -192,9 +194,9 @@ collectUsedAbbrevNames doc =
 -- | Render a 'LeanDoc' to Lean 4 source text.
 --
 -- Emits the file-level preamble (helper definitions) followed by each
--- 'LeanBlock'.  The @__main__@ block is rendered without an explicit
--- @namespace@\/@end@ wrapper — its declarations appear at file scope.
--- All other blocks are wrapped in @namespace <name> … end <name>@.
+-- 'LeanBlock'.  Every block is wrapped in @namespace <name> … end <name>@
+-- except for the reserved name @\"__main__\"@, which renders at file scope
+-- (used only by test helpers; 'theoryBlocks' no longer emits it).
 -- Only abbreviation @def@s that are actually referenced in the document
 -- are emitted.
 renderLeanDoc :: LeanDoc -> String
