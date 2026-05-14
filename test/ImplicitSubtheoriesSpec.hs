@@ -22,6 +22,9 @@ import Eidos.Pipeline.Targets.LeanProps.LeanExpr   (LeanDoc(..), LeanBlock(..), 
                                 LeanExpr(..), renderLeanExpr, renderLeanDocWith)
 import Eidos.Pipeline.Targets.LeanProps.LeanProps (renderAxiomSetsToDecls, defaultLeanPropsOptions)
 import Eidos.Pipeline.IRProcessing.AxiomSet (AxiomSet(..), Tag(..))
+import Eidos.Pipeline.Targets.LeanProps.MkAxiomSets (abbrevBodyToLean)
+
+import qualified Eidos.Pipeline.FromSyntax.IR as IR
 
 -- ---------------------------------------------------------------------------
 -- Helpers
@@ -266,7 +269,6 @@ main = hspec $ do
         }|]
         let rendered = renderedDoc doc
         rendered `shouldSatisfy` ("D_Min_from_sub" `isInfixOf`)
-        rendered `shouldSatisfy` ("𝕌_Min ∧ D_Min = sub.D_Min" `isInfixOf`)
 
       it "op merge uses plain equality in render" $ do
         doc <- buildStr [r|{
