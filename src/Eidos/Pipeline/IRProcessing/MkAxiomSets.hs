@@ -22,18 +22,15 @@ import qualified Eidos.Pipeline.IRProcessing.SortBounds as SB
 import qualified Eidos.Pipeline.IRProcessing.FunctionFacts as FF
 import           Eidos.Pipeline.IRProcessing.AxiomSet
 import qualified Eidos.Pipeline.IRProcessing.MereologicalOpDefs as MOD
+import qualified Eidos.Pipeline.IRProcessing.NamingConventions as NC
 
 -- ---------------------------------------------------------------------------
--- Naming helpers
+-- Naming helpers (thin wrappers around NamingConventions)
 -- ---------------------------------------------------------------------------
-
-minSuffix, maxSuffix :: String
-minSuffix = "_Min"
-maxSuffix = "_Max"
 
 sortMinName, sortMaxName :: String -> String
-sortMinName s = s ++ minSuffix
-sortMaxName s = s ++ maxSuffix
+sortMinName = NC.sortMin
+sortMaxName = NC.sortMax
 
 uSortName, pSortName, dSortName :: String
 uSortName = "𝕌"
@@ -41,44 +38,40 @@ pSortName = "ℙ"
 dSortName = "𝔻"
 
 uMinName, uMaxName, pMinName, pMaxName, dMinName, dMaxName :: String
-uMinName = sortMinName uSortName   -- "𝕌_Min"
-uMaxName = sortMaxName uSortName   -- "𝕌_Max"
-pMinName = sortMinName pSortName   -- "ℙ_Min"
-pMaxName = sortMaxName pSortName   -- "ℙ_Max"
-dMinName = sortMinName dSortName   -- "𝔻_Min"
-dMaxName = sortMaxName dSortName   -- "𝔻_Max"
+uMinName = NC.sortMin uSortName   -- "𝕌_Min"
+uMaxName = NC.sortMax uSortName   -- "𝕌_Max"
+pMinName = NC.sortMin pSortName   -- "ℙ_Min"
+pMaxName = NC.sortMax pSortName   -- "ℙ_Max"
+dMinName = NC.sortMin dSortName   -- "𝔻_Min"
+dMaxName = NC.sortMax dSortName   -- "𝔻_Max"
 
 sanitizeName :: String -> String
-sanitizeName = map (\c -> if c == '#' then '_' else c)
+sanitizeName = NC.sanitizeHash
 
 domMinName, domMaxName :: IR.Function -> String
-domMinName f = sanitizeName (IR.sortName dom) ++ minSuffix
+domMinName f = NC.sortMin (NC.sanitizeHash (IR.sortName dom))
   where dom = maybe (error "no domain sort") id (IR.funcDomain f)
-domMaxName f = sanitizeName (IR.sortName dom) ++ maxSuffix
+domMaxName f = NC.sortMax (NC.sanitizeHash (IR.sortName dom))
   where dom = maybe (error "no domain sort") id (IR.funcDomain f)
 
 dirImgName, invImgName :: IR.Function -> String
-dirImgName f = IR.funcName f ++ "_dir_img"
-invImgName f = IR.funcName f ++ "_inv_img"
+dirImgName f = NC.funDirImg (IR.funcName f)
+invImgName f = NC.funInvImg (IR.funcName f)
 
 piName :: IR.Function -> Int -> String
-piName f k = IR.funcName f ++ "_pi_" ++ show k
+piName f k = NC.funPi (IR.funcName f) k
 
 piInvName :: IR.Function -> Int -> String
-piInvName f k = IR.funcName f ++ "_pi_" ++ show k ++ "_inv"
+piInvName f k = NC.funPiInv (IR.funcName f) k
 
 tupleName :: IR.Function -> String
-tupleName f = IR.funcName f ++ "_tuple"
+tupleName f = NC.funTuple (IR.funcName f)
 
 irPredicateName :: IR.Function -> String
-irPredicateName f = "IR_" ++ IR.funcName f
+irPredicateName f = NC.irPredicate (IR.funcName f)
 
 invName :: IR.Function -> String
-invName f = IR.funcName f ++ "_inv"
-
-minSuffixForAxiomNames, maxSuffixForAxiomNames :: String
-minSuffixForAxiomNames = "_min"
-maxSuffixForAxiomNames = "_max"
+invName f = NC.funInv (IR.funcName f)
 
 -- ---------------------------------------------------------------------------
 -- Tag-set helpers
@@ -198,8 +191,8 @@ mkAxiomSets pt = concat
         , IR.relOrigin r == IR.FromSignature
         ]
 
-  relDomMinName r = sanitizeName (IR.sortName (IR.relDomain r)) ++ minSuffix
-  relDomMaxName r = sanitizeName (IR.sortName (IR.relDomain r)) ++ maxSuffix
+  relDomMinName r = NC.sortMin (NC.sanitizeHash (IR.sortName (IR.relDomain r)))
+  relDomMaxName r = NC.sortMax (NC.sanitizeHash (IR.sortName (IR.relDomain r)))
 
   translationOfFacts =
     [ f | f <- IR.theoryFacts theory
@@ -413,10 +406,10 @@ mkAxiomSets pt = concat
         let fInv = invName f
         in [ axiomSet [SFunction (IR.funcName f), SInverse, SArgObject 1]
                       (tags [TagFunction, TagFOLFunction, TagInverse, TagDecl])
-               [(fInv ++ "_1", ABDeclProp)]
+               [(NC.funArgN fInv 1, ABDeclProp)]
            , axiomSet [SFunction (IR.funcName f), SInverse, SResObject]
                       (tags [TagFunction, TagFOLFunction, TagInverse, TagDecl])
-               [(fInv ++ "_res", ABDeclProp)]
+               [(NC.funRes fInv, ABDeclProp)]
            ]
 
   -- -------------------------------------------------------------------------
@@ -446,10 +439,10 @@ mkAxiomSets pt = concat
           mkOne f k =
             [ axiomSet [SFunction (IR.funcName f), SProjection k, SArgObject 1]
                        (tags [TagFunction, TagFOLFunction, TagProjection, TagDecl])
-                [(piName f k ++ "_1", ABDeclProp)]
+                [(NC.funArgN (piName f k) 1, ABDeclProp)]
             , axiomSet [SFunction (IR.funcName f), SProjection k, SResObject]
                        (tags [TagFunction, TagFOLFunction, TagProjection, TagDecl])
-                [(piName f k ++ "_res", ABDeclProp)]
+                [(NC.funRes (piName f k), ABDeclProp)]
             ]
 
   -- -------------------------------------------------------------------------
@@ -460,8 +453,8 @@ mkAxiomSets pt = concat
     where
       mkWitnesses f =
         let fN   = invImgName f
-            argN = fN ++ "_arg"
-            resN = fN ++ "_res"
+            argN = NC.funArg fN
+            resN = NC.funRes fN
         in [ axiomSet [SFunction (IR.funcName f), SImage, SArgObject 1]
                       (tags [TagFunction, TagFOLFunction, TagImage, TagDecl])
                [(argN, ABDeclProp)]
@@ -639,9 +632,9 @@ mkAxiomSets pt = concat
             dMx  = relDomMaxName r
         in axiomSet [SSet (IR.relName r)] (tags tSet)
              [ (argN, ABDeclProp)
-             , (argN ++ minSuffixForAxiomNames,
+             , (NC.boundMin argN,
                   ABMereo (IR.MRevDiff (IR.MVar argN) (IR.MVar dMn)))
-             , (argN ++ maxSuffixForAxiomNames,
+             , (NC.boundMax argN,
                   ABMereo (IR.MRevDiff (IR.MVar dMx) (IR.MVar argN)))
              ]
 
@@ -730,7 +723,7 @@ mkAxiomSets pt = concat
 
       mergeAxiomName :: String -> String -> String
       mergeAxiomName lhsName rhsName =
-        concatMap safeMergeChar lhsName ++ "_from_" ++ subtheoryFromRhs rhsName
+        NC.mergeName (concatMap NC.safeMergeChar lhsName) (subtheoryFromRhs rhsName)
 
       subtheoryFromRhs :: String -> String
       subtheoryFromRhs rhsName =
@@ -748,12 +741,6 @@ mkAxiomSets pt = concat
       dotToUnderscore :: Char -> Char
       dotToUnderscore '.' = '_'
       dotToUnderscore c   = c
-
-      safeMergeChar :: Char -> String
-      safeMergeChar c = case c of
-        '+' -> "plus"; '-' -> "minus"; '×' -> "times"
-        '⇒' -> "impl"; '∸' -> "sub";  '/' -> "div"
-        '#' -> "_";    '.' -> "_";    _   -> [c]
 
       resolveConstRef :: IR.ResolvedConstantRef -> String
       resolveConstRef = resolveName . IR.resolvedConstRefName

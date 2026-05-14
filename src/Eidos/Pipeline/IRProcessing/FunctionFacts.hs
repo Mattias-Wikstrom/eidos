@@ -20,6 +20,7 @@ module Eidos.Pipeline.IRProcessing.FunctionFacts
   ) where
 
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
+import qualified Eidos.Pipeline.IRProcessing.NamingConventions as NC
 
 -- ---------------------------------------------------------------------------
 -- Context type
@@ -61,15 +62,15 @@ data FunctionFactEntry = FunctionFactEntry
 -- ---------------------------------------------------------------------------
 
 invN, dirImgN, invImgN, tupleN, irPredN :: String -> String
-invN    fn = fn ++ "_inv"
-dirImgN fn = fn ++ "_dir_img"
-invImgN fn = fn ++ "_inv_img"
-tupleN  fn = fn ++ "_tuple"
-irPredN fn = "IR_" ++ fn
+invN    = NC.funInv
+dirImgN = NC.funDirImg
+invImgN = NC.funInvImg
+tupleN  = NC.funTuple
+irPredN = NC.irPredicate
 
 piN, piInvN :: String -> Int -> String
-piN    fn k = fn ++ "_pi_" ++ show k
-piInvN fn k = fn ++ "_pi_" ++ show k ++ "_inv"
+piN    = NC.funPi
+piInvN = NC.funPiInv
 
 -- ---------------------------------------------------------------------------
 -- Private MereoExpr helpers
@@ -159,7 +160,7 @@ theoryFunctionFactEntries theory = concat
                 foldr (\(xi, obj) acc -> bounded xi (IR.mereoSort obj) acc)
                       (bounded resVarN (IR.mereoSort resObj) body)
                       (zip argVarNs argObjs)
-          in FunctionFactEntry (FFCFunctionConnection fN) [(fN ++ "_fact", quantified)]
+          in FunctionFactEntry (FFCFunctionConnection fN) [(NC.axiomFact fN, quantified)]
 
     -- -----------------------------------------------------------------------
     -- 23. FOL inverse connection axioms
@@ -171,15 +172,15 @@ theoryFunctionFactEntries theory = concat
               fInvN   = invN fN
               argSort = head (IR.funcArgSorts f)
               resSort = IR.funcResSort f
-              n1      = fInvN ++ "_1"
-              nr      = fInvN ++ "_res"
+              n1      = NC.funArgN fInvN 1
+              nr      = NC.funRes fInvN
               lhs     = conj (bicond (var "X1") (var n1))
                              (bicond (var "X2") (var nr))
               rhs     = bicond (var "X2") (app fInvN [var "X1"])
               body    = bicond lhs rhs
               q2      = bounded "X2" argSort body
               q1      = bounded "X1" resSort q2
-          in FunctionFactEntry (FFCInverseConnection fN) [(fInvN ++ "_fact", q1)]
+          in FunctionFactEntry (FFCInverseConnection fN) [(NC.axiomFact fInvN, q1)]
 
     -- -----------------------------------------------------------------------
     -- 24. Direct image connection axioms
@@ -202,7 +203,7 @@ theoryFunctionFactEntries theory = concat
                   body    = bicond lhs rhs
                   qB      = bounded "B" resSort body
                   qA      = bounded "A" dom qB
-              in [FunctionFactEntry (FFCDirImageConnection fN) [(dImgN ++ "_fact", qA)]]
+              in [FunctionFactEntry (FFCDirImageConnection fN) [(NC.axiomFact dImgN, qA)]]
 
     -- -----------------------------------------------------------------------
     -- 25. Inverse image connection axioms
@@ -212,8 +213,8 @@ theoryFunctionFactEntries theory = concat
         mkInvImgConn f =
           let fN      = IR.funcName f
               iImgN   = invImgN fN
-              argNm   = iImgN ++ "_arg"
-              resNm   = iImgN ++ "_res"
+              argNm   = NC.funArg iImgN
+              resNm   = NC.funRes iImgN
               dom     = domSort f
               resSort = IR.funcResSort f
               lhs     = conj (bicond (var "A") (var argNm))
@@ -222,7 +223,7 @@ theoryFunctionFactEntries theory = concat
               body    = bicond lhs rhs
               qB      = bounded "B" dom body
               qA      = bounded "A" resSort qB
-          in FunctionFactEntry (FFCInvImageConnection fN) [(iImgN ++ "_fact", qA)]
+          in FunctionFactEntry (FFCInvImageConnection fN) [(NC.axiomFact iImgN, qA)]
 
     -- -----------------------------------------------------------------------
     -- 26. FOL adjunction axioms
@@ -239,7 +240,7 @@ theoryFunctionFactEntries theory = concat
               body    = bicond lhs rhs
               qY      = bounded "Y" resSort body
               qX      = bounded "X" argSort qY
-          in FunctionFactEntry (FFCInverseAdjunction fN) [(fN ++ "_adjunction", qX)]
+          in FunctionFactEntry (FFCInverseAdjunction fN) [(NC.axiomAdjunction fN, qX)]
 
     -- -----------------------------------------------------------------------
     -- 27. Image adjunction axioms
@@ -255,7 +256,7 @@ theoryFunctionFactEntries theory = concat
               body    = bicond lhs rhs
               qY      = bounded "Y" resSort body
               qX      = bounded "X" dom qY
-          in FunctionFactEntry (FFCImageAdjunction fN) [(fN ++ "_image_adjunction", qX)]
+          in FunctionFactEntry (FFCImageAdjunction fN) [(NC.axiomImageAdjunction fN, qX)]
 
     -- -----------------------------------------------------------------------
     -- 28. Decomposition axioms: f = f_dir_img ∘ f_tuple
@@ -271,7 +272,7 @@ theoryFunctionFactEntries theory = concat
               quantified =
                 foldr (\(xi, srt) acc -> bounded xi srt acc)
                       body (zip varNs argSorts)
-          in FunctionFactEntry (FFCDecomposition fN) [(fN ++ "_decomposition", quantified)]
+          in FunctionFactEntry (FFCDecomposition fN) [(NC.axiomDecomposition fN, quantified)]
 
     -- -----------------------------------------------------------------------
     -- 29. Tuple connection axioms: f_tuple_fact
@@ -302,7 +303,7 @@ theoryFunctionFactEntries theory = concat
                     foldr (\(xi, srt) acc -> bounded xi srt acc)
                           (bounded resVar dom body)
                           (zip argVars argSorts)
-              in [FunctionFactEntry (FFCTupleConnection fN) [(tupleN fN ++ "_fact", quantified)]]
+              in [FunctionFactEntry (FFCTupleConnection fN) [(NC.axiomFact (tupleN fN), quantified)]]
 
     -- -----------------------------------------------------------------------
     -- 30. Projection connection axioms: f_pi_k_fact
@@ -316,8 +317,8 @@ theoryFunctionFactEntries theory = concat
              | (k, srt) <- zip [1 ..] (IR.funcArgSorts f) ]
           where
             mkOne fN dom k srt =
-              let n1   = piN fN k ++ "_1"
-                  nr   = piN fN k ++ "_res"
+              let n1   = NC.funArgN (piN fN k) 1
+                  nr   = NC.funRes  (piN fN k)
                   lhs  = conj (bicond (var "X1") (var n1))
                               (bicond (var "X2") (var nr))
                   rhs  = bicond (var "X2") (app (piN fN k) [var "X1"])
@@ -325,7 +326,7 @@ theoryFunctionFactEntries theory = concat
                   qX2  = bounded "X2" srt body
                   qX1  = bounded "X1" dom qX2
               in FunctionFactEntry (FFCProjectionConnection fN k)
-                   [(piN fN k ++ "_fact", qX1)]
+                   [(NC.axiomFact (piN fN k), qX1)]
 
     -- -----------------------------------------------------------------------
     -- 31. Projection adjunction axioms: f_pi_k_adjunction
@@ -345,7 +346,7 @@ theoryFunctionFactEntries theory = concat
                   qY   = bounded "Y" srt body
                   qX   = bounded "X" dom qY
               in FunctionFactEntry (FFCProjectionAdjunction fN k)
-                   [(piN fN k ++ "_adjunction", qX)]
+                   [(NC.axiomAdjunction (piN fN k), qX)]
 
     -- -----------------------------------------------------------------------
     -- 32. Tuple inverse decomposition: f_tuple = f_pi_1_inv ∩ f_pi_2_inv ∩ …
@@ -364,7 +365,7 @@ theoryFunctionFactEntries theory = concat
                 foldr (\(xi, srt) acc -> bounded xi srt acc)
                       body (zip varNs argSorts)
           in FunctionFactEntry (FFCTupleInvDecomposition fN)
-               [(tupleN fN ++ "_inv_decomposition", quantified)]
+               [(NC.axiomInvDecomposition (tupleN fN), quantified)]
 
     -- -----------------------------------------------------------------------
     -- 33. IR tuple-with-projections axioms
@@ -381,7 +382,7 @@ theoryFunctionFactEntries theory = concat
               body    = bicond irZ (bicond (var "Z") (app (tupleN fN) piApps))
               qZ      = bounded "Z" dom body
           in FunctionFactEntry (FFCIRTupleWithProjections fN)
-               [(irN ++ "_tuple_with_projections", qZ)]
+               [(NC.axiomTupleWithProjections irN, qZ)]
 
     -- -----------------------------------------------------------------------
     -- 34. IR projections-from-tuple axioms
@@ -402,7 +403,7 @@ theoryFunctionFactEntries theory = concat
                 foldr (\(xi, srt) acc -> bounded xi srt acc)
                       body (zip varNs argSorts)
           in FunctionFactEntry (FFCIRProjectionsFromTuple fN)
-               [(irN ++ "_projections_from_tuple", quantified)]
+               [(NC.axiomProjectionsFromTuple irN, quantified)]
 
     -- -----------------------------------------------------------------------
     -- 35. IR separates axioms
@@ -420,7 +421,7 @@ theoryFunctionFactEntries theory = concat
               sep   = bicond (bicond (var "X") (var "Y")) qZ
               qY    = bounded "Y" dom sep
               qX    = bounded "X" dom qY
-          in FunctionFactEntry (FFCIRSeparates fN) [(irN ++ "_separates", qX)]
+          in FunctionFactEntry (FFCIRSeparates fN) [(NC.axiomSeparates irN, qX)]
 
     -- -----------------------------------------------------------------------
     -- R6. Relation bounds axioms
@@ -437,6 +438,6 @@ theoryFunctionFactEntries theory = concat
                 foldr (\(xi, srt) acc -> bounded xi srt acc)
                       body (zip varNs (map snd args))
           in FunctionFactEntry (FFCRelBounds rN)
-               [ (rN ++ "_min", quantify (impl relApp (sMin dom)))
-               , (rN ++ "_max", quantify (impl (sMax dom) relApp))
+               [ (NC.boundMin rN, quantify (impl relApp (sMin dom)))
+               , (NC.boundMax rN, quantify (impl (sMax dom) relApp))
                ]

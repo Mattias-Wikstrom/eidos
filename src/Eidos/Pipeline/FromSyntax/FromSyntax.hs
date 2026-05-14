@@ -24,6 +24,7 @@ import           Eidos.Pipeline.FromSyntax.Check.TypeCheck
 import           Eidos.Pipeline.FromSyntax.Check.SubLanguage
 
 import           Eidos.Pipeline.Resolution.Resolution    (resolveExternalRefs, resolveWithFn, BuildError)
+import qualified Eidos.Pipeline.IRProcessing.NamingConventions as NC
 
 -- ---------------------------------------------------------------------------
 -- Public entry points
@@ -645,11 +646,6 @@ createTheory parentMaybe name isRefl =
 
   in th
 
-minSuffix :: String
-minSuffix = "_Min"
-
-maxSuffix :: String
-maxSuffix = "_Max"
 
 -- ---------------------------------------------------------------------------
 -- Smart constructors for IR entities
@@ -674,7 +670,7 @@ mkSort th k nm orig =
         { mereoKind          = MereologicalEntityKindLowerLimitForSort
         , mereoOrigin        = orig
         , mereoTheory        = th
-        , mereoName          = nm ++ minSuffix
+        , mereoName          = NC.sortMin nm
         , mereoSort          = s
         , mereoLimitForSort  = Just s
         , mereoReflectedFrom = Nothing
@@ -684,7 +680,7 @@ mkSort th k nm orig =
         { mereoKind          = MereologicalEntityKindUpperLimitForSort
         , mereoOrigin        = orig
         , mereoTheory        = th
-        , mereoName          = nm ++ maxSuffix
+        , mereoName          = NC.sortMax nm
         , mereoSort          = s
         , mereoLimitForSort  = Just s
         , mereoReflectedFrom = Nothing
@@ -712,9 +708,9 @@ mkSOLFunction th nm k argSorts resSort orig = Function
   , funcName          = nm
   , funcArgSorts      = argSorts
   , funcResSort       = resSort
-  , funcResObject     = mkMereo th MereologicalEntityKindResultOfSOLFunction (nm ++ "_res") resSort orig
+  , funcResObject     = mkMereo th MereologicalEntityKindResultOfSOLFunction (NC.funRes nm) resSort orig
   , funcArgObjects    = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
-                                          (nm ++ "_" ++ show i) s orig) argSorts [1..]
+                                          (NC.funArgN nm i) s orig) argSorts [1..]
   , funcDomain        = Nothing
   , funcArgument      = Nothing
   , funcDirectImage   = Nothing
@@ -731,34 +727,34 @@ mkFOLFunction th nm argSorts resSort orig =
         { sortKind             = SortKindProduct
         , sortTheory           = th
         , sortOrigin           = auxOrig
-        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_dom" ++ minSuffix) domSort auxOrig
-        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_dom" ++ maxSuffix) domSort auxOrig
-        , sortName             = nm ++ "_dom"
+        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (NC.sortMin (NC.funDom nm)) domSort auxOrig
+        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (NC.sortMax (NC.funDom nm)) domSort auxOrig
+        , sortName             = NC.funDom nm
         , sortComponentSorts   = argSorts
         , sortAssociatedEntity = Just (EntityFunction f)
         , sortReflectedFrom    = Nothing
         }
-      domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_arg") domSort auxOrig
-      dirImg = mkSOLFunction th (nm ++ "_dir_img") FunctionKindDirectImageFunction [domSort] resSort auxOrig
-      invImg = mkSOLFunction th (nm ++ "_inv_img") FunctionKindInverseImageFunction [resSort] domSort auxOrig
+      domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (NC.funArg nm) domSort auxOrig
+      dirImg = mkSOLFunction th (NC.funDirImg nm) FunctionKindDirectImageFunction [domSort] resSort auxOrig
+      invImg = mkSOLFunction th (NC.funInvImg nm) FunctionKindInverseImageFunction [resSort] domSort auxOrig
       f = f0 { funcDomain      = Just domSort
              , funcArgument    = Just domArg
              , funcDirectImage  = Just dirImg
              , funcInverseImage = Just invImg
              }
-      inv0 = mkSOLFunction th (nm ++ "_inv") FunctionKindFOLFunctionFromTheory [resSort] domSort auxOrig
+      inv0 = mkSOLFunction th (NC.funInv nm) FunctionKindFOLFunctionFromTheory [resSort] domSort auxOrig
       invDomSort = Sort
         { sortKind             = SortKindProduct
         , sortTheory           = th
         , sortOrigin           = auxOrig
-        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_inv_dom" ++ minSuffix) invDomSort auxOrig
-        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_inv_dom" ++ maxSuffix) invDomSort auxOrig
-        , sortName             = nm ++ "_inv_dom"
+        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (NC.sortMin (NC.funInvDom nm)) invDomSort auxOrig
+        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (NC.sortMax (NC.funInvDom nm)) invDomSort auxOrig
+        , sortName             = NC.funInvDom nm
         , sortComponentSorts   = [resSort]
         , sortAssociatedEntity = Just (EntityFunction invFn)
         , sortReflectedFrom    = Nothing
         }
-      invArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (nm ++ "_inv_arg") invDomSort auxOrig
+      invArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (NC.funInvArg nm) invDomSort auxOrig
       invFn = inv0 { funcDomain   = Just invDomSort
                    , funcArgument = Just invArg
                    }
@@ -876,15 +872,15 @@ mkRelation th nm argSorts orig =
         { sortKind             = SortKindProduct
         , sortTheory           = th
         , sortOrigin           = orig
-        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (nm ++ "_dom" ++ minSuffix) domSort orig
-        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (nm ++ "_dom" ++ maxSuffix) domSort orig
-        , sortName             = nm ++ "_dom"
+        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (NC.sortMin (NC.funDom nm)) domSort orig
+        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (NC.sortMax (NC.funDom nm)) domSort orig
+        , sortName             = NC.funDom nm
         , sortComponentSorts   = argSorts
         , sortAssociatedEntity = Just (EntityRelation rel)
         , sortReflectedFrom    = Nothing
         }
-      domArg   = mkMereo th MereologicalEntityKindIndividual (nm ++ "_arg") domSort orig
-      assocSet = mkMereo th MereologicalEntityKindSet        (nm ++ "_set") (head argSorts) orig
+      domArg   = mkMereo th MereologicalEntityKindIndividual (NC.funArg nm) domSort orig
+      assocSet = mkMereo th MereologicalEntityKindSet        (NC.funSet nm) (head argSorts) orig
       rel = Relation
         { relOrigin        = orig
         , relKind          = MereologicalEntityKindSet
@@ -893,7 +889,7 @@ mkRelation th nm argSorts orig =
         , relArgSorts      = argSorts
         , relDomain        = domSort
         , relArgObjects    = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
-                                              (nm ++ "_" ++ show i) s orig) argSorts [1..]
+                                              (NC.funArgN nm i) s orig) argSorts [1..]
         , relArgument      = domArg
         , relAssociatedSet = assocSet
         , relReflectedFrom = Nothing
@@ -1009,12 +1005,12 @@ addMergeEqualityFacts th lhsName lhsEntity rhsName rhsEntity =
 
     mergePairs
       | isSort lhsEntity =
-          [ (lhsName ++ "_Min", rhsWithLeaf (lhsName ++ minSuffix))
-          , (lhsName ++ "_Max", rhsWithLeaf (lhsName ++ maxSuffix))
+          [ (NC.sortMin lhsName, rhsWithLeaf (NC.sortMin lhsName))
+          , (NC.sortMax lhsName, rhsWithLeaf (NC.sortMax lhsName))
           ]
       | otherwise = case lhsName of
-          "⊤" -> [("ℙ" ++ minSuffix, rhsWithLeaf "ℙ" ++ minSuffix)]
-          "⊥" -> [("ℙ" ++ maxSuffix, rhsWithLeaf "ℙ" ++ maxSuffix)]
+          "⊤" -> [(NC.sortMin "ℙ", rhsWithLeaf (NC.sortMin "ℙ"))]
+          "⊥" -> [(NC.sortMax "ℙ", rhsWithLeaf (NC.sortMax "ℙ"))]
           _   -> [(lhsName, rhsName)]
 
     isSort (EntitySort _) = True
@@ -1150,20 +1146,20 @@ wrapFreeVarsMereo [] body = body
 wrapFreeVarsMereo (vd:rest) body =
   let varN   = resolvedVarName vd
       sn     = sortName (resolvedVarSort vd)
-      lo     = MVar (sn ++ minSuffix)
-      hi     = MVar (sn ++ maxSuffix)
+      lo     = MVar (NC.sortMin sn)
+      hi     = MVar (NC.sortMax sn)
   in MBoundedSum varN lo hi (wrapFreeVarsMereo rest body)
 
 wrapAsFact :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
 wrapAsFact th freeVars expr =
   let body = wrapFreeVarsMereo freeVars (propExprToMereo (translatePropExpr th expr))
-      pMin = MVar (sortName (theoryProp th) ++ "_Min")
+      pMin = MVar (NC.sortMin (sortName (theoryProp th)))
   in MAbbrevApp "WrapFact" [pMin, body]
 
 wrapAsAssertion :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
 wrapAsAssertion th freeVars expr =
-  let pMin = MVar (sortName (theoryProp th) ++ minSuffix)
-      pMax = MVar (sortName (theoryProp th) ++ maxSuffix)
+  let pMin = MVar (NC.sortMin (sortName (theoryProp th)))
+      pMax = MVar (NC.sortMax (sortName (theoryProp th)))
       -- Assertions may contain '¬'; pass pMax as the negation bottom so that
       -- '¬A' translates to 'A ⇒ ℙ_Max' (propositional falsehood).
       body = wrapFreeVarsMereo freeVars (propExprToMereoNb pMax (translatePropExpr th expr))
@@ -1172,7 +1168,7 @@ wrapAsAssertion th freeVars expr =
 wrapAsMetafact :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
 wrapAsMetafact th freeVars expr =
   let body = wrapFreeVarsMereo freeVars (propExprToMereo (translatePropExpr th expr))
-      uMin = MVar (sortName (theoryUniverse th) ++ "_Min")
+      uMin = MVar (NC.sortMin (sortName (theoryUniverse th)))
   in MAbbrevApp "WrapMetafact" [uMin, body]
 
 -- ---------------------------------------------------------------------------
@@ -1255,8 +1251,8 @@ quantifierToMereo q body =
         ResolvedQExists vd' -> (vd', True)
       varN  = resolvedVarName vd
       sn    = sortName (resolvedVarSort vd)
-      lo    = MVar (sn ++ minSuffix)
-      hi    = MVar (sn ++ maxSuffix)
+      lo    = MVar (NC.sortMin sn)
+      hi    = MVar (NC.sortMax sn)
       isInd = resolvedVarKind vd == VarKindIndividual
   in if isExists then (if isInd then MProductOfIndividuals varN lo hi body else MBoundedProduct varN lo hi body)
     else (if isInd then MSumOfIndividuals varN lo hi body else MBoundedSum varN lo hi body)
@@ -1333,8 +1329,8 @@ baseTermToMereo bt = case bt of
   ResolvedBTProjectionToSort pts ->
     MAbbrevApp "ProjectIntoInterval"
       [ termToMereo (resolvedPTOperand pts)
-      , MVar (sortName (resolvedPTSort pts) ++ minSuffix)
-      , MVar (sortName (resolvedPTSort pts) ++ maxSuffix)
+      , MVar (NC.sortMin (sortName (resolvedPTSort pts)))
+      , MVar (NC.sortMax (sortName (resolvedPTSort pts)))
       ]
   ResolvedBTProjectionToInterval pti ->
     MAbbrevApp "ProjectIntoInterval"
@@ -1348,8 +1344,8 @@ baseTermToMereo bt = case bt of
          Left vd ->
            let varN  = resolvedVarName vd
                sn    = sortName (resolvedVarSort vd)
-               lo    = MVar (sn ++ minSuffix)
-               hi    = MVar (sn ++ maxSuffix)
+               lo    = MVar (NC.sortMin sn)
+               hi    = MVar (NC.sortMax sn)
                isInd = resolvedVarKind vd == VarKindIndividual
            in if isInd then MSumOfIndividuals varN lo hi operand else MBoundedSum varN lo hi operand
          Right bareVar ->
@@ -1358,8 +1354,8 @@ baseTermToMereo bt = case bt of
     let vd   = resolvedSCVar sc
         varN = resolvedVarName vd
         sn   = sortName (resolvedVarSort vd)
-        lo   = MVar (sn ++ minSuffix)
-        hi   = MVar (sn ++ maxSuffix)
+        lo   = MVar (NC.sortMin sn)
+        hi   = MVar (NC.sortMax sn)
         isInd = resolvedVarKind vd == VarKindIndividual
     in if isInd then MSumOfIndividuals varN lo hi (MRevDiff (propExprToMereo (resolvedSCBody sc)) (MVar varN))
       else MBoundedSum varN lo hi (MRevDiff (propExprToMereo (resolvedSCBody sc)) (MVar varN))
@@ -1367,8 +1363,8 @@ baseTermToMereo bt = case bt of
     let vd   = resolvedDescVar desc
         varN = resolvedVarName vd
         sn   = sortName (resolvedVarSort vd)
-        lo   = MVar (sn ++ minSuffix)
-        hi   = MVar (sn ++ maxSuffix)
+        lo   = MVar (NC.sortMin sn)
+        hi   = MVar (NC.sortMax sn)
         isInd = resolvedVarKind vd == VarKindIndividual
     in if isInd then MSumOfIndividuals varN lo hi (MRevDiff (propExprToMereo (resolvedDescBody desc)) (MVar varN))
       else MBoundedSum varN lo hi (MRevDiff (propExprToMereo (resolvedDescBody desc)) (MVar varN))

@@ -34,6 +34,7 @@ library
                     , Eidos.Pipeline.Targets.Mereological.MereoExpr
                     , Eidos.Pipeline.Targets.Mereological.MkAxiomSets
                     , Eidos.Pipeline.Targets.Mereological.Mereological
+                    , Eidos.Pipeline.IRProcessing.NamingConventions
                     , Eidos.Pipeline.IRProcessing.SortBounds
                     , Eidos.Pipeline.InvokePipeline
                     , Eidos.Pipeline.PipelineCore

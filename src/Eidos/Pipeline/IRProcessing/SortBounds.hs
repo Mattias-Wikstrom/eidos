@@ -22,6 +22,7 @@ module Eidos.Pipeline.IRProcessing.SortBounds
   ) where
 
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
+import qualified Eidos.Pipeline.IRProcessing.NamingConventions as NC
 
 -- ---------------------------------------------------------------------------
 -- Options
@@ -76,9 +77,6 @@ data SortBoundEntry = SortBoundEntry
 -- Internal helpers
 -- ---------------------------------------------------------------------------
 
-sanitize :: String -> String
-sanitize = map (\c -> if c == '#' then '_' else c)
-
 -- | Build the axiom list for one object given its (IR-level) names.
 -- @obj@ is the IR object name (e.g. @\"f#res\"@); @lo@ and @hi@ are IR names
 -- for the lower/upper sort bounds (e.g. @\"S_Min\"@, @\"S_Max\"@).
@@ -86,13 +84,13 @@ sanitize = map (\c -> if c == '#' then '_' else c)
 mkAxioms :: SortBoundOptions -> String -> String -> String -> [(String, IR.MereoExpr)]
 mkAxioms opts obj lo hi
   | sboCollapse opts =
-      [ ( sanitize obj ++ "_sorting"
+      [ ( NC.boundSorting (NC.sanitizeHash obj)
         , IR.MAbbrevApp "IsWithinBounds" [IR.MVar lo, IR.MVar obj, IR.MVar hi]
         )
       ]
   | otherwise =
-      [ (sanitize obj ++ "_min", IR.MRevDiff (IR.MVar obj) (IR.MVar lo))
-      , (sanitize obj ++ "_max", IR.MRevDiff (IR.MVar hi) (IR.MVar obj))
+      [ (NC.boundMin (NC.sanitizeHash obj), IR.MRevDiff (IR.MVar obj) (IR.MVar lo))
+      , (NC.boundMax (NC.sanitizeHash obj), IR.MRevDiff (IR.MVar hi) (IR.MVar obj))
       ]
 
 mkEntry :: SortBoundOptions -> String -> String -> String -> SortBoundContext -> SortBoundEntry
@@ -163,7 +161,7 @@ theorySortBoundEntries opts theory = concat
     individualBounds =
       [ let n          = IR.mereoName m
             (lo, hi)   = sortMinMaxNames (IR.mereoSort m)
-        in mkEntry opts n lo hi (SBCIndividual (sanitize n))
+        in mkEntry opts n lo hi (SBCIndividual (NC.sanitizeHash n))
       | IR.EntityMereological m <- IR.theoryObjects theory
       , IR.mereoKind   m == IR.MereologicalEntityKindIndividual
       , IR.mereoOrigin m == IR.FromSignature
@@ -200,7 +198,7 @@ theorySortBoundEntries opts theory = concat
     userSortSetBounds =
       [ let n        = IR.mereoName m
             (lo, hi) = sortMinMaxNames (IR.mereoSort m)
-        in mkEntry opts n lo hi (SBCSet (sanitize n))
+        in mkEntry opts n lo hi (SBCSet (NC.sanitizeHash n))
       | IR.EntityMereological m <- IR.theoryObjects theory
       , IR.mereoKind   m == IR.MereologicalEntityKindSet
       , IR.mereoOrigin m == IR.FromSignature
@@ -225,9 +223,9 @@ theorySortBoundEntries opts theory = concat
     folInverseBounds = concatMap mkForFunc folSingleArg
       where
         mkForFunc f =
-          let fInv  = IR.funcName f ++ "_inv"
-              n1    = fInv ++ "_1"
-              nr    = fInv ++ "_res"
+          let fInv  = NC.funInv (IR.funcName f)
+              n1    = NC.funArgN fInv 1
+              nr    = NC.funRes fInv
               (lo1, hi1) = sortMinMaxNames (IR.funcResSort f)
               (lor, hir) = sortMinMaxNames (head (IR.funcArgSorts f))
           in [ mkEntry opts n1 lo1 hi1 (SBCFunctionInverseArg (IR.funcName f))
@@ -255,9 +253,9 @@ theorySortBoundEntries opts theory = concat
     invImgWitnessBounds = concatMap mkForFunc multiArgFol
       where
         mkForFunc f =
-          let fN     = IR.funcName f ++ "_inv_img"
-              argN   = fN ++ "_arg"
-              resN   = fN ++ "_res"
+          let fN     = NC.funInvImg (IR.funcName f)
+              argN   = NC.funArg fN
+              resN   = NC.funRes fN
               dom    = maybe (error "SortBounds: no domain sort") id (IR.funcDomain f)
               domMin = IR.mereoName (IR.sortMin dom)
               domMax = IR.mereoName (IR.sortMax dom)
@@ -278,9 +276,9 @@ theorySortBoundEntries opts theory = concat
           in concatMap (mkOne domMin domMax) (zip [1 ..] (IR.funcArgSorts f))
           where
             mkOne domMin domMax (k, srt) =
-              let base = IR.funcName f ++ "_pi_" ++ show k
-                  n1   = base ++ "_1"
-                  nr   = base ++ "_res"
+              let base = NC.funPi (IR.funcName f) k
+                  n1   = NC.funArgN base 1
+                  nr   = NC.funRes base
                   (sMin, sMax) = sortMinMaxNames srt
               in [ mkEntry opts n1 domMin domMax (SBCFunctionProjectionArg (IR.funcName f) k)
                  , mkEntry opts nr  sMin   sMax   (SBCFunctionProjectionRes (IR.funcName f) k)
@@ -373,20 +371,20 @@ theorySortOrderEntries theory = concat
     -- -----------------------------------------------------------------------
     builtinSortOrders =
       [ SortOrderEntry (SOCBuiltinSort uSortN)
-          [ (uSortN ++ "_ordering", impl (var uMaxN) (var uMinN)) ]
+          [ (NC.sortOrdering uSortN, impl (var uMaxN) (var uMinN)) ]
       , SortOrderEntry (SOCBuiltinSort pSortN)
-          [ (pSortN ++ "_upper",    impl (var uMaxN) (var pMaxN))
-          , (pSortN ++ "_ordering", impl (var pMaxN) (var pMinN))
-          , (pSortN ++ "_lower",    impl (var pMinN) (var uMinN))
+          [ (NC.sortUpper    pSortN, impl (var uMaxN) (var pMaxN))
+          , (NC.sortOrdering pSortN, impl (var pMaxN) (var pMinN))
+          , (NC.sortLower    pSortN, impl (var pMinN) (var uMinN))
           ]
       ] ++
       if usesDomain
         then let dMaxN = IR.mereoName (IR.sortMax dSort)
                  dMinN = IR.mereoName (IR.sortMin dSort)
              in [ SortOrderEntry (SOCBuiltinSort dSortN)
-                    [ (dSortN ++ "_upper",    impl (var uMaxN) (var dMaxN))
-                    , (dSortN ++ "_ordering", impl (var dMaxN) (var dMinN))
-                    , (dSortN ++ "_lower",    impl (var dMinN) (var pMaxN))
+                    [ (NC.sortUpper    dSortN, impl (var uMaxN) (var dMaxN))
+                    , (NC.sortOrdering dSortN, impl (var dMaxN) (var dMinN))
+                    , (NC.sortLower    dSortN, impl (var dMinN) (var pMaxN))
                     ]
                 ]
         else []
@@ -405,31 +403,31 @@ theorySortOrderEntries theory = concat
               let pMinN' = IR.mereoName (IR.sortMin parent)
                   pMaxN' = IR.mereoName (IR.sortMax parent)
               in SortOrderEntry (SOCUserSort sN)
-                   [ (sN ++ "_lower",    bicond (var sMinN) (var pMinN'))
-                   , (sN ++ "_upper",    impl   (var pMaxN') (var sMaxN))
-                   , (sN ++ "_ordering", impl   (var sMaxN) (var sMinN))
+                   [ (NC.sortLower    sN, bicond (var sMinN) (var pMinN'))
+                   , (NC.sortUpper    sN, impl   (var pMaxN') (var sMaxN))
+                   , (NC.sortOrdering sN, impl   (var sMaxN) (var sMinN))
                    ]
             (IR.Quotient, Just parent) ->
               let pMinN' = IR.mereoName (IR.sortMin parent)
                   pMaxN' = IR.mereoName (IR.sortMax parent)
               in SortOrderEntry (SOCUserSort sN)
-                   [ (sN ++ "_lower",    impl   (var pMinN') (var sMinN))
-                   , (sN ++ "_upper",    bicond (var sMaxN) (var pMaxN'))
-                   , (sN ++ "_ordering", impl   (var sMaxN) (var sMinN))
+                   [ (NC.sortLower    sN, impl   (var pMinN') (var sMinN))
+                   , (NC.sortUpper    sN, bicond (var sMaxN) (var pMaxN'))
+                   , (NC.sortOrdering sN, impl   (var sMaxN) (var sMinN))
                    ]
             (IR.SubQuotient, Just parent) ->
               let pMinN' = IR.mereoName (IR.sortMin parent)
                   pMaxN' = IR.mereoName (IR.sortMax parent)
               in SortOrderEntry (SOCUserSort sN)
-                   [ (sN ++ "_lower",    impl (var pMinN') (var sMinN))
-                   , (sN ++ "_upper",    impl (var pMaxN') (var sMaxN))
-                   , (sN ++ "_ordering", impl (var sMaxN) (var sMinN))
+                   [ (NC.sortLower    sN, impl (var pMinN') (var sMinN))
+                   , (NC.sortUpper    sN, impl (var pMaxN') (var sMaxN))
+                   , (NC.sortOrdering sN, impl (var sMaxN) (var sMinN))
                    ]
             _ ->
               SortOrderEntry (SOCUserSort sN)
-                [ (sN ++ "_upper",    impl (var uMaxN) (var sMaxN))
-                , (sN ++ "_ordering", impl (var sMaxN) (var sMinN))
-                , (sN ++ "_lower",    impl (var sMinN) (var pMaxN))
+                [ (NC.sortUpper    sN, impl (var uMaxN) (var sMaxN))
+                , (NC.sortOrdering sN, impl (var sMaxN) (var sMinN))
+                , (NC.sortLower    sN, impl (var sMinN) (var pMaxN))
                 ]
 
     -- -----------------------------------------------------------------------
@@ -443,9 +441,9 @@ theorySortOrderEntries theory = concat
               dMinN = IR.mereoName (IR.sortMin dom)
               dMaxN = IR.mereoName (IR.sortMax dom)
           in SortOrderEntry (SOCProductSort fN)
-               [ (fN ++ "_dom_upper",    impl (var uMaxN) (var dMaxN))
-               , (fN ++ "_dom_ordering", impl (var dMaxN) (var dMinN))
-               , (fN ++ "_dom_lower",    impl (var dMinN) (var pMaxN))
+               [ (NC.funDomUpper    fN, impl (var uMaxN) (var dMaxN))
+               , (NC.funDomOrdering fN, impl (var dMaxN) (var dMinN))
+               , (NC.funDomLower    fN, impl (var dMinN) (var pMaxN))
                ]
 
     -- -----------------------------------------------------------------------
@@ -459,7 +457,7 @@ theorySortOrderEntries theory = concat
               dMinN = IR.mereoName (IR.sortMin dom)
               dMaxN = IR.mereoName (IR.sortMax dom)
           in SortOrderEntry (SOCRelationProductSort rN)
-               [ (rN ++ "_dom_upper",    impl (var uMaxN) (var dMaxN))
-               , (rN ++ "_dom_ordering", impl (var dMaxN) (var dMinN))
-               , (rN ++ "_dom_lower",    impl (var dMinN) (var pMaxN))
+               [ (NC.funDomUpper    rN, impl (var uMaxN) (var dMaxN))
+               , (NC.funDomOrdering rN, impl (var dMaxN) (var dMinN))
+               , (NC.funDomLower    rN, impl (var dMinN) (var pMaxN))
                ]
