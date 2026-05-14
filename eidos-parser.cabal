@@ -7,6 +7,9 @@ build-type:         Simple
 common warnings
     ghc-options: -Wall
 
+common test-warnings
+    ghc-options: -w
+
 common deps
     build-depends:    base >=4.17 && <5
 
@@ -22,7 +25,7 @@ library
                     , Eidos.Print.DebugIR
                     , Eidos.Pipeline.FromSyntax.Check.TypeCheck
                     , Eidos.Pipeline.Resolution.ExternalRef
-                    , Eidos.Pipeline.Resolution.Resolution 
+                    , Eidos.Pipeline.Resolution.Resolution
                     , Eidos.Pipeline.FromSyntax.Check.SubLanguage
                     , Eidos.Print.JSON
                     , Eidos.Pipeline.Targets.Lean.Lean
@@ -55,7 +58,7 @@ library
                     , filepath
                     , mtl
                     , aeson >=2.0
-                    , aeson-pretty >=0.8 
+                    , aeson-pretty >=0.8
                     , bytestring >=0.10
 
 executable eidos-parser
@@ -82,10 +85,10 @@ test-suite eidos-tests
                  raw-strings-qq,
                  megaparsec
   default-language: Haskell2010
-
+  ghc-options: -w
 
 test-suite basic-tests
-  import:           warnings, deps
+  import:           test-warnings, deps
   type:             exitcode-stdio-1.0
   main-is:          BasicSpec.hs
   hs-source-dirs:   test
@@ -97,7 +100,7 @@ test-suite basic-tests
                     megaparsec
 
 test-suite typecheck-tests
-  import:           warnings, deps
+  import:           test-warnings, deps
   type:             exitcode-stdio-1.0
   main-is:          TypeCheckSpec.hs
   hs-source-dirs:   test
@@ -110,7 +113,7 @@ test-suite typecheck-tests
                     megaparsec
 
 test-suite externalref-tests
-  import:           warnings, deps
+  import:           test-warnings, deps
   type:             exitcode-stdio-1.0
   main-is:          ExternalRefSpec.hs
   hs-source-dirs:   test
@@ -123,7 +126,7 @@ test-suite externalref-tests
                     filepath
 
 test-suite theories-tests
-  import:           warnings, deps
+  import:           test-warnings, deps
   type:             exitcode-stdio-1.0
   main-is:          TheoryCollectionSpec.hs
   hs-source-dirs:   test
@@ -138,7 +141,7 @@ test-suite theories-tests
                     megaparsec
 
 test-suite ir-tests
-  import:           warnings, deps
+  import:           test-warnings, deps
   type:             exitcode-stdio-1.0
   main-is:          IRSpec.hs
   hs-source-dirs:   test
@@ -151,7 +154,7 @@ test-suite ir-tests
                     megaparsec
 
 test-suite leanprops-tests
-  import:           warnings, deps
+  import:           test-warnings, deps
   type:             exitcode-stdio-1.0
   main-is:          LeanPropsSpec.hs
   hs-source-dirs:   test
@@ -162,11 +165,8 @@ test-suite leanprops-tests
                     raw-strings-qq,
                     megaparsec
 
-
-
-
 test-suite implicit-subtheories-tests
-  import:           warnings, deps
+  import:           test-warnings, deps
   type:             exitcode-stdio-1.0
   main-is:          ImplicitSubtheoriesSpec.hs
   hs-source-dirs:   test
@@ -177,9 +177,8 @@ test-suite implicit-subtheories-tests
                     raw-strings-qq,
                     megaparsec
 
-
 test-suite leanprops-functions-tests
-  import:           warnings, deps
+  import:           test-warnings, deps
   type:             exitcode-stdio-1.0
   main-is:          LeanPropsSpecFunctions.hs
   hs-source-dirs:   test
@@ -191,7 +190,7 @@ test-suite leanprops-functions-tests
                     megaparsec
 
 test-suite leanprops-gaps-tests
-  import:           warnings, deps
+  import:           test-warnings, deps
   type:             exitcode-stdio-1.0
   main-is:          LeanPropsGapsSpec.hs
   hs-source-dirs:   test
@@ -203,7 +202,7 @@ test-suite leanprops-gaps-tests
                     megaparsec
 
 test-suite sublanguage-tests
-  import:           warnings, deps
+  import:           test-warnings, deps
   type:             exitcode-stdio-1.0
   main-is:          SubLanguageSpec.hs
   hs-source-dirs:   test
@@ -213,6 +212,7 @@ test-suite sublanguage-tests
                     base,
                     raw-strings-qq,
                     megaparsec
+
 -- ---------------------------------------------------------------------------
 -- Wasm executable
 --
