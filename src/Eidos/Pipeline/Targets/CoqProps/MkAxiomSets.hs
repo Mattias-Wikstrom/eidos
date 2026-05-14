@@ -84,8 +84,17 @@ axBodyToCoq (PA.ABFuncEq l r)   = CEq (CVar (resolveName l)) (CVar (resolveName 
 -- Pass 'resolveName' for theory axiom bodies (theory-specific names need
 -- sanitisation) or 'id' for abbreviation bodies (parameter names like
 -- @"lo"@, @"hi"@ are kept verbatim).
-mereoExprToCoq' :: (String -> String) -> IR.MereoExpr -> CoqExpr
-mereoExprToCoq' resolve = go
+type CoqAbbrevHandler = String -> [CoqExpr] -> CoqExpr
+
+genericCoqAbbrev :: CoqAbbrevHandler
+genericCoqAbbrev name args = CApp (CVar name) args
+
+expandingCoqAbbrev :: CoqAbbrevHandler
+expandingCoqAbbrev "ProjectIntoInterval" [x, lo, hi] = CProjectIntoInterval x lo hi
+expandingCoqAbbrev name args                          = CApp (CVar name) args
+
+mereoExprToCoq' :: CoqAbbrevHandler -> (String -> String) -> IR.MereoExpr -> CoqExpr
+mereoExprToCoq' abbrevHandler resolve = go
   where
     go (IR.MSum a b)     = CConj   (go a) (go b)
     go (IR.MProd a b)    = CDisj   (go a) (go b)
@@ -95,7 +104,7 @@ mereoExprToCoq' resolve = go
     go (IR.MVar n)       = CVar (resolve n)
     go IR.MZero          = CTop
     go (IR.MAbbrevApp name args) =
-      CApp (CVar name) (map go args)
+      abbrevHandler name (map go args)
     go (IR.MProductOfIndividuals var lo hi body) =
       case (lo, hi) of
         (IR.MVar loName, IR.MVar hiName) ->
@@ -130,10 +139,10 @@ mereoExprToCoq' resolve = go
                       (go body))
 
 mereoExprToCoq :: IR.MereoExpr -> CoqExpr
-mereoExprToCoq = mereoExprToCoq' resolveName
+mereoExprToCoq = mereoExprToCoq' expandingCoqAbbrev resolveName
 
 abbrevBodyToCoq :: IR.MereoExpr -> CoqExpr
-abbrevBodyToCoq = mereoExprToCoq' id
+abbrevBodyToCoq = mereoExprToCoq' genericCoqAbbrev id
 
 renderAbbrevDef :: IR.AbbrevDef -> String
 renderAbbrevDef ad =
