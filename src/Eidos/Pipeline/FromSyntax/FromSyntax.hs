@@ -1526,25 +1526,27 @@ lookupSortByExpr th sexpr = do
 
 lookupEntity :: Theory -> String -> Either BuildError Entity
 lookupEntity th nm =
-  let parts = splitOn '.' nm
-  in case parts of
-    [] -> Left "Empty name"
-    [single] -> case Map.lookup single (theoryObjectsByName th) of
-      Just [e]  -> Right (resolveEntityAlias e)
-      Just (_:_) -> Left $ "Ambiguous name: '" ++ single ++ "'"
-      Nothing   -> Left $ "Unknown reference: '" ++ nm ++ "'"
-    (first:rest) ->
-      let matchingSubs = filter (\sub -> theoryName sub == first) (theorySubtheories th)
-      in case matchingSubs of
-        []  -> Left $ "Unknown subtheory: '" ++ first ++ "'"
-        [_] -> lookupEntity (head matchingSubs) (intercalate "." rest)
-        _   -> Left $ "Ambiguous path: '" ++ first ++ "' refers to multiple subtheories"
+  case Map.lookup nm (theoryObjectsByName th) of
+    Just [e]   -> Right (resolveEntityAlias e)
+    Just []    -> Left $ "Unknown reference: '" ++ nm ++ "'"
+    Just (_:_) -> Left $ "Ambiguous name: '" ++ nm ++ "'"
+    Nothing    -> Left $ "Unknown reference: '" ++ nm ++ "'"
 
 lookupEntityInPath :: Theory -> [String] -> String -> Either BuildError Entity
-lookupEntityInPath th [] nm   = lookupEntity th nm
-lookupEntityInPath th path nm = do
-  subTh <- findSubtheoryByPath th path
-  lookupEntity subTh nm
+lookupEntityInPath th [] nm = lookupEntity th nm
+lookupEntityInPath th path nm =
+  -- Always check the parent theory's map under the fully-qualified name first.
+  -- This is essential for reflection subtheories: the reflected entity lives in
+  -- the parent under the qualified key, while the subtheory holds the original
+  -- (unreflected) entity.  Descending into the subtheory would find the wrong one.
+  let qualifiedName = intercalate "." (path ++ [nm])
+  in case Map.lookup qualifiedName (theoryObjectsByName th) of
+    Just [e]   -> Right (resolveEntityAlias e)
+    Just []    -> Left $ "Unknown reference: '" ++ qualifiedName ++ "'"
+    Just (_:_) -> Left $ "Ambiguous name: '" ++ qualifiedName ++ "'"
+    Nothing    -> do
+      subTh <- findSubtheoryByPath th path
+      lookupEntity subTh nm
 
 lookupInPath :: Theory -> [String] -> (Theory -> a) -> a
 lookupInPath th [] f    = f th
