@@ -1308,7 +1308,7 @@ applySuffixToMereo expr suffix = case suffix of
   ResolvedSuffixCall args ->
     MAbbrevApp (flattenMereoName expr) (map termToMereo args)
   ResolvedSuffixSpecialOp _ (Just entity) ->
-    MVar (entityName entity)
+    MVar (entityFullyQualifiedName entity)
   ResolvedSuffixSpecialOp op Nothing ->
     MVar (flattenMereoName expr ++ "_" ++ op)
 
