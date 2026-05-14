@@ -160,27 +160,27 @@ main = hspec $ do
   -- ── Gap 4: direct/inverse image functions ──────────────────────────────
   describe "Gap 4: direct and inverse image SOL functions" $ do
 
-    it "creates f#dir_img for a FOL function f" $ do
+    it "creates f_dir_img for a FOL function f" $ do
       th <- buildStr "{ signature { sort S; sort T; f : S → T; } }"
-      lookupByName th "f#dir_img" `shouldSatisfy` isJust
+      lookupByName th "f_dir_img" `shouldSatisfy` isJust
 
-    it "creates f#inv_img for a FOL function f" $ do
+    it "creates f_inv_img for a FOL function f" $ do
       th <- buildStr "{ signature { sort S; sort T; f : S → T; } }"
-      lookupByName th "f#inv_img" `shouldSatisfy` isJust
+      lookupByName th "f_inv_img" `shouldSatisfy` isJust
 
-    it "f#dir_img has kind FunctionKindDirectImageFunction" $ do
+    it "f_dir_img has kind FunctionKindDirectImageFunction" $ do
       th <- buildStr "{ signature { sort S; sort T; f : S → T; } }"
-      case lookupByName th "f#dir_img" of
+      case lookupByName th "f_dir_img" of
         Just (EntityFunction fn) ->
           funcKind fn `shouldBe` FunctionKindDirectImageFunction
-        _ -> fail "f#dir_img not found or wrong type"
+        _ -> fail "f_dir_img not found or wrong type"
 
-    it "f#inv_img has kind FunctionKindInverseImageFunction" $ do
+    it "f_inv_img has kind FunctionKindInverseImageFunction" $ do
       th <- buildStr "{ signature { sort S; sort T; f : S → T; } }"
-      case lookupByName th "f#inv_img" of
+      case lookupByName th "f_inv_img" of
         Just (EntityFunction fn) ->
           funcKind fn `shouldBe` FunctionKindInverseImageFunction
-        _ -> fail "f#inv_img not found or wrong type"
+        _ -> fail "f_inv_img not found or wrong type"
 
     it "SOL function F (uppercase) does NOT get f_inv" $ do
       th <- buildStr "{ signature { sort S; sort T; F : S → T; } }"
@@ -743,10 +743,10 @@ main = hspec $ do
           sub: { signature { sort S; sort T; f : S → T; } }
         }}
       }|]
-      Map.lookup "f#dir_img" (theoryObjectsByName th) `shouldSatisfy` isNothing
-      Map.lookup "f#inv_img" (theoryObjectsByName th) `shouldSatisfy` isNothing
+      Map.lookup "f_dir_img" (theoryObjectsByName th) `shouldSatisfy` isNothing
+      Map.lookup "f_inv_img" (theoryObjectsByName th) `shouldSatisfy` isNothing
       -- But the qualified versions must exist
-      Map.lookup "sub.f#dir_img" (theoryObjectsByName th) `shouldSatisfy` maybe False (not . null)
+      Map.lookup "sub.f_dir_img" (theoryObjectsByName th) `shouldSatisfy` maybe False (not . null)
 
     -- Three-deep inheritance chain (preorder → partial_order → lattice)
     it "item1+3: three-deep implicit chain merges LessThanOrEq with exactly one canonical" $ do

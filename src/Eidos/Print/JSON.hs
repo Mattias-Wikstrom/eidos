@@ -130,7 +130,7 @@ extractFunctions th =
   ]
   where
     isInternalFunction f =
-      any (`isInfixOf` IR.funcName f) ["#dir_img", "#inv_img", "_inv"]
+      any (`isInfixOf` IR.funcName f) ["_dir_img", "_inv_img", "_inv"]
 
 extractIndividuals :: IR.Theory -> [IndividualExport]
 extractIndividuals th =
