@@ -1485,7 +1485,33 @@ lookupSort th nm = case nm of
   "𝔻"    -> Right (theoryDomain th)
   "ℙ"    -> Right (theoryProp th)
   "Prop" -> Right (theoryProp th)
-  _ -> case Map.lookup nm (theoryObjectsByName th) of
+  _ -> case break (== '#') nm of
+    (base, '#' : attr) -> lookupHashAttrSort th base attr
+    _ -> lookupSortByRawName th nm
+
+lookupHashAttrSort :: Theory -> String -> String -> Either BuildError Sort
+lookupHashAttrSort th base attr = do
+  fn <- lookupFunction th base
+  case attr of
+    "dom" -> maybe (Left $ "Function '" ++ base ++ "' has no domain sort") Right
+                   (funcDomain fn)
+    _     -> Left $ "Unknown sort attribute '#" ++ attr ++ "' on '" ++ base ++ "'"
+
+lookupFunction :: Theory -> String -> Either BuildError Function
+lookupFunction th nm =
+  case Map.lookup nm (theoryObjectsByName th) of
+    Just (EntityFunction f : _) -> Right f
+    _ ->
+      case mapMaybe (\sub -> case Map.lookup nm (theoryObjectsByName sub) of
+                                Just (EntityFunction f : _) -> Just f
+                                _                           -> Nothing)
+                    (theorySubtheories th) of
+        (f:_) -> Right f
+        []    -> Left $ "Unknown function: '" ++ nm ++ "'"
+
+lookupSortByRawName :: Theory -> String -> Either BuildError Sort
+lookupSortByRawName th nm =
+  case Map.lookup nm (theoryObjectsByName th) of
     Just (EntitySort s : _) -> Right s
     _ ->
       case mapMaybe (\sub -> case Map.lookup nm (theoryObjectsByName sub) of
