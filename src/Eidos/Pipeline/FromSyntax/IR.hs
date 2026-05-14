@@ -472,10 +472,17 @@ type ExprType = EntityClass
 -- Resolved expressions
 -- ---------------------------------------------------------------------------
 
+data VarKind
+  = VarKindMereological  -- X : 𝕌
+  | VarKindIndividual    -- x : S
+  | VarKindSet           -- X ⊆ S
+  | VarKindProposition   -- X : ℙ
+  deriving (Show, Eq)
+
 data ResolvedVarDecl = ResolvedVarDecl
-  { resolvedVarName  :: String
-  , resolvedVarIsSet :: Bool
-  , resolvedVarSort  :: Sort
+  { resolvedVarName :: String
+  , resolvedVarKind :: VarKind
+  , resolvedVarSort :: Sort
   }
   deriving (Show)
 

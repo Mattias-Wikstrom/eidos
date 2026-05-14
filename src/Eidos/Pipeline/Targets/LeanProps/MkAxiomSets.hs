@@ -74,8 +74,21 @@ axBodyToLean (PA.ABFuncEq l r)   = LEq (LVar l) (LVar r)
 -- included here; it is added on top by 'mereoExprToLean' so that
 -- 'abbrevBodyToLean' keeps the generic 'LApp' rendering for abbreviation
 -- definitions.
-mereoExprToLean' :: (String -> String) -> IR.MereoExpr -> LeanExpr
-mereoExprToLean' resolve = go
+-- | Convert an abbreviation application to a 'LeanExpr'.
+-- Receives the abbreviation name and already-translated arguments.
+type AbbrevHandler = String -> [LeanExpr] -> LeanExpr
+
+-- | Generic handler: keep every abbreviation as a plain 'LApp'.
+genericAbbrev :: AbbrevHandler
+genericAbbrev name args = LApp (LVar name) args
+
+-- | Expanding handler: unfold known abbreviations into dedicated constructors.
+expandingAbbrev :: AbbrevHandler
+expandingAbbrev "ProjectIntoInterval" [x, lo, hi] = LProjectIntoInterval x lo hi
+expandingAbbrev name args                          = LApp (LVar name) args
+
+mereoExprToLean' :: AbbrevHandler -> (String -> String) -> IR.MereoExpr -> LeanExpr
+mereoExprToLean' abbrevHandler resolve = go
   where
     go (IR.MSum a b)     = LConj   (go a) (go b)
     go (IR.MProd a b)    = LDisj   (go a) (go b)
@@ -85,7 +98,7 @@ mereoExprToLean' resolve = go
     go (IR.MVar n)       = LVar (resolve n)
     go IR.MZero          = LTop
     go (IR.MAbbrevApp name args) =
-      LApp (LVar name) (map go args)
+      abbrevHandler name (map go args)
     go (IR.MBoundedSum var lo hi body) =
       case (lo, hi) of
         (IR.MVar loName, IR.MVar hiName) ->
@@ -120,10 +133,10 @@ mereoExprToLean' resolve = go
                           (go body))
 
 mereoExprToLean :: IR.MereoExpr -> LeanExpr
-mereoExprToLean = mereoExprToLean' resolveName
+mereoExprToLean = mereoExprToLean' expandingAbbrev resolveName
 
 abbrevBodyToLean :: IR.MereoExpr -> LeanExpr
-abbrevBodyToLean = mereoExprToLean' id
+abbrevBodyToLean = mereoExprToLean' genericAbbrev id
 
 renderAbbrevDef :: IR.AbbrevDef -> String
 renderAbbrevDef ad =

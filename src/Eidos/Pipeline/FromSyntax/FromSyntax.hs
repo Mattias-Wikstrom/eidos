@@ -516,7 +516,7 @@ addPropFact th0 fk th prop = do
 toResolvedVarDecl :: Theory -> VarDecl -> Either BuildError ResolvedVarDecl
 toResolvedVarDecl th (VarDecl name op sortExpr) = do
   s <- lookupSortByExpr th sortExpr
-  return $ ResolvedVarDecl name (op == "⊆") s
+  return $ ResolvedVarDecl name (varKindFromOpAndSort (op == "⊆") s) s
 
 propSourceContext :: PropExprInclVars -> String
 propSourceContext (PropExprInclVars line col _ _) =
@@ -1152,8 +1152,7 @@ wrapFreeVarsMereo (vd:rest) body =
       sn     = sortName (resolvedVarSort vd)
       lo     = MVar (sn ++ minSuffix)
       hi     = MVar (sn ++ maxSuffix)
-      isInd  = not (resolvedVarIsSet vd)
-  in if isInd then (MSumOfIndividuals varN lo hi (wrapFreeVarsMereo rest body)) else (MBoundedSum varN lo hi (wrapFreeVarsMereo rest body))
+  in MBoundedSum varN lo hi (wrapFreeVarsMereo rest body)
 
 wrapAsFact :: Theory -> [ResolvedVarDecl] -> ResolvedPropExpr -> MereoExpr
 wrapAsFact th freeVars expr =
@@ -1258,7 +1257,7 @@ quantifierToMereo q body =
       sn    = sortName (resolvedVarSort vd)
       lo    = MVar (sn ++ minSuffix)
       hi    = MVar (sn ++ maxSuffix)
-      isInd = not (resolvedVarIsSet vd)
+      isInd = resolvedVarKind vd == VarKindIndividual
   in if isExists then (if isInd then MProductOfIndividuals varN lo hi body else MBoundedProduct varN lo hi body)
     else (if isInd then MSumOfIndividuals varN lo hi body else MBoundedSum varN lo hi body)
 
@@ -1276,7 +1275,7 @@ applyRelOpToMereo leftExpr rfbt =
   in case resolvedRFTOp rfbt of
        "+"  -> MSum     leftExpr right
        "×"  -> MProd    leftExpr right
-       "-"  -> MDiff    right    leftExpr   -- note: diff is right-asymmetric
+       "-"  -> MDiff    leftExpr right
        "∸"  -> MSymDiff leftExpr right
        "⇒"  -> MRevDiff leftExpr right
        "="  -> MSymDiff leftExpr right      -- = in sort-limit facts translates to ∸
@@ -1351,7 +1350,7 @@ baseTermToMereo bt = case bt of
                sn    = sortName (resolvedVarSort vd)
                lo    = MVar (sn ++ minSuffix)
                hi    = MVar (sn ++ maxSuffix)
-               isInd = not (resolvedVarIsSet vd)
+               isInd = resolvedVarKind vd == VarKindIndividual
            in if isInd then MSumOfIndividuals varN lo hi operand else MBoundedSum varN lo hi operand
          Right bareVar ->
            MBoundedSum bareVar MZero MZero operand
@@ -1361,7 +1360,7 @@ baseTermToMereo bt = case bt of
         sn   = sortName (resolvedVarSort vd)
         lo   = MVar (sn ++ minSuffix)
         hi   = MVar (sn ++ maxSuffix)
-        isInd = not (resolvedVarIsSet vd)
+        isInd = resolvedVarKind vd == VarKindIndividual
     in if isInd then MSumOfIndividuals varN lo hi (MRevDiff (propExprToMereo (resolvedSCBody sc)) (MVar varN))
       else MBoundedSum varN lo hi (MRevDiff (propExprToMereo (resolvedSCBody sc)) (MVar varN))
   ResolvedBTDescription desc ->
@@ -1370,7 +1369,7 @@ baseTermToMereo bt = case bt of
         sn   = sortName (resolvedVarSort vd)
         lo   = MVar (sn ++ minSuffix)
         hi   = MVar (sn ++ maxSuffix)
-        isInd = not (resolvedVarIsSet vd)
+        isInd = resolvedVarKind vd == VarKindIndividual
     in if isInd then MSumOfIndividuals varN lo hi (MRevDiff (propExprToMereo (resolvedDescBody desc)) (MVar varN))
       else MBoundedSum varN lo hi (MRevDiff (propExprToMereo (resolvedDescBody desc)) (MVar varN))
 
@@ -1556,7 +1555,10 @@ entityToExprType (EntityFunction f) =
 entityToExprType (EntityRelation r)    = RelationClass (length (relArgSorts r))
 entityToExprType (EntityMereological m) =
   case mereoKind m of
-    MereologicalEntityKindIndividual  -> IndividualClass
+    MereologicalEntityKindIndividual  ->
+      if isUniverseSort (mereoSort m)
+      then OtherMereologicalClass
+      else IndividualClass
     MereologicalEntityKindSet         -> RelationClass 1
     MereologicalEntityKindProposition -> PropositionClass
     -- Sort-limit objects (ℙ_Min, ℙ_Max) are propositions; limits of other
@@ -1596,7 +1598,7 @@ resolvePropExprInclVars th ctx (PropExprInclVars _ _ vars propExprAST) = do
                Left $ "Free individual variable must start with lowercase: " ++ vid
       when ((isPropSort s || isUniverseSort s) && not isSet' && not (firstLetterIsUppercase vid)) $
         Left $ "Proposition/mereological variable must start with uppercase: " ++ vid
-      let rvd = ResolvedVarDecl vid isSet' s
+      let rvd = ResolvedVarDecl vid (varKindFromOpAndSort isSet' s) s
       return (extendVarContext c rvd)
 
 resolvePropExpr :: Theory -> VarContext -> PropExpr -> Either BuildError ResolvedPropExpr
@@ -1661,7 +1663,7 @@ resolveVarDecl th ctx (VarDecl vid cos sexpr) = do
            Left $ "Individual variable must start with lowercase: " ++ vid
   when ((isPropSort s || isUniverseSort s) && not isSet' && not (firstLetterIsUppercase vid)) $
     Left $ "Proposition/mereological variable must start with uppercase: " ++ vid
-  let rvd = ResolvedVarDecl vid isSet' s
+  let rvd = ResolvedVarDecl vid (varKindFromOpAndSort isSet' s) s
   return (rvd, extendVarContext ctx rvd)
 
 resolveAtomicProp :: Theory -> VarContext -> AtomicProp -> Either BuildError ResolvedAtomicProp
@@ -1705,7 +1707,14 @@ resolveFactor th ctx (Factor base suffixes) = do
   return (ResolvedFactor rb rs resultType)
 
 isSet :: ResolvedVarDecl -> Bool
-isSet (ResolvedVarDecl _ b _) = b
+isSet rvd = resolvedVarKind rvd == VarKindSet
+
+varKindFromOpAndSort :: Bool -> Sort -> VarKind
+varKindFromOpAndSort True  _  = VarKindSet
+varKindFromOpAndSort False s
+  | isPropSort     s = VarKindProposition
+  | isUniverseSort s = VarKindMereological
+  | otherwise        = VarKindIndividual
 
 termIfPlain :: ResolvedPropExpr -> Maybe ResolvedTerm
 termIfPlain (ResolvedPropBicond (ResolvedRightImpl left Nothing) []) =
@@ -1876,12 +1885,11 @@ resolveConstantRef th ctx (ConstantRef specs ref) = do
   case mbVar of
     Just rvd -> do
       -- Bound variable: not a theory entity, use the source name as-is.
-      let ty = if resolvedVarIsSet rvd
-               then RelationClass 1
-               else case sortKind (resolvedVarSort rvd) of
-                      SortKindProp     -> PropositionClass
-                      SortKindUniverse -> OtherMereologicalClass
-                      _                -> IndividualClass
+      let ty = case resolvedVarKind rvd of
+                 VarKindSet          -> RelationClass 1
+                 VarKindProposition  -> PropositionClass
+                 VarKindMereological -> OtherMereologicalClass
+                 VarKindIndividual   -> IndividualClass
       return (ResolvedConstantRef ref
                 (EntityMereological (mkMereo th MereologicalEntityKindIndividual ref (resolvedVarSort rvd) FromSignature))
                 ty)

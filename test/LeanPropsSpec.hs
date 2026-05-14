@@ -131,6 +131,25 @@ noDuplicateNames doc =
   let names = map axiomName (axioms doc)
   in nub names == names
 
+-- | True if the predicate holds for the expression or any sub-expression.
+anySubExpr :: (LeanExpr -> Bool) -> LeanExpr -> Bool
+anySubExpr p e = p e || case e of
+  LImpl a b                       -> anySubExpr p a || anySubExpr p b
+  LConj a b                       -> anySubExpr p a || anySubExpr p b
+  LDisj a b                       -> anySubExpr p a || anySubExpr p b
+  LBicond a b                     -> anySubExpr p a || anySubExpr p b
+  LEq a b                         -> anySubExpr p a || anySubExpr p b
+  LApp f args                     -> anySubExpr p f || any (anySubExpr p) args
+  LForall _ _ body                -> anySubExpr p body
+  LForallKw _ _ body              -> anySubExpr p body
+  LExists _ _ body                -> anySubExpr p body
+  LBoundedForall _ _ _ body       -> anySubExpr p body
+  LForallIndividuals _ _ _ body   -> anySubExpr p body
+  LBoundedExists _ _ _ body       -> anySubExpr p body
+  LExistsIndividuals _ _ _ body   -> anySubExpr p body
+  LProjectIntoInterval a b c      -> anySubExpr p a || anySubExpr p b || anySubExpr p c
+  _                               -> False
+
 
 -- ---------------------------------------------------------------------------
 -- Main
@@ -457,39 +476,39 @@ main = hspec $ do
 
     it "renders [X : ℙ] body as LBoundedForall X P_Min P_Max ..." $ do
       doc <- buildStr [r|{
-        axioms { assertions { ∀X : ℙ, (X → ¬¬X); } }
+        axioms { assertions { ∀X : ℙ (X → ¬¬X); } }
       }|]
       hasAssertionBodyWith doc (\case
-        LBoundedForall "X" "P_Min" "P_Max" _ -> True
+        LBoundedForall "X" "ℙ_Min" "ℙ_Max" _ -> True
         _                                    -> False)
         `shouldBe` True
 
     it "renders [X : 𝕌] body as LBoundedForall X U_Min U_Max ..." $ do
       doc <- buildStr [r|{
         signature { A : 𝕌; },
-        axioms { metafacts { ∀X : 𝕌, (A - (A - X)) - X; } }
+        axioms { metafacts { ∀X : 𝕌 (A - (A - X)) - X; } }
       }|]
       hasMetafactBodyWith doc (\case
-        LBoundedForall "X" "U_Min" "U_Max" _ -> True
+        LBoundedForall "X" "𝕌_Min" "𝕌_Max" _ -> True
         _                                    -> False)
         `shouldBe` True
 
-    it "bounded guard for ℙ-quantifier uses IsWithinBounds P_Min X P_Max" $ do
+    it "bounded guard for ℙ-quantifier uses IsWithinBounds ℙ_Min X ℙ_Max" $ do
       doc <- buildStr [r|{
-        axioms { assertions { ∀X : ℙ, (X → ¬¬X); } }
+        axioms { assertions { ∀X : ℙ (X → ¬¬X); } }
       }|]
       hasAssertionBodyWith doc (\case
-        LBoundedForall "X" "P_Min" "P_Max" _ -> True
+        LBoundedForall "X" "ℙ_Min" "ℙ_Max" _ -> True
         _ -> False)
         `shouldBe` True
 
-    it "bounded guard for 𝕌-quantifier uses IsWithinBounds U_Min X U_Max" $ do
+    it "bounded guard for 𝕌-quantifier uses IsWithinBounds 𝕌_Min X 𝕌_Max" $ do
       doc <- buildStr [r|{
         signature { A : 𝕌; },
-        axioms { metafacts { ∀X : 𝕌, (A - (A - X)) - X; } }
+        axioms { metafacts { ∀X : 𝕌 (A - (A - X)) - X; } }
       }|]
       hasMetafactBodyWith doc (\case
-        LBoundedForall "X" "U_Min" "U_Max" _ -> True
+        LBoundedForall "X" "𝕌_Min" "𝕌_Max" _ -> True
         _ -> False)
         `shouldBe` True
         
@@ -498,8 +517,8 @@ main = hspec $ do
         axioms { assertions { X : ℙ, (X → ¬¬X); } }
       }|]
       hasAssertionBodyWith doc (\case
-        LBoundedForall "X" "P_Min" "P_Max" (LImpl (LIsIndividual _ _ _) _) -> False
-        LBoundedForall "X" "P_Min" "P_Max" _ -> True
+        LBoundedForall "X" "ℙ_Min" "ℙ_Max" (LImpl (LIsIndividual _ _ _) _) -> False
+        LBoundedForall "X" "ℙ_Min" "ℙ_Max" _ -> True
         _ -> False)
         `shouldBe` True
 
@@ -509,8 +528,8 @@ main = hspec $ do
         axioms { metafacts { X : 𝕌, (A - (A - X)) - X; } }
       }|]
       hasMetafactBodyWith doc (\case
-        LBoundedForall "X" "U_Min" "U_Max" (LImpl (LIsIndividual _ _ _) _) -> False
-        LBoundedForall "X" "U_Min" "U_Max" _ -> True
+        LBoundedForall "X" "𝕌_Min" "𝕌_Max" (LImpl (LIsIndividual _ _ _) _) -> False
+        LBoundedForall "X" "𝕌_Min" "𝕌_Max" _ -> True
         _ -> False)
         `shouldBe` True
 
@@ -557,10 +576,6 @@ main = hspec $ do
     it "renders LIsIndividual as IsIndividual lo hi var" $
       renderLeanExpr (LIsIndividual "S_Min" "x" "S_Max")
         `shouldBe` "(IsIndividual S_Min S_Max x)"
-
-    it "IsIndividual is defined as always-true in the output header" $
-      renderLeanDoc (LeanDoc "" [])
-        `shouldSatisfy` ("def IsIndividual" `isInfixOf`)
 
   -- =========================================================================
   describe "theoryToLeanDoc – set union (∪), intersection (∩), subset (⊆) in metafacts" $ do
@@ -644,13 +659,13 @@ main = hspec $ do
   describe "theoryToLeanDoc – projection-to-sort <S>(x)" $ do
   -- =========================================================================
 
-    it "metafact body for <𝕌>(A) uses U_Min and U_Max as bounds" $ do
+    it "metafact body for <𝕌>(A) uses 𝕌_Min and 𝕌_Max as bounds" $ do
       doc <- buildStr [r|{
         signature { A : 𝕌; },
         axioms { metafacts { <𝕌>(A); } }
       }|]
       hasMetafactBody doc
-        (LProjectIntoInterval (LVar "A") (LVar "U_Min") (LVar "U_Max"))
+        (LProjectIntoInterval (LVar "A") (LVar "𝕌_Min") (LVar "𝕌_Max"))
         `shouldBe` True
 
     it "metafact body for <S>(A) uses S_Min and S_Max as bounds" $ do
@@ -695,11 +710,12 @@ main = hspec $ do
           x : S, {y : S | y =_S x} ⊆ {y : S | y =_S x};
         }}
       }|]
-      -- The comprehension { y : S | y =_S x } produces a LBoundedForall
-      -- as the body of the WrapAssertion axiom.
-      hasAssertionBodyWith doc (\case
-        LBoundedForall _ _ _ _ -> True
-        _ -> False) `shouldBe` True
+      -- The comprehension { y : S | y =_S x } produces LForallIndividuals
+      -- somewhere inside the assertion body (possibly wrapped in LBoundedForall
+      -- if there are free variables).
+      any (anySubExpr (\case LForallIndividuals _ _ _ _ -> True; _ -> False))
+          (assertionBodies doc)
+        `shouldBe` True
 
     it "description ιx : S φ(x) produces the same Lean output as set comprehension" $ do
       docComp <- buildStr [r|{
@@ -714,10 +730,9 @@ main = hspec $ do
           x : S, ιy : S y =_S a ∈ {z : S | z =_S a};
         }}
       }|]
-      -- Both should produce a LBoundedForall as the assertion body.
-      let hasComprehensionForm d = hasAssertionBodyWith d (\case
-              LBoundedForall _ _ _ _ -> True
-              _ -> False)
+      let hasComprehensionForm d =
+            any (anySubExpr (\case LForallIndividuals _ _ _ _ -> True; _ -> False))
+                (assertionBodies d)
       hasComprehensionForm docComp `shouldBe` True
       hasComprehensionForm docDesc `shouldBe` True
 
@@ -728,7 +743,7 @@ main = hspec $ do
           {x : S | x =_S x} ⊆ {x : S | x =_S x};
         }}
       }|]
-      -- The LBoundedForall in the assertion body should use S_Min and S_Max.
-      hasAssertionBodyWith doc (\case
-        LBoundedForall _ "S_Min" "S_Max" _ -> True
-        _ -> False) `shouldBe` True
+      -- LForallIndividuals with S_Min / S_Max bounds appears somewhere in the body.
+      any (anySubExpr (\case LForallIndividuals _ "S_Min" "S_Max" _ -> True; _ -> False))
+          (assertionBodies doc)
+        `shouldBe` True

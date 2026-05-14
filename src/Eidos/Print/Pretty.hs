@@ -533,7 +533,7 @@ prettyResolvedVarDeclWithOpts opts vd =
       typeInfo = if poShowTypes opts
                  then " : " ++ show (resolvedVarSort vd)
                  else ""
-  in "[" ++ name ++ (if resolvedVarIsSet vd then " ⊆ " else " : ") ++ sName ++ typeInfo ++ "]"
+  in "[" ++ name ++ (if resolvedVarKind vd == IR.VarKindSet then " ⊆ " else " : ") ++ sName ++ typeInfo ++ "]"
 
 prettyResolvedAtomicPropWithOpts :: PrettyOptions -> ResolvedAtomicProp -> Doc
 prettyResolvedAtomicPropWithOpts opts (ResolvedAtomicConstant ref) = 
@@ -575,11 +575,11 @@ prettyResolvedBaseTermWithOpts opts bt = case bt of
   ResolvedBTPropParen inner -> "(" ++ prettyResolvedPropExprWithOpts opts inner ++ ")"
   ResolvedBTTermParen term -> "(" ++ prettyResolvedTermWithOpts opts term ++ ")"
   ResolvedBTSetComprehension (ResolvedSetComprehension rvd rbody) ->
-    let op = if resolvedVarIsSet rvd then " ⊆ " else " : "
+    let op = if resolvedVarKind rvd == IR.VarKindSet then " ⊆ " else " : "
         binder = resolvedVarName rvd ++ op ++ IR.sortName (resolvedVarSort rvd)
     in "{ " ++ binder ++ " | " ++ prettyResolvedPropExprWithOpts opts rbody ++ " }"
   ResolvedBTDescription (ResolvedDescription rvd rbody) ->
-    let op = if resolvedVarIsSet rvd then " ⊆ " else " : "
+    let op = if resolvedVarKind rvd == IR.VarKindSet then " ⊆ " else " : "
         binder = resolvedVarName rvd ++ op ++ IR.sortName (resolvedVarSort rvd)
     in "ι" ++ binder ++ " " ++ prettyResolvedPropExprWithOpts opts rbody
   ResolvedBTSingleton t -> "{" ++ prettyResolvedTermWithOpts opts t ++ "}"

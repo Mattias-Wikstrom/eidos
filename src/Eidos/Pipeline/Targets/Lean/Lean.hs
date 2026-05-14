@@ -153,7 +153,7 @@ theoryToLeanTypeDoc theory =
     wrapFreeVars (vd:rest) body =
       let varName = IR.resolvedVarName vd
           -- Determine the type: if it's a subset variable, it's S → P; otherwise it's S
-          varType = if IR.resolvedVarIsSet vd
+          varType = if IR.resolvedVarKind vd == IR.VarKindSet
                     then LTArrow (LTVar (IR.sortName (IR.resolvedVarSort vd))) (LTVar "P")
                     else LTVar (IR.sortName (IR.resolvedVarSort vd))
       in LTForall varName varType (wrapFreeVars rest body)

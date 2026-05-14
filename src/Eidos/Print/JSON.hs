@@ -234,7 +234,7 @@ renderQuantified (IR.ResolvedQuantified qs atomic) =
 renderVarDecl :: IR.ResolvedVarDecl -> String
 renderVarDecl vd =
   "[" ++ IR.resolvedVarName vd ++ 
-  (if IR.resolvedVarIsSet vd then " ⊆ " else " : ") ++
+  (if IR.resolvedVarKind vd == IR.VarKindSet then " ⊆ " else " : ") ++
   IR.sortName (IR.resolvedVarSort vd) ++ "]"
 
 renderAtomic :: IR.ResolvedAtomicProp -> String
