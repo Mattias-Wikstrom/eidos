@@ -14,7 +14,8 @@
 -- == Encoding conventions
 --
 -- * @→@ renders as @->@; @∧@ as @/\@; @∨@ as @\/@; @↔@ as @<->@.
--- * Subtheory scopes use flat @Module@\/@End@ blocks (dots in FQNs become @_@).
+-- * Subtheory scopes use nested @Module@\/@End@ blocks; dots in cross-module
+--   references are kept as Coq module-qualified name separators.
 -- * Assertions are wrapped with @ℙ_Min@; metafacts with @𝕌_Min@.
 module Eidos.Pipeline.Targets.CoqProps.CoqProps
   ( -- * Internal representation (re-exported from CoqExpr)

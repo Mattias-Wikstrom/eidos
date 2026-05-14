@@ -26,7 +26,7 @@ import qualified Eidos.Pipeline.Targets.Lean.Lean as Lean
 import qualified Eidos.Pipeline.Targets.LeanProps.LeanProps as LeanProps
 import qualified Eidos.Pipeline.Targets.LeanProps.MkAxiomSets as LeanPropsMk
 import qualified Eidos.Pipeline.Targets.Mereological.Mereological as Mereological
-import           Data.List (sortOn)
+import           Data.List (intercalate, sortOn)
 
 data PipelineTarget = TargetLean | TargetLeanProps | TargetCoqProps | TargetMereological
   deriving (Show, Eq)
@@ -77,11 +77,11 @@ invokePipeline target opts theory =
           prepared = prepareTheory pipeOpts theory
           render (ns, as_) =
             let as1 = if toGroupByEntity opts then sortOn asPath as_ else as_
-            in CoqProps.CoqBlock ns (CoqProps.renderAxiomSetsToDecls coqOpts as1)
-          blocks = map render (CoqPropsMk.theoryBlocks prepared)
+            in (ns, CoqProps.renderAxiomSetsToDecls coqOpts as1)
+          flatBlocks = map render (CoqPropsMk.theoryBlocks prepared)
           doc = CoqProps.CoqDoc
             { CoqProps.coqDocTheoryName = IR.theoryFullyQualifiedName theory
-            , CoqProps.coqDocBlocks = blocks
+            , CoqProps.coqDocBlocks = nestCoqBlocks flatBlocks
             }
       in CoqProps.renderCoqDoc doc
     TargetMereological ->
@@ -101,3 +101,28 @@ invokePipeline target opts theory =
       , CoqProps.optAddGroupComments = toAddGroupComments opts
       , CoqProps.optAddTagComments = toAddTagComments opts
       }
+
+-- | Convert a flat post-ordered list of @(fqn, decls)@ pairs into a nested
+-- 'CoqProps.CoqBlock' tree.  Children (entries whose FQN has a longer prefix
+-- matching a parent's FQN) are placed in 'CoqProps.blockChildren' of their
+-- parent, preserving the original order.
+nestCoqBlocks :: [(String, [CoqProps.CoqDecl])] -> [CoqProps.CoqBlock]
+nestCoqBlocks flatBlocks = buildForest ""
+  where
+    buildForest parentFqn =
+      [ CoqProps.CoqBlock (localName fqn) (buildForest fqn) decls
+      | (fqn, decls) <- flatBlocks
+      , parentOf fqn == parentFqn
+      ]
+
+    parentOf fqn = case reverse (splitOnDot fqn) of
+      (_:rest) -> intercalate "." (reverse rest)
+      []       -> ""
+
+    localName fqn = case reverse (splitOnDot fqn) of
+      (x:_) -> x
+      []    -> fqn
+
+    splitOnDot s = case break (== '.') s of
+      (h, [])     -> [h]
+      (h, _:rest) -> h : splitOnDot rest

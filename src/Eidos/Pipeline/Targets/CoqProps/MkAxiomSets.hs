@@ -35,7 +35,7 @@ sanitizeName :: String -> String
 sanitizeName = concatMap sanitizeChar
   where
     sanitizeChar c
-      | isAlphaNum c || c `elem` "_'" = [c]
+      | isAlphaNum c || c `elem` "_'." = [c]
       | otherwise = case c of
           '+'  -> "Plus"
           '×'  -> "Times"

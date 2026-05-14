@@ -4,13 +4,12 @@
 --
 -- == Document model
 --
--- A 'CoqDoc' is a sequence of 'CoqBlock' values.  Each block corresponds to
--- exactly one Coq @Module … End@ region.  Every theory — including the root —
--- is wrapped in its own @Module@.  The reserved name @__main__@ renders at
--- file scope and is only used by test helpers.  Blocks are always emitted
--- flat — subtheories are never nested inside their parent's @Module@ block.
--- Blocks must be ordered so that dependencies are declared before their
--- dependents (post-order over the subtheory tree).
+-- A 'CoqDoc' is a tree of 'CoqBlock' values.  Each block corresponds to one
+-- Coq @Module … End@ region; child subtheories are nested inside their
+-- parent's block via 'blockChildren'.  The reserved name @__main__@ renders
+-- at file scope and is only used by test helpers.  Within each block,
+-- children are rendered before the block's own declarations (post-order:
+-- dependencies before dependents).
 module Eidos.Pipeline.Targets.CoqProps.CoqExpr
   ( -- * Document structure
     CoqDoc (..)
@@ -41,17 +40,19 @@ data CoqDoc = CoqDoc
   , coqDocBlocks     :: [CoqBlock]
   } deriving (Eq, Show)
 
--- | One flat @Module … End@ region in the output.
+-- | One @Module … End@ region in the output, optionally containing nested
+-- child modules.
 --
--- 'blockModule' is the Coq module identifier.  Every theory — including the
--- root — uses its 'IR.theoryFullyQualifiedName'.  The reserved name
--- @\"__main__\"@ is recognised by 'renderBlock' as "render at file scope"
--- and is only used by test helpers.  Dotted namespace names
--- (e.g. @\"lattice.lower\"@) have their dots replaced with underscores to
--- form a valid Coq identifier.
+-- 'blockModule' is the local Coq module identifier (no dots — just the last
+-- component of the FQN).  The reserved name @\"__main__\"@ is recognised by
+-- 'renderBlock' as "render at file scope" and is only used by test helpers.
+--
+-- 'blockChildren' are rendered inside the @Module … End@ block, before the
+-- block's own declarations (preserving post-order: children before parents).
 data CoqBlock = CoqBlock
-  { blockModule :: String      -- ^ dotted FQN (or @\"__main__\"@ for test helpers)
-  , blockDecls  :: [CoqDecl]
+  { blockModule   :: String      -- ^ local module name (or @\"__main__\"@)
+  , blockChildren :: [CoqBlock]  -- ^ nested sub-modules
+  , blockDecls    :: [CoqDecl]
   } deriving (Eq, Show)
 
 data CoqDecl
@@ -140,10 +141,12 @@ data CoqExpr
 
 collectUsedAbbrevNames :: CoqDoc -> [String]
 collectUsedAbbrevNames doc =
-  nub [ n | blk  <- coqDocBlocks doc
-           , decl <- blockDecls blk
-           , n   <- declAbbrevs decl ]
+  nub (concatMap collectFromBlock (coqDocBlocks doc))
   where
+    collectFromBlock blk =
+      concatMap declAbbrevs (blockDecls blk)
+      ++ concatMap collectFromBlock (blockChildren blk)
+
     declAbbrevs (DeclAxiom ax) = exprAbbrevs (axiomType ax)
     declAbbrevs (DeclDef   df) = exprAbbrevs (coqDefBody df)
     declAbbrevs _              = []
@@ -193,16 +196,16 @@ sanitizeModuleName = map (\c -> if isAlphaNum c || c `elem` "_'" then c else '_'
 renderBlock :: CoqBlock -> String
 renderBlock blk
   | blockModule blk == "__main__" =
-      unlines (map renderDecl (blockDecls blk))
+      concatMap renderBlock (blockChildren blk)
+      ++ unlines (map renderDecl (blockDecls blk))
   | otherwise =
-      let modName = sanitizeModuleName (blockModule blk)
-      in unlines
-           (  [ "Module " ++ modName ++ "." ]
-           ++ map renderDecl (blockDecls blk)
-           ++ [ "End " ++ modName ++ "."
-              , ""
-              ]
-           )
+      let modName  = sanitizeModuleName (blockModule blk)
+          children = concatMap renderBlock (blockChildren blk)
+          decls    = unlines (map renderDecl (blockDecls blk))
+      in "Module " ++ modName ++ ".\n"
+         ++ children
+         ++ decls
+         ++ "End " ++ modName ++ ".\n\n"
 
 renderDecl :: CoqDecl -> String
 renderDecl DeclBlankLine    = ""
