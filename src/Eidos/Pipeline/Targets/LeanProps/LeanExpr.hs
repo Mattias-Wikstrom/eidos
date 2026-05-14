@@ -307,3 +307,6 @@ renderLeanExpr (LProjectIntoInterval x lo hi) =
     ++ renderLeanExpr x ++ " "
     ++ renderLeanExpr lo ++ " "
     ++ renderLeanExpr hi ++ ")"
+renderLeanExpr LTop = "⊤"
+renderLeanExpr LBot = "⊥"
+

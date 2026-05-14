@@ -273,3 +273,5 @@ renderCoqExpr (CProjectIntoInterval x lo hi) =
     ++ renderCoqExpr x ++ " "
     ++ renderCoqExpr lo ++ " "
     ++ renderCoqExpr hi ++ ")"
+renderLeanExpr CTop = "True"
+renderLeanExpr CBot = "False"
