@@ -130,50 +130,41 @@ mkAxiomSets pt = concat
 
   userSorts =
     [ s | IR.EntitySort s <- IR.theoryObjects theory
-        , IR.sortKind s == IR.SortKindFromSignature ]
+        , IR.sortKind s `elem` [IR.SortKindFromSignature, IR.SortKindFromReflection] ]
 
   solFunctions = IR.theorySOLFunctions theory
   folFunctions = IR.theoryFOLFunctions theory
 
   folSingleArgFunctions =
-    filter (\f -> length (IR.funcArgSorts f) == 1
-               && IR.funcOrigin f == IR.FromSignature)
-           folFunctions
+    filter (\f -> length (IR.funcArgSorts f) == 1) folFunctions
 
   multiArgFolFunctions =
-    filter (\f -> length (IR.funcArgSorts f) > 1
-               && IR.funcOrigin f == IR.FromSignature)
-           folFunctions
+    filter (\f -> length (IR.funcArgSorts f) > 1) folFunctions
 
-  userDeclaredFolFunctions =
-    filter (\f -> IR.funcOrigin f == IR.FromSignature) folFunctions
+  userDeclaredFolFunctions = folFunctions
 
   individualObjects =
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
-        , IR.mereoKind   m == IR.MereologicalEntityKindIndividual
-        , IR.mereoOrigin m == IR.FromSignature
-        , IR.mereoName   m `notElem` [uMinName, uMaxName]
+        , IR.mereoKind m == IR.MereologicalEntityKindIndividual
+        , IR.mereoName m `notElem` [uMinName, uMaxName]
         ]
 
   mereoObjects =
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
-        , IR.mereoKind   m == IR.MereologicalEntityKindMereological
-        , IR.mereoOrigin m == IR.FromSignature
-        , IR.mereoName   m `notElem` [uMinName, uMaxName]
+        , IR.mereoKind m == IR.MereologicalEntityKindMereological
+        , IR.mereoName m `notElem` [uMinName, uMaxName]
         ]
 
   propObjects =
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
-        , IR.mereoKind   m == IR.MereologicalEntityKindProposition
-        , IR.mereoOrigin m == IR.FromSignature
-        , IR.mereoName   m `notElem` [pMinName, pMaxName, "⊤", "⊥"]
+        , IR.mereoKind m == IR.MereologicalEntityKindProposition
+        , IR.mereoName m `notElem` [pMinName, pMaxName, "⊤", "⊥"]
         ]
 
   setObjects =
     if usesDomain
     then [ m | IR.EntityMereological m <- IR.theoryObjects theory
-             , IR.mereoKind   m == IR.MereologicalEntityKindSet
-             , IR.mereoOrigin m == IR.FromSignature
+             , IR.mereoKind  m == IR.MereologicalEntityKindSet
              , IR.sortKind  (IR.mereoSort m) == IR.SortKindDomain
              , IR.sortName  (IR.mereoSort m) == dSortName
              ]
@@ -181,15 +172,12 @@ mkAxiomSets pt = concat
 
   userSortSets =
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
-        , IR.mereoKind   m == IR.MereologicalEntityKindSet
-        , IR.mereoOrigin m == IR.FromSignature
-        , IR.sortKind  (IR.mereoSort m) == IR.SortKindFromSignature
+        , IR.mereoKind m == IR.MereologicalEntityKindSet
+        , IR.sortKind (IR.mereoSort m) `elem` [IR.SortKindFromSignature, IR.SortKindFromReflection]
         ]
 
   userRelations =
-    [ r | IR.EntityRelation r <- IR.theoryObjects theory
-        , IR.relOrigin r == IR.FromSignature
-        ]
+    [ r | IR.EntityRelation r <- IR.theoryObjects theory ]
 
   relDomMinName r = NC.sortMin (NC.sanitizeHash (IR.sortName (IR.relDomain r)))
   relDomMaxName r = NC.sortMax (NC.sanitizeHash (IR.sortName (IR.relDomain r)))
