@@ -393,7 +393,8 @@ mkAxiomSets pt = concat
            ]
         ++ [ axiomSet [SFunction (IR.funcName f), SResObject]
                       (tags tFun)
-               [(sanitizeName (IR.mereoName (IR.funcResObject f)), ABDeclProp)]
+               [(sanitizeName (IR.mereoName obj), ABDeclProp)]
+           | Just obj <- [IR.funcResObject f]
            ]
 
   -- -------------------------------------------------------------------------

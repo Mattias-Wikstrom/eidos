@@ -624,8 +624,7 @@ createTheory parentMaybe name isRefl =
       falsity = (mkMereo th MereologicalEntityKindProposition "⊥" prop InEveryTheory)
                   { mereoAlias = Just (EntityMereological (sortMax prop)) }
 
-      mkBinSOL sym = mkSOLFunction th sym FunctionKindMereologicalOperation
-                       [universe, universe] universe InEveryTheory
+      mkBinSOL sym = mkMereoOperation th sym [universe, universe] universe InEveryTheory
 
       sumF     = mkBinSOL "+"
       prodF    = mkBinSOL "×"
@@ -708,9 +707,26 @@ mkSOLFunction th nm k argSorts resSort orig = Function
   , funcName          = nm
   , funcArgSorts      = argSorts
   , funcResSort       = resSort
-  , funcResObject     = mkMereo th MereologicalEntityKindResultOfSOLFunction (NC.funRes nm) resSort orig
+  , funcResObject     = Just (mkMereo th MereologicalEntityKindResultOfSOLFunction (NC.funRes nm) resSort orig)
   , funcArgObjects    = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
                                           (NC.funArgN nm i) s orig) argSorts [1..]
+  , funcDomain        = Nothing
+  , funcArgument      = Nothing
+  , funcDirectImage   = Nothing
+  , funcInverseImage  = Nothing
+  , funcReflectedFrom = Nothing
+  }
+
+mkMereoOperation :: Theory -> String -> [Sort] -> Sort -> Origin -> Function
+mkMereoOperation th nm argSorts resSort orig = Function
+  { funcKind          = FunctionKindMereologicalOperation
+  , funcOrigin        = orig
+  , funcTheory        = th
+  , funcName          = nm
+  , funcArgSorts      = argSorts
+  , funcResSort       = resSort
+  , funcResObject     = Nothing
+  , funcArgObjects    = []
   , funcDomain        = Nothing
   , funcArgument      = Nothing
   , funcDirectImage   = Nothing
@@ -921,16 +937,23 @@ reflectEntity (EntityRelation r) =
                     , relReflectedFrom = Just (relTheory r) })
 reflectEntity e = e
 
--- | After reflection, patch all sort references inside a function entity to use
--- the qualified name (i.e. prefix each sort name with @subName ++ "."@).
--- This ensures that @funcArgSorts@ and @funcResSort@ point to the reflected
--- (renamed) sorts rather than the originals.
+-- | After reflection, patch all sort references inside an entity to use the
+-- qualified name (i.e. prefix each sort name with @subName ++ "."@).
+-- This ensures that sort fields point to the reflected (renamed) sorts rather
+-- than the originals.
 qualifySortRefs :: String -> Entity -> Entity
+qualifySortRefs subName (EntitySort s) =
+  EntitySort (s { sortMin = qualMereo (sortMin s)
+                , sortMax = qualMereo (sortMax s) })
+  where qualMereo m = m { mereoName = subName ++ "." ++ mereoName m }
 qualifySortRefs subName (EntityFunction f) =
   EntityFunction (f { funcArgSorts = map qualSort (funcArgSorts f)
                     , funcResSort  = qualSort (funcResSort f) })
-  where
-    qualSort s = s { sortName = subName ++ "." ++ sortName s }
+  where qualSort s = s { sortName = subName ++ "." ++ sortName s }
+qualifySortRefs subName (EntityMereological m) =
+  EntityMereological (m { mereoSort        = qualSort (mereoSort m)
+                        , mereoLimitForSort = fmap qualSort (mereoLimitForSort m) })
+  where qualSort s = s { sortName = subName ++ "." ++ sortName s }
 qualifySortRefs _ e = e
 
 -- | Patch the primary name field of an entity.  Used when a reflected entity
@@ -1968,7 +1991,7 @@ applySpecialOp op ty curEnt = case op of
 
   where
     resolveResArg s (Just (EntityFunction f)) =
-      let mObj = if s == "res" then Just (funcResObject f) else funcArgument f
+      let mObj = if s == "res" then funcResObject f else funcArgument f
       in case mObj of
            Just obj -> Right (Just (EntityMereological obj), OtherMereologicalClass)
            Nothing  -> Left $ "Function has no '" ++ s ++ "' object"

@@ -322,7 +322,7 @@ data Function = Function
   , funcName         :: String
   , funcArgSorts     :: [Sort]
   , funcResSort      :: Sort
-  , funcResObject    :: MereologicalObject
+  , funcResObject    :: Maybe MereologicalObject
   , funcArgObjects   :: [MereologicalObject]
   , funcDomain       :: Maybe Sort
   , funcArgument     :: Maybe MereologicalObject

@@ -214,7 +214,7 @@ theorySortBoundEntries opts theory = concat
           [ let n        = IR.mereoName m
                 (lo, hi) = sortMinMaxNames (IR.mereoSort m)
             in mkEntry opts n lo hi (SBCFunctionObj (IR.funcName f))
-          | m <- IR.funcArgObjects f ++ [IR.funcResObject f]
+          | m <- IR.funcArgObjects f ++ maybe [] (:[]) (IR.funcResObject f)
           ]
 
     -- -----------------------------------------------------------------------

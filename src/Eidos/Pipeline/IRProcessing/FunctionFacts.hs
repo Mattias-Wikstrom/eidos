@@ -139,28 +139,29 @@ theoryFunctionFactEntries theory = concat
     -- -----------------------------------------------------------------------
     -- 22. Function connection axioms (SOL + user FOL)
     -- -----------------------------------------------------------------------
-    functionConnections = map mkConn (solFunctions ++ userDeclFol)
+    functionConnections = concatMap mkConn (solFunctions ++ userDeclFol)
       where
-        mkConn f =
-          let fN       = IR.funcName f
-              argObjs  = IR.funcArgObjects f
-              resObj   = IR.funcResObject f
-              argCount = length argObjs
-              argVarNs = ["X" ++ show i | i <- [1 .. argCount]]
-              resVarN  = "X" ++ show (argCount + 1)
-              argEqs   = [ bicond (var xi) (var (IR.mereoName obj))
-                         | (xi, obj) <- zip argVarNs argObjs ]
-              resEq    = bicond (var resVarN) (var (IR.mereoName resObj))
-              lhsConj  = case argEqs of
-                []     -> resEq
-                (e:es) -> foldl conj e (es ++ [resEq])
-              rhsEq    = bicond (var resVarN) (app fN (map var argVarNs))
-              body     = bicond lhsConj rhsEq
-              quantified =
-                foldr (\(xi, obj) acc -> bounded xi (IR.mereoSort obj) acc)
-                      (bounded resVarN (IR.mereoSort resObj) body)
-                      (zip argVarNs argObjs)
-          in FunctionFactEntry (FFCFunctionConnection fN) [(NC.axiomFact fN, quantified)]
+        mkConn f = case IR.funcResObject f of
+          Nothing     -> []
+          Just resObj ->
+            let fN       = IR.funcName f
+                argObjs  = IR.funcArgObjects f
+                argCount = length argObjs
+                argVarNs = ["X" ++ show i | i <- [1 .. argCount]]
+                resVarN  = "X" ++ show (argCount + 1)
+                argEqs   = [ bicond (var xi) (var (IR.mereoName obj))
+                           | (xi, obj) <- zip argVarNs argObjs ]
+                resEq    = bicond (var resVarN) (var (IR.mereoName resObj))
+                lhsConj  = case argEqs of
+                  []     -> resEq
+                  (e:es) -> foldl conj e (es ++ [resEq])
+                rhsEq    = bicond (var resVarN) (app fN (map var argVarNs))
+                body     = bicond lhsConj rhsEq
+                quantified =
+                  foldr (\(xi, obj) acc -> bounded xi (IR.mereoSort obj) acc)
+                        (bounded resVarN (IR.mereoSort resObj) body)
+                        (zip argVarNs argObjs)
+            in [FunctionFactEntry (FFCFunctionConnection fN) [(NC.axiomFact fN, quantified)]]
 
     -- -----------------------------------------------------------------------
     -- 23. FOL inverse connection axioms
@@ -196,7 +197,7 @@ theoryFunctionFactEntries theory = concat
                   dom     = domSort f
                   resSort = IR.funcResSort f
                   argNm   = IR.mereoName arg
-                  resNm   = IR.mereoName (IR.funcResObject f)
+                  resNm   = maybe (IR.funcName f ++ "_res") IR.mereoName (IR.funcResObject f)
                   lhs     = conj (bicond (var "A") (var argNm))
                                  (bicond (var "B") (var resNm))
                   rhs     = bicond (var "B") (app dImgN [var "A"])
