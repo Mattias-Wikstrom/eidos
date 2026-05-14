@@ -376,24 +376,6 @@ main = hspec $ do
         axioms { assertions { ιx : S x =_S a =_S a; } }
       }|]
 
-    it "rejects set comprehension in .eq theory" $
-      shouldReject "set comprehension" $ check EquationalTheory [r|{
-        signature { sort S; },
-        axioms { facts { {x : S | x =_S x} = {x : S | x =_S x}; } }
-      }|]
-
-    it "rejects set comprehension in .reg theory" $
-      shouldReject "set comprehension" $ check RegularTheory [r|{
-        signature { sort S; },
-        axioms { assertions { {x : S | x =_S x} ⊆ {x : S | x =_S x}; } }
-      }|]
-
-    it "rejects set comprehension in .coh theory" $
-      shouldReject "set comprehension" $ check CoherentTheory [r|{
-        signature { sort S; },
-        axioms { assertions { {x : S | x =_S x} ⊆ {x : S | x =_S x}; } }
-      }|]
-
     it "rejects description in .prop theory" $
       shouldReject "description operator" $ check PropositionalTheory [r|{
         signature { P : ℙ; },

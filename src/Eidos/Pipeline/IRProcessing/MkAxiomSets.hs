@@ -637,13 +637,12 @@ mkAxiomSets pt = concat
         let argN = sanitizeName (IR.mereoName (IR.relArgument r))
             dMn  = relDomMinName r
             dMx  = relDomMaxName r
-            pMin = IR.MVar pMinName
         in axiomSet [SSet (IR.relName r)] (tags tSet)
              [ (argN, ABDeclProp)
              , (argN ++ minSuffixForAxiomNames,
-                  ABMereo (IR.MRevDiff pMin (IR.MRevDiff (IR.MVar argN) (IR.MVar dMn))))
+                  ABMereo (IR.MRevDiff (IR.MVar argN) (IR.MVar dMn)))
              , (argN ++ maxSuffixForAxiomNames,
-                  ABMereo (IR.MRevDiff pMin (IR.MRevDiff (IR.MVar dMx) (IR.MVar argN))))
+                  ABMereo (IR.MRevDiff (IR.MVar dMx) (IR.MVar argN)))
              ]
 
   -- -------------------------------------------------------------------------
