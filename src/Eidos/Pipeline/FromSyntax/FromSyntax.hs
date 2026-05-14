@@ -902,22 +902,45 @@ mkRelation th nm argSorts orig =
 
 reflectEntity :: Entity -> Entity
 reflectEntity (EntityFunction f) =
-  if funcKind f == FunctionKindSOLFunctionFromTheory
-    then EntityFunction (f { funcKind         = FunctionKindFOLFunctionFromTheory
-                           , funcReflectedFrom = Just (funcTheory f) })
-    else EntityFunction (f { funcReflectedFrom = Just (funcTheory f) })
+  EntityFunction (f { funcKind          = FunctionKindFOLFunctionFromReflection
+                    , funcOrigin        = FromReflection
+                    , funcReflectedFrom = Just (funcTheory f) })
 reflectEntity (EntitySort s) =
   EntitySort (s { sortKind          = SortKindFromReflection
+                , sortOrigin        = FromReflection
                 , sortReflectedFrom = Just (sortTheory s)
                 , sortRelationship  = NotRelational
                 , sortParent        = Nothing
                 })
 reflectEntity (EntityMereological m) =
   EntityMereological (m { mereoKind           = MereologicalEntityKindIndividual
+                        , mereoOrigin         = FromReflection
                         , mereoReflectedFrom  = Just (mereoTheory m) })
 reflectEntity (EntityRelation r) =
-  EntityRelation (r { relReflectedFrom = Just (relTheory r) })
+  EntityRelation (r { relOrigin        = FromReflection
+                    , relReflectedFrom = Just (relTheory r) })
 reflectEntity e = e
+
+-- | After reflection, patch all sort references inside a function entity to use
+-- the qualified name (i.e. prefix each sort name with @subName ++ "."@).
+-- This ensures that @funcArgSorts@ and @funcResSort@ point to the reflected
+-- (renamed) sorts rather than the originals.
+qualifySortRefs :: String -> Entity -> Entity
+qualifySortRefs subName (EntityFunction f) =
+  EntityFunction (f { funcArgSorts = map qualSort (funcArgSorts f)
+                    , funcResSort  = qualSort (funcResSort f) })
+  where
+    qualSort s = s { sortName = subName ++ "." ++ sortName s }
+qualifySortRefs _ e = e
+
+-- | Patch the primary name field of an entity.  Used when a reflected entity
+-- enters the parent theory's object list under its qualified name.
+renameEntity :: String -> Entity -> Entity
+renameEntity nm (EntityMereological m) = EntityMereological (m { mereoName = nm })
+renameEntity nm (EntitySort s)         = EntitySort         (s { sortName  = nm })
+renameEntity nm (EntityFunction f)     = EntityFunction     (f { funcName  = nm })
+renameEntity nm (EntityRelation r)     = EntityRelation     (r { relName   = nm })
+renameEntity _  e                      = e
 
 -- ---------------------------------------------------------------------------
 -- Subtheory propagation
@@ -928,17 +951,35 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
   foldM addEntry parentTh (Map.toList (theoryObjectsByName subTh))
   where
     addEntry th (name, entities) = do
-      let transformed = if isReflection then map reflectEntity entities else entities
+      let transformed = if isReflection
+                          then map (qualifySortRefs subName . reflectEntity) entities
+                          else entities
           qualifiedName = if null subName then name else subName ++ "." ++ name
           localToSub = [e | e <- transformed, theoryFullyQualifiedName (entityTheory e) == theoryFullyQualifiedName subTh]
 
+      -- Update the name map (existing behaviour).
       let th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
+
+      -- Also register in theoryObjects so the pipeline sees these entities:
+      --   Reflection subtheories are skipped in block generation, so their
+      --   reflected entities must be owned by the parent under a qualified name.
+      --   Implicit subtheory entities enter under their original name; dedup
+      --   ensures an entity shared by multiple implicit subtheories appears once.
+      let th2
+            | isReflection =
+                let renamed = map (renameEntity qualifiedName) localToSub
+                in th1 { theoryObjects = theoryObjects th1 ++ renamed }
+            | isImplicit && not (all isInternalEntity transformed) && not (null localToSub) =
+                let existingNames = map entityName (theoryObjects th1)
+                    fresh = filter (\e -> entityName e `notElem` existingNames) localToSub
+                in th1 { theoryObjects = theoryObjects th1 ++ fresh }
+            | otherwise = th1
 
       if isImplicit && not (all isInternalEntity transformed) && not (null transformed)
         then if not (null localToSub)
-               then foldM (addUnqualified name qualifiedName) th1 localToSub
-               else Right $ foldl (\t e -> addEntityToParent t name e) th1 transformed
-        else Right th1
+               then foldM (addUnqualified name qualifiedName) th2 localToSub
+               else Right $ foldl (\t e -> addEntityToParent t name e) th2 transformed
+        else Right th2
 
 termFromEntityWithName :: String -> Entity -> ResolvedTerm
 termFromEntityWithName displayName entity =

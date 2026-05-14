@@ -248,7 +248,7 @@ main = hspec $ do
       }|]
       case lookupInParentByName th "refl.F" of
         Just (EntityFunction f) ->
-          funcKind f `shouldBe` FunctionKindFOLFunctionFromTheory
+          funcKind f `shouldBe` FunctionKindFOLFunctionFromReflection
         _ -> fail "refl.F not found or wrong type"
 
     it "reflection sets funcReflectedFrom on reflected function" $ do

@@ -22,6 +22,7 @@ data Origin
   | FromSort
   | FromFunction
   | FromRelation
+  | FromReflection     -- ^ Entity produced by a reflection subtheory
   deriving (Show, Eq)
 
 data EntityKind
