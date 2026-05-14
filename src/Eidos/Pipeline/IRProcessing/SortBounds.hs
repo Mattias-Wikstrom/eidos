@@ -144,6 +144,7 @@ theorySortBoundEntries opts theory = concat
     pMinName   = IR.mereoName (IR.sortMin (IR.theoryProp theory))
     pMaxName   = IR.mereoName (IR.sortMax (IR.theoryProp theory))
     domMinName = IR.mereoName (IR.sortMin (IR.theoryDomain theory))
+    domMaxName = IR.mereoName (IR.sortMax (IR.theoryDomain theory))
 
     -- -----------------------------------------------------------------------
     -- 36. Mereological (𝕌-sorted) object bounds
@@ -182,12 +183,11 @@ theorySortBoundEntries opts theory = concat
 
     -- -----------------------------------------------------------------------
     -- 38. 𝔻-sorted set bounds
-    -- Both lo and hi are the domain minimum, preserving current behaviour.
     -- -----------------------------------------------------------------------
     dSetBounds
       | not usesDomain = []
       | otherwise =
-          [ mkEntry opts (IR.mereoName m) domMinName domMinName SBCGlobal
+          [ mkEntry opts (IR.mereoName m) domMinName domMaxName SBCGlobal
           | IR.EntityMereological m <- IR.theoryObjects theory
           , IR.mereoKind   m == IR.MereologicalEntityKindSet
           , IR.mereoOrigin m == IR.FromSignature
