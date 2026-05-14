@@ -145,8 +145,7 @@ pSortRef = do
   -- Allow sort references to use term-style hash attributes, e.g. "f#dom".
   -- This is required for variable declarations like: [X ⊆ f#dom].
   mbAttr <- optional (try (hash *> pHashAttrKeyword))
-  let c' = maybe c (\attr -> c ++ "#" ++ attr) mbAttr
-  return $ SortRef specs c'
+  return $ SortRef specs c mbAttr
 
 -- | One dot-qualified path segment: "name."
 --

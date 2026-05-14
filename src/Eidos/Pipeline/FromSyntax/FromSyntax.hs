@@ -236,7 +236,7 @@ buildSignatureItem th0 th item = do
       return (if shouldInsert then addSortToTh th s else th)
 
     SigRelationalSort (RelationalSortDeclaration nm rel sortExprAST) -> do
-      parentSort <- lookupSort th (sortConstant (sortRef sortExprAST))
+      parentSort <- lookupSortByExpr th sortExprAST
       let th' = markTheorySortExprUsage th sortExprAST
           s   = mkRelatedSort th' rel nm parentSort
           entity = EntitySort s
@@ -1307,7 +1307,9 @@ applySuffixToMereo expr suffix = case suffix of
     MVar (flattenMereoName expr ++ "." ++ attr)
   ResolvedSuffixCall args ->
     MAbbrevApp (flattenMereoName expr) (map termToMereo args)
-  ResolvedSuffixSpecialOp op ->
+  ResolvedSuffixSpecialOp _ (Just entity) ->
+    MVar (entityName entity)
+  ResolvedSuffixSpecialOp op Nothing ->
     MVar (flattenMereoName expr ++ "_" ++ op)
 
 flattenMereoName :: MereoExpr -> String
@@ -1485,17 +1487,15 @@ lookupSort th nm = case nm of
   "𝔻"    -> Right (theoryDomain th)
   "ℙ"    -> Right (theoryProp th)
   "Prop" -> Right (theoryProp th)
-  _ -> case break (== '#') nm of
-    (base, '#' : attr) -> lookupHashAttrSort th base attr
-    _ -> lookupSortByRawName th nm
-
-lookupHashAttrSort :: Theory -> String -> String -> Either BuildError Sort
-lookupHashAttrSort th base attr = do
-  fn <- lookupFunction th base
-  case attr of
-    "dom" -> maybe (Left $ "Function '" ++ base ++ "' has no domain sort") Right
-                   (funcDomain fn)
-    _     -> Left $ "Unknown sort attribute '#" ++ attr ++ "' on '" ++ base ++ "'"
+  _ -> case Map.lookup nm (theoryObjectsByName th) of
+    Just (EntitySort s : _) -> Right s
+    _ ->
+      case mapMaybe (\sub -> case Map.lookup nm (theoryObjectsByName sub) of
+                                Just (EntitySort s : _) -> Just s
+                                _                       -> Nothing)
+                    (theorySubtheories th) of
+        (s:_) -> Right s
+        []    -> Left $ "Unknown sort: " ++ nm
 
 lookupFunction :: Theory -> String -> Either BuildError Function
 lookupFunction th nm =
@@ -1509,26 +1509,20 @@ lookupFunction th nm =
         (f:_) -> Right f
         []    -> Left $ "Unknown function: '" ++ nm ++ "'"
 
-lookupSortByRawName :: Theory -> String -> Either BuildError Sort
-lookupSortByRawName th nm =
-  case Map.lookup nm (theoryObjectsByName th) of
-    Just (EntitySort s : _) -> Right s
-    _ ->
-      case mapMaybe (\sub -> case Map.lookup nm (theoryObjectsByName sub) of
-                                Just (EntitySort s : _) -> Just s
-                                _                       -> Nothing)
-                    (theorySubtheories th) of
-        (s:_) -> Right s
-        []    -> Left $ "Unknown sort: " ++ nm
-
 lookupSortByExpr :: Theory -> SortExpr -> Either BuildError Sort
 lookupSortByExpr th sexpr = do
   let sr = sortRef sexpr
-  case sortSpecifier sr of
-    [] -> lookupSort th (sortConstant sr)
-    specs -> do
-      subTh <- findSubtheoryByPath th (map theoryRefName specs)
-      lookupSort subTh (sortConstant sr)
+  th' <- case sortSpecifier sr of
+    []    -> Right th
+    specs -> findSubtheoryByPath th (map theoryRefName specs)
+  case sortHashAttr sr of
+    Nothing   -> lookupSort th' (sortConstant sr)
+    Just attr -> do
+      fn <- lookupFunction th' (sortConstant sr)
+      case attr of
+        "dom" -> maybe (Left $ "Function '" ++ sortConstant sr ++ "' has no domain sort") Right
+                       (funcDomain fn)
+        _     -> Left $ "Unknown sort attribute '#" ++ attr ++ "' on '" ++ sortConstant sr ++ "'"
 
 lookupEntity :: Theory -> String -> Either BuildError Entity
 lookupEntity th nm =
@@ -1725,7 +1719,10 @@ resolveOFF th ctx (OperationFollowedByFactor specs op rightF) = do
 resolveFactor :: Theory -> VarContext -> Factor -> Either BuildError ResolvedFactor
 resolveFactor th ctx (Factor base suffixes) = do
   (rb, baseType) <- resolveBaseTerm th ctx base
-  (rs, resultType) <- foldM (resolveSuffix th ctx) ([], baseType) suffixes
+  let baseEntity = case rb of
+        ResolvedBTAtomic rc -> Just (resolvedConstEntity rc)
+        _                   -> Nothing
+  (rs, resultType, _) <- foldM (resolveSuffix th ctx) ([], baseType, baseEntity) suffixes
   return (ResolvedFactor rb rs resultType)
 
 isSet :: ResolvedVarDecl -> Bool
@@ -1832,10 +1829,10 @@ resolveBaseTerm th ctx bt = case bt of
 resolveSuffix
   :: Theory
   -> VarContext
-  -> ([ResolvedTermSuffix], ExprType)
+  -> ([ResolvedTermSuffix], ExprType, Maybe Entity)
   -> TermSuffix
-  -> Either BuildError ([ResolvedTermSuffix], ExprType)
-resolveSuffix th ctx (acc, ty) suffix = case suffix of
+  -> Either BuildError ([ResolvedTermSuffix], ExprType, Maybe Entity)
+resolveSuffix th ctx (acc, ty, curEnt) suffix = case suffix of
 
   SuffixCall (CallSuffix args) -> do
     rargs <- mapM (resolveTerm th ctx) args
@@ -1849,56 +1846,98 @@ resolveSuffix th ctx (acc, ty) suffix = case suffix of
               case argTy of
                 IndividualClass -> return ()
                 _ -> Left "Relation argument must be an individual"
-            return (acc ++ [ResolvedSuffixCall rargs], PropositionClass)
+            return (acc ++ [ResolvedSuffixCall rargs], PropositionClass, Nothing)
       FOLFunctionClass n ->
         if length args /= n
           then Left $ "FOL function arity mismatch: expected " ++ show n ++ ", got " ++ show (length args)
           else do
             let anySet = any (\arg -> case resolvedTermType arg of RelationClass 1 -> True; _ -> False) rargs
                 resultClass = if anySet then RelationClass 1 else IndividualClass
-            return (acc ++ [ResolvedSuffixCall rargs], resultClass)
+            return (acc ++ [ResolvedSuffixCall rargs], resultClass, Nothing)
       SOLFunctionClass n ->
         if length args /= n
           then Left $ "SOL function arity mismatch: expected " ++ show n ++ ", got " ++ show (length args)
-          else return (acc ++ [ResolvedSuffixCall rargs], RelationClass 1)
+          else return (acc ++ [ResolvedSuffixCall rargs], RelationClass 1, Nothing)
       _ -> Left "Cannot apply arguments to a non‑function/non‑set"
 
-  SuffixSpecialOp op -> case op of
-    s | s `elem` ["min","max"] ->
-        case ty of
-          SortClass -> return (acc ++ [ResolvedSuffixSpecialOp s], OtherMereologicalClass)
-          _ -> Left $ "Attempt to apply '#" ++ s ++ "' to a non-sort."
-    s | s `elem` ["res","arg"] ->
-        case ty of
-          FOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp s], OtherMereologicalClass)
-          SOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp s], OtherMereologicalClass)
-          _ -> Left $ "Attempt to apply '#" ++ s ++ "' to a non-function."
-    "dom" ->
-        case ty of
-          FOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp "dom"], SortClass)
-          SOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp "dom"], SortClass)
-          _ -> Left "Attempt to apply '#dom' to a non-function."
-    s | s `elem` ["set","individual","mereological","proposition"] ->
-        let newClass = case s of
-              "set"           -> RelationClass 1
-              "individual"    -> IndividualClass
-              "proposition"   -> PropositionClass
-              "mereological"  -> OtherMereologicalClass
-              _               -> ty
-        in return (acc ++ [ResolvedSuffixSpecialOp s], newClass)
-    s | all (`elem` "0123456789") s && not (null s) ->
-        case ty of
-          FOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp s], OtherMereologicalClass)
-          SOLFunctionClass _ -> return (acc ++ [ResolvedSuffixSpecialOp s], OtherMereologicalClass)
-          _ -> Left $ "Attempt to apply '#" ++ s ++ "' to a non-function."
-    other -> return (acc ++ [ResolvedSuffixSpecialOp other], ty)
+  SuffixSpecialOp op -> do
+    (resultEnt, newTy) <- applySpecialOp op ty curEnt
+    return (acc ++ [ResolvedSuffixSpecialOp op resultEnt], newTy, resultEnt)
 
   SuffixDotAttr attr -> case attr of
     s | s `elem` ["min","max"] ->
         case ty of
-          SortClass -> return (acc ++ [ResolvedSuffixDotAttr s], OtherMereologicalClass)
+          SortClass -> return (acc ++ [ResolvedSuffixDotAttr s], OtherMereologicalClass, Nothing)
           _ -> Left $ "Attempt to apply '." ++ s ++ "' to a non-sort."
-    other -> return (acc ++ [ResolvedSuffixDotAttr other], ty)
+    other -> return (acc ++ [ResolvedSuffixDotAttr other], ty, Nothing)
+
+-- | Resolve a hash-attribute operation to its result entity and expression type.
+-- Operations that yield a named entity return @Just entity@; type-coercion
+-- operations (which do not change the underlying object) return @Nothing@.
+applySpecialOp :: String -> ExprType -> Maybe Entity -> Either BuildError (Maybe Entity, ExprType)
+applySpecialOp op ty curEnt = case op of
+
+  s | s `elem` ["min", "max"] ->
+    case (ty, curEnt) of
+      (SortClass, Just (EntitySort s')) ->
+        let m = if op == "min" then sortMin s' else sortMax s'
+        in Right (Just (EntityMereological m), OtherMereologicalClass)
+      (SortClass, _) -> Left $ "Cannot apply '#" ++ s ++ "': sort entity not available"
+      _              -> Left $ "Attempt to apply '#" ++ s ++ "' to a non-sort."
+
+  "dom" ->
+    case (ty, curEnt) of
+      (FOLFunctionClass _, Just (EntityFunction f)) ->
+        case funcDomain f of
+          Just d  -> Right (Just (EntitySort d), SortClass)
+          Nothing -> Left "Function has no domain sort"
+      (SOLFunctionClass _, Just (EntityFunction f)) ->
+        case funcDomain f of
+          Just d  -> Right (Just (EntitySort d), SortClass)
+          Nothing -> Left "Function has no domain sort"
+      (FOLFunctionClass _, _) -> Left "Cannot apply '#dom': function entity not available"
+      (SOLFunctionClass _, _) -> Left "Cannot apply '#dom': function entity not available"
+      _                       -> Left "Attempt to apply '#dom' to a non-function."
+
+  s | s `elem` ["res", "arg"] ->
+    case ty of
+      FOLFunctionClass _ -> resolveResArg s curEnt
+      SOLFunctionClass _ -> resolveResArg s curEnt
+      _                  -> Left $ "Attempt to apply '#" ++ s ++ "' to a non-function."
+
+  s | all (`elem` "0123456789") s && not (null s) ->
+    case ty of
+      FOLFunctionClass _ -> resolveArgN s curEnt
+      SOLFunctionClass _ -> resolveArgN s curEnt
+      _                  -> Left $ "Attempt to apply '#" ++ s ++ "' to a non-function."
+
+  -- Type-coercion ops: no entity change, only ExprType changes.
+  s | s `elem` ["set", "individual", "mereological", "proposition"] ->
+    let newClass = case s of
+          "set"          -> RelationClass 1
+          "individual"   -> IndividualClass
+          "proposition"  -> PropositionClass
+          "mereological" -> OtherMereologicalClass
+          _              -> ty
+    in Right (Nothing, newClass)
+
+  other -> Right (Nothing, ty)  -- unknown op: pass through unchanged
+
+  where
+    resolveResArg s (Just (EntityFunction f)) =
+      let mObj = if s == "res" then Just (funcResObject f) else funcArgument f
+      in case mObj of
+           Just obj -> Right (Just (EntityMereological obj), OtherMereologicalClass)
+           Nothing  -> Left $ "Function has no '" ++ s ++ "' object"
+    resolveResArg s _ = Left $ "Cannot apply '#" ++ s ++ "': function entity not available"
+
+    resolveArgN s (Just (EntityFunction f)) =
+      let n    = read s :: Int
+          args = funcArgObjects f
+      in if n >= 1 && n <= length args
+         then Right (Just (EntityMereological (args !! (n - 1))), OtherMereologicalClass)
+         else Left $ "Argument index #" ++ s ++ " out of range"
+    resolveArgN s _ = Left $ "Cannot apply '#" ++ s ++ "': function entity not available"
 
 resolveConstantRef :: Theory -> VarContext -> ConstantRef -> Either BuildError ResolvedConstantRef
 resolveConstantRef th ctx (ConstantRef specs ref) = do

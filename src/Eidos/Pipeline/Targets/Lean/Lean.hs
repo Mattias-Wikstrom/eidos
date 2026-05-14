@@ -242,7 +242,8 @@ theoryToLeanTypeDoc theory =
     applySuffix :: LeanTypeExpr -> IR.ResolvedTermSuffix -> LeanTypeExpr
     applySuffix expr (IR.ResolvedSuffixCall args) =
       LTApp expr (map termToLeanType args)
-    applySuffix expr _ = expr
+    applySuffix expr (IR.ResolvedSuffixSpecialOp _ _) = expr
+    applySuffix expr _                                = expr
     
     baseTermToLeanType :: IR.ResolvedBaseTerm -> LeanTypeExpr
     baseTermToLeanType (IR.ResolvedBTAtomic ref) =

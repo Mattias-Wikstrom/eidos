@@ -99,6 +99,7 @@ newtype SortExpr = SortExpr { sortRef :: SortRef }
 data SortRef = SortRef
   { sortSpecifier :: [TheoryRef]
   , sortConstant  :: String
+  , sortHashAttr  :: Maybe String  -- ^ e.g. @Just "dom"@ for @f#dom@
   } deriving (Show, Eq)
 
 -- | One dot-qualified path segment, e.g. "sub." in "sub.S".

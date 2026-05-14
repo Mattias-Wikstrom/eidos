@@ -663,7 +663,8 @@ data ResolvedGeneralizedSumOrProduct = ResolvedGeneralizedSumOrProduct
 data ResolvedTermSuffix
   = ResolvedSuffixDotAttr   String
   | ResolvedSuffixCall      [ResolvedTerm]
-  | ResolvedSuffixSpecialOp String
+  | ResolvedSuffixSpecialOp String (Maybe Entity)
+      -- ^ op name (for printing) + resolved result entity (Nothing for type-coercion ops)
   deriving (Show)
 
 -- ---------------------------------------------------------------------------

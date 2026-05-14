@@ -83,7 +83,7 @@ mkTheoryBody th = TheoryBody $ concat
 
 -- Convert IR Sort to AST SortExpr (simplified - just use the name)
 sortToSortExpr :: IR.Sort -> SortExpr
-sortToSortExpr s = SortExpr $ SortRef [] (IR.sortName s)
+sortToSortExpr s = SortExpr $ SortRef [] (IR.sortName s) Nothing
 
 mkSignatureSection :: Theory -> SignatureSection
 mkSignatureSection th = SignatureSection $
@@ -234,8 +234,9 @@ prettySignatureItem item =
       nm ++ " ⊆ " ++ intercalate ", " (map prettySortExpr domain) ++ ";"
 
 prettySortExpr :: SortExpr -> Doc
-prettySortExpr (SortExpr (SortRef specifiers constName)) =
-  (if null specifiers then "" else concatMap (++ ".") (map prettyTheoryRef specifiers)) ++ constName
+prettySortExpr (SortExpr (SortRef specifiers constName mbAttr)) =
+  (if null specifiers then "" else concatMap (++ ".") (map prettyTheoryRef specifiers))
+  ++ constName ++ maybe "" (\attr -> "#" ++ attr) mbAttr
 
 prettyTheoryRef :: TheoryRef -> Doc
 prettyTheoryRef (TheoryRef nm) = nm
@@ -598,7 +599,7 @@ prettyResolvedSuffixWithOpts :: PrettyOptions -> ResolvedTermSuffix -> Doc
 prettyResolvedSuffixWithOpts opts (ResolvedSuffixDotAttr attr) = "." ++ attr
 prettyResolvedSuffixWithOpts opts (ResolvedSuffixCall args) = 
   "(" ++ intercalate ", " (map (prettyResolvedTermWithOpts opts) args) ++ ")"
-prettyResolvedSuffixWithOpts opts (ResolvedSuffixSpecialOp op) = "#" ++ op
+prettyResolvedSuffixWithOpts opts (ResolvedSuffixSpecialOp op _) = "#" ++ op
 
 -- | Pretty-print a resolved proposition expression (with default options)
 prettyResolvedPropExpr :: ResolvedPropExpr -> Doc

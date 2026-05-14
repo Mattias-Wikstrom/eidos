@@ -705,18 +705,18 @@ checkTermPairForBottom ctx (TermPair left rights) =
 
 -- | True if a sort expression refers to ℙ (the proposition sort).
 isPropSortExpr :: SortExpr -> Bool
-isPropSortExpr (SortExpr (SortRef [] c)) = c `elem` ["ℙ", "Prop"]
+isPropSortExpr (SortExpr (SortRef [] c Nothing)) = c `elem` ["ℙ", "Prop"]
 isPropSortExpr _                          = False
 
 -- | True if a sort expression refers to 𝕌 (the universe sort).
 isUniverseSortExpr :: SortExpr -> Bool
-isUniverseSortExpr (SortExpr (SortRef [] "𝕌")) = True
+isUniverseSortExpr (SortExpr (SortRef [] "𝕌" Nothing)) = True
 isUniverseSortExpr _                             = False
 
 -- | Pretty name for a sort expression (for error messages).
 sortExprName :: SortExpr -> String
-sortExprName (SortExpr (SortRef specs c)) =
-  concatMap (\(TheoryRef n) -> n ++ ".") specs ++ c
+sortExprName (SortExpr (SortRef specs c mbAttr)) =
+  concatMap (\(TheoryRef n) -> n ++ ".") specs ++ c ++ maybe "" (\attr -> "#" ++ attr) mbAttr
 
 -- ---------------------------------------------------------------------------
 -- Function name helpers

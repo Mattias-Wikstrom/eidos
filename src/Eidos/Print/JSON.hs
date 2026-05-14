@@ -263,7 +263,7 @@ renderFactor (IR.ResolvedFactor base suffixes _) =
   where
     renderSuffix (IR.ResolvedSuffixCall args) =
       "(" ++ intercalate ", " (map renderTerm args) ++ ")"
-    renderSuffix (IR.ResolvedSuffixSpecialOp op) = "#" ++ op
+    renderSuffix (IR.ResolvedSuffixSpecialOp op _) = "#" ++ op
     renderSuffix (IR.ResolvedSuffixDotAttr attr) = "." ++ attr
 
 renderBase :: IR.ResolvedBaseTerm -> String
