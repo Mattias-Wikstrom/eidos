@@ -19,13 +19,22 @@ import Eidos.Pipeline.FromSyntax.FromSyntax        (buildTheoryPure)
 import qualified Eidos.Pipeline.InvokePipeline as PL
 import Eidos.Pipeline.IRProcessing.MkAxiomSets (mkAxiomSets)
 import Eidos.Pipeline.Targets.LeanProps.LeanExpr   (LeanDoc(..), LeanBlock(..), LeanDecl(..), LeanAxiom(..),
-                                LeanExpr(..), renderLeanExpr, renderLeanDoc)
+                                LeanExpr(..), renderLeanExpr, renderLeanDocWith)
 import Eidos.Pipeline.Targets.LeanProps.LeanProps (renderAxiomSetsToDecls, defaultLeanPropsOptions)
 import Eidos.Pipeline.IRProcessing.AxiomSet (AxiomSet(..), Tag(..))
 
 -- ---------------------------------------------------------------------------
 -- Helpers
 -- ---------------------------------------------------------------------------
+
+renderAbbrevDef :: IR.AbbrevDef -> String
+renderAbbrevDef ad =
+  "def " ++ IR.abbrevName ad
+  ++ " " ++ unwords [ "(" ++ p ++ " : Prop)" | p <- IR.abbrevParams ad ]
+  ++ " : Prop := " ++ renderLeanExpr (abbrevBodyToLean (IR.abbrevBody ad))
+
+renderLeanDoc :: LeanDoc -> String
+renderLeanDoc = renderLeanDocWith renderAbbrevDef
 
 buildStr :: String -> IO LeanDoc
 buildStr src = case parseString src of
