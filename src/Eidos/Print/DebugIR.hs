@@ -110,7 +110,7 @@ renderEntity level e =
           ", domain=" ++ sortName (relDomain r) ++
           ", arg-objects=[" ++ intercalate ", " (map mereoName (relArgObjects r)) ++ "]" ++
           ", argument=" ++ mereoName (relArgument r) ++
-          ", associated-set=" ++ mereoName (relAssociatedSet r) ++
+          maybe "" (\s -> ", associated-set=" ++ mereoName s) (relAssociatedSet r) ++
           ", reflected-from=" ++ maybe "<none>" theoryFullyQualifiedName (relReflectedFrom r) ++
           "}"
     EntityTheory t ->

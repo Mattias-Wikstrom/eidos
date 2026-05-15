@@ -801,6 +801,34 @@ addFOLInfraForReflected th (EntityFunction f)
                th6 = addEntityToTh th5 (EntityFunction invImg)
                th7 = addMultiArgFOLExtras th6 f' domSort auxOrig
            in th7
+addFOLInfraForReflected th (EntityRelation r)
+  | relKind r == MereologicalEntityKindRelationFromReflection =
+      let nm       = relName r
+          argSorts = relArgSorts r
+          auxOrig  = FromReflection
+          -- Reflected domain sort: SortKindFromReflection with its own min/max.
+          -- This represents Powerset(S1 × S2 × …) in the metatheory.
+          domSort  = mkSort th SortKindFromReflection (NC.funDom nm) auxOrig
+          -- arg-position individuals: each nm_i is an element of inner_theory.S_i
+          argObjs  = zipWith (\s i -> mkMereo th MereologicalEntityKindIndividual
+                                        (NC.funArgN nm i) s auxOrig)
+                             argSorts [1..]
+          -- argument individual: element of the reflected domain sort
+          domArg   = mkMereo th MereologicalEntityKindIndividual (NC.funArg nm) domSort auxOrig
+          r'       = r { relDomain     = domSort
+                       , relArgObjects = argObjs
+                       , relArgument   = domArg
+                       }
+          replaceR e = case e of
+            EntityRelation s | relName s == nm -> EntityRelation r'
+            _                                  -> e
+          th1 = th { theoryObjects      = map replaceR (theoryObjects th)
+                   , theoryObjectsByName = Map.adjust (map replaceR) nm (theoryObjectsByName th)
+                   }
+          th2 = addSortToTh th1 domSort
+          th3 = foldl (\t o -> addEntityToTh t (EntityMereological o)) th2 argObjs
+          th4 = addEntityToTh th3 (EntityMereological domArg)
+      in th4
 addFOLInfraForReflected th _ = th
 
 mkFOLFunction :: Theory -> String -> [Sort] -> Sort -> Origin
@@ -1052,7 +1080,7 @@ mkRelation th nm argSorts orig =
         , relArgObjects    = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
                                               (NC.funArgN nm i) s orig) argSorts [1..]
         , relArgument      = domArg
-        , relAssociatedSet = assocSet
+        , relAssociatedSet = Just assocSet
         , relReflectedFrom = Nothing
         }
   in rel
@@ -1078,7 +1106,9 @@ reflectEntity (EntityMereological m) =
                         , mereoOrigin         = FromReflection
                         , mereoReflectedFrom  = Just (mereoTheory m) })
 reflectEntity (EntityRelation r) =
-  EntityRelation (r { relOrigin        = FromReflection
+  EntityRelation (r { relKind          = MereologicalEntityKindRelationFromReflection
+                    , relOrigin        = FromReflection
+                    , relAssociatedSet = Nothing
                     , relReflectedFrom = Just (relTheory r) })
 reflectEntity e = e
 
@@ -1104,7 +1134,7 @@ qualifySortRefs subName (EntityRelation r) =
                     , relDomain        = qualSort (relDomain r)
                     , relArgObjects    = map qualMereo (relArgObjects r)
                     , relArgument      = qualMereo (relArgument r)
-                    , relAssociatedSet = qualMereo (relAssociatedSet r) })
+                    , relAssociatedSet = fmap qualMereo (relAssociatedSet r) })
   where
     qualSort  s = s { sortName  = subName ++ "." ++ sortName s }
     qualMereo m = m { mereoName = subName ++ "." ++ mereoName m }

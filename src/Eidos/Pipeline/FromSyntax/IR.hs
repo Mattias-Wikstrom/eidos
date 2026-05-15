@@ -57,6 +57,7 @@ data EntityKind
   | MereologicalEntityKindLowerLimitForSort      -- ^ The S#min limit object for sort S
   | MereologicalEntityKindResultOfSOLFunction    -- ^ The f#res result object of an SOL function
   | MereologicalEntityKindArgumentOfSOLFunction  -- ^ The f#N argument object of an SOL function
+  | MereologicalEntityKindRelationFromReflection -- ^ A relation reflected into its parent theory as an individual
   deriving (Show, Eq)
 
 data FactCategory
@@ -380,7 +381,7 @@ data Relation = Relation
   , relDomain        :: Sort
   , relArgObjects    :: [MereologicalObject]
   , relArgument      :: MereologicalObject
-  , relAssociatedSet :: MereologicalObject
+  , relAssociatedSet :: Maybe MereologicalObject
   , relReflectedFrom :: Maybe Theory   -- ^ Just originalTheory when this is a reflected copy
   }
 
