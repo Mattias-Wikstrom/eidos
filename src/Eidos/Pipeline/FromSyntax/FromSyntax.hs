@@ -1099,6 +1099,15 @@ qualifySortRefs subName (EntityMereological m) =
   EntityMereological (m { mereoSort        = qualSort (mereoSort m)
                         , mereoLimitForSort = fmap qualSort (mereoLimitForSort m) })
   where qualSort s = s { sortName = subName ++ "." ++ sortName s }
+qualifySortRefs subName (EntityRelation r) =
+  EntityRelation (r { relArgSorts      = map qualSort (relArgSorts r)
+                    , relDomain        = qualSort (relDomain r)
+                    , relArgObjects    = map qualMereo (relArgObjects r)
+                    , relArgument      = qualMereo (relArgument r)
+                    , relAssociatedSet = qualMereo (relAssociatedSet r) })
+  where
+    qualSort  s = s { sortName  = subName ++ "." ++ sortName s }
+    qualMereo m = m { mereoName = subName ++ "." ++ mereoName m }
 qualifySortRefs _ e = e
 
 -- | Patch the primary name field of an entity.  Used when a reflected entity
