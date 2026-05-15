@@ -815,9 +815,12 @@ addFOLInfraForReflected th (EntityRelation r)
                              argSorts [1..]
           -- argument individual: element of the reflected domain sort
           domArg   = mkMereo th MereologicalEntityKindIndividual (NC.funArg nm) domSort auxOrig
-          r'       = r { relDomain     = domSort
-                       , relArgObjects = argObjs
-                       , relArgument   = domArg
+          -- associated-set individual: also an element of the reflected domain sort
+          assocSet = (relAssociatedSet r) { mereoSort = domSort }
+          r'       = r { relDomain        = domSort
+                       , relArgObjects    = argObjs
+                       , relArgument      = domArg
+                       , relAssociatedSet = assocSet
                        }
           replaceR e = case e of
             EntityRelation s | relName s == nm -> EntityRelation r'
