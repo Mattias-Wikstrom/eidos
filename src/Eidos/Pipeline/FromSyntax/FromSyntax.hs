@@ -744,37 +744,57 @@ addFOLInfraForReflected th (EntityFunction f)
           argSorts = funcArgSorts f
           resSort  = funcResSort f
           auxOrig  = FromReflection
-          domSort  = Sort
-            { sortKind             = SortKindProduct
-            , sortTheory           = th
-            , sortOrigin           = auxOrig
-            , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (NC.sortMin (NC.funDom nm)) domSort auxOrig
-            , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (NC.sortMax (NC.funDom nm)) domSort auxOrig
-            , sortName             = NC.funDom nm
-            , sortComponentSorts   = argSorts
-            , sortAssociatedEntity = Just (EntityFunction f')
-            , sortReflectedFrom    = Nothing
-            }
-          domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (NC.funArg nm) domSort auxOrig
-          dirImg = mkSOLFunction th (NC.funDirImg nm) FunctionKindDirectImageFunction [domSort] resSort auxOrig
-          invImg = mkSOLFunction th (NC.funInvImg nm) FunctionKindInverseImageFunction [resSort] domSort auxOrig
-          f'     = f { funcDomain      = Just domSort
-                     , funcArgument    = Just domArg
-                     , funcDirectImage  = Just dirImg
-                     , funcInverseImage = Just invImg
-                     }
-          replaceF e = case e of
-            EntityFunction g | funcName g == nm -> EntityFunction f'
-            _                                   -> e
-          th1 = th  { theoryObjects      = map replaceF (theoryObjects th)
-                     , theoryObjectsByName = Map.adjust (map replaceF) nm (theoryObjectsByName th)
-                     }
-          th2 = addEntityToTh th1 (EntitySort domSort)
-          th3 = addEntityToTh th2 (EntityMereological (sortMin domSort))
-          th4 = addEntityToTh th3 (EntityMereological (sortMax domSort))
-          th5 = addEntityToTh th4 (EntityFunction dirImg)
-          th6 = addEntityToTh th5 (EntityFunction invImg)
-      in th6
+      in if length argSorts == 1
+         then
+           -- single-arg: no product sort; dirImg/invImg use the argument sort directly
+           let argSort = head argSorts
+               dirImg  = mkSOLFunction th (NC.funDirImg nm) FunctionKindDirectImageFunction [argSort] resSort auxOrig
+               invImg  = mkSOLFunction th (NC.funInvImg nm) FunctionKindInverseImageFunction [resSort] argSort auxOrig
+               f'      = f { funcDirectImage  = Just dirImg
+                           , funcInverseImage = Just invImg
+                           }
+               replaceF e = case e of
+                 EntityFunction g | funcName g == nm -> EntityFunction f'
+                 _                                   -> e
+               th1 = th { theoryObjects      = map replaceF (theoryObjects th)
+                         , theoryObjectsByName = Map.adjust (map replaceF) nm (theoryObjectsByName th)
+                         }
+               th2 = addEntityToTh th1 (EntityFunction dirImg)
+               th3 = addEntityToTh th2 (EntityFunction invImg)
+           in th3
+         else
+           -- multi-arg: create product domain sort with limits, domArg, dirImg, invImg
+           let domSort  = Sort
+                 { sortKind             = SortKindProduct
+                 , sortTheory           = th
+                 , sortOrigin           = auxOrig
+                 , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (NC.sortMin (NC.funDom nm)) domSort auxOrig
+                 , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (NC.sortMax (NC.funDom nm)) domSort auxOrig
+                 , sortName             = NC.funDom nm
+                 , sortComponentSorts   = argSorts
+                 , sortAssociatedEntity = Just (EntityFunction f')
+                 , sortReflectedFrom    = Nothing
+                 }
+               domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (NC.funArg nm) domSort auxOrig
+               dirImg = mkSOLFunction th (NC.funDirImg nm) FunctionKindDirectImageFunction [domSort] resSort auxOrig
+               invImg = mkSOLFunction th (NC.funInvImg nm) FunctionKindInverseImageFunction [resSort] domSort auxOrig
+               f'     = f { funcDomain      = Just domSort
+                          , funcArgument    = Just domArg
+                          , funcDirectImage  = Just dirImg
+                          , funcInverseImage = Just invImg
+                          }
+               replaceF e = case e of
+                 EntityFunction g | funcName g == nm -> EntityFunction f'
+                 _                                   -> e
+               th1 = th  { theoryObjects      = map replaceF (theoryObjects th)
+                          , theoryObjectsByName = Map.adjust (map replaceF) nm (theoryObjectsByName th)
+                          }
+               th2 = addEntityToTh th1 (EntitySort domSort)
+               th3 = addEntityToTh th2 (EntityMereological (sortMin domSort))
+               th4 = addEntityToTh th3 (EntityMereological (sortMax domSort))
+               th5 = addEntityToTh th4 (EntityFunction dirImg)
+               th6 = addEntityToTh th5 (EntityFunction invImg)
+           in th6
 addFOLInfraForReflected th _ = th
 
 mkFOLFunction :: Theory -> String -> [Sort] -> Sort -> Origin
