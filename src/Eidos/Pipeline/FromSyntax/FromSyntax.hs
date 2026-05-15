@@ -1186,7 +1186,9 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
                                then NC.sortMinElem else NC.sortMaxElem
                   elemName  = if null subName then mkElemName (sortName limitSort)
                               else subName ++ "." ++ mkElemName (sortName limitSort)
-                  reflected = qualifySortRefs subName (reflectEntity (EntityMereological m))
+                  reflected = case qualifySortRefs subName (reflectEntity (EntityMereological m)) of
+                                EntityMereological m' -> EntityMereological (m' { mereoLimitForSort = Nothing })
+                                e                     -> e
                   renamed   = renameEntity elemName reflected
                   th1 = addEntityToParent th elemName reflected
                   th2 = th1 { theoryObjects      = theoryObjects th1 ++ [renamed]
