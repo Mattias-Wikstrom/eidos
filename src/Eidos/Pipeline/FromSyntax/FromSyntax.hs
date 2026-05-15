@@ -1725,18 +1725,25 @@ lookupFunction th nm =
 
 lookupSortByExpr :: Theory -> SortExpr -> Either BuildError Sort
 lookupSortByExpr th sexpr = do
-  let sr = sortRef sexpr
-  th' <- case sortSpecifier sr of
-    []    -> Right th
-    specs -> findSubtheoryByPath th (map theoryRefName specs)
-  case sortHashAttr sr of
-    Nothing   -> lookupSort th' (sortConstant sr)
-    Just attr -> do
-      fn <- lookupFunction th' (sortConstant sr)
-      case attr of
-        "dom" -> maybe (Left $ "Function '" ++ sortConstant sr ++ "' has no domain sort") Right
-                       (funcDomain fn)
-        _     -> Left $ "Unknown sort attribute '#" ++ attr ++ "' on '" ++ sortConstant sr ++ "'"
+  let sr    = sortRef sexpr
+      specs = sortSpecifier sr
+  case specs of
+    [] -> case sortHashAttr sr of
+      Nothing   -> lookupSort th (sortConstant sr)
+      Just attr -> do
+        fn <- lookupFunction th (sortConstant sr)
+        case attr of
+          "dom" -> maybe (Left $ "Function '" ++ sortConstant sr ++ "' has no domain sort") Right
+                         (funcDomain fn)
+          _     -> Left $ "Unknown sort attribute '#" ++ attr ++ "' on '" ++ sortConstant sr ++ "'"
+    _ -> do
+      -- For qualified names (e.g. inner_theory.S), look up the fully-qualified
+      -- key in the parent theory's name map only.  The parent is authoritative:
+      -- reflected sorts live here under their qualified name.
+      let qualifiedName = intercalate "." (map theoryRefName specs ++ [sortConstant sr])
+      case Map.lookup qualifiedName (theoryObjectsByName th) of
+        Just (EntitySort s : _) -> Right s
+        _                       -> Left $ "Unknown sort: " ++ qualifiedName
 
 lookupEntity :: Theory -> String -> Either BuildError Entity
 lookupEntity th nm =
