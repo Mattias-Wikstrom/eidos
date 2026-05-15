@@ -1136,7 +1136,13 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
       let th2
             | isReflection =
                 let renamed = map (renameEntity qualifiedName) localToSub
-                    thBase  = th1 { theoryObjects = theoryObjects th1 ++ renamed }
+                    -- Also update theoryObjectsByName so qualified lookups return
+                    -- the renamed entity (with the qualified sortName) rather than
+                    -- the transformed entity (with the original unqualified name)
+                    -- that was stored by addEntityToParent above.
+                    thBase  = foldl (\t e -> t { theoryObjects      = theoryObjects t ++ [e]
+                                               , theoryObjectsByName = Map.insert (entityName e) [e] (theoryObjectsByName t) })
+                                    th1 renamed
                 in foldl addFOLInfraForReflected thBase renamed
             | isImplicit && not (all isInternalEntity transformed) && not (null localToSub) =
                 let existingNames = map entityName (theoryObjects th1)
