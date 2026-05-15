@@ -70,9 +70,6 @@ tupleName f = NC.funTuple (IR.funcName f)
 irPredicateName :: IR.Function -> String
 irPredicateName f = NC.irPredicate (IR.funcName f)
 
-invName :: IR.Function -> String
-invName f = NC.funInv (IR.funcName f)
-
 -- ---------------------------------------------------------------------------
 -- Tag-set helpers
 -- ---------------------------------------------------------------------------
@@ -104,11 +101,9 @@ mkAxiomSets pt = concat
   , projectionFunctionDeclAxiomSets
   , projectionInverseDeclAxiomSets
   , tupleFunctionDeclAxiomSets
-  , folInverseDeclAxiomSets
   , irPredicateDeclAxiomSets
   , functionArgResultDeclAxiomSets
   , relArgObjectDeclAxiomSets
-  , folInverseArgResDeclAxiomSets
   , productArgDeclAxiomSets
   , relArgumentDeclAxiomSets
   , projectionWitnessDeclAxiomSets
@@ -141,7 +136,7 @@ mkAxiomSets pt = concat
   multiArgFolFunctions =
     filter (\f -> length (IR.funcArgSorts f) > 1) folFunctions
 
-  userDeclaredFolFunctions = folFunctions
+  userDeclaredFolFunctions = filter (\f -> IR.funcOrigin f == IR.FromSignature) folFunctions
 
   individualObjects =
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
@@ -282,14 +277,22 @@ mkAxiomSets pt = concat
     ++ map mkFOLDecl userDeclaredFolFunctions
     where
       mkSOLDecl f =
-        axiomSet [SFunction (IR.funcName f)] (tags tSOL)
-          [(IR.funcName f, funcArity f)]
+        let n = length (IR.funcArgObjects f)
+        in axiomSet [SFunction (IR.funcName f)] (tags tSOL)
+             [(IR.funcName f, if n == 0 then ABDeclProp else ABDeclFunc n)]
       mkFOLDecl f =
         axiomSet [SFunction (IR.funcName f)] (tags tFOL)
-          [(IR.funcName f, funcArity f)]
-      funcArity f =
-        let n = length (IR.funcArgObjects f)
-        in if n == 0 then ABDeclProp else ABDeclFunc n
+          [(IR.funcName f, folFuncBody f)]
+      folFuncBody f =
+        let fn     = IR.funcName f
+            n      = length (IR.funcArgSorts f)
+            params = [ "X" ++ show k | k <- [1..n] ]
+            arg    = case params of
+                       [p] -> IR.MVar p
+                       _   -> IR.MAbbrevApp (NC.funTuple fn) (map IR.MVar params)
+        in if n == 0
+           then ABDeclProp
+           else ABDef params (IR.MAbbrevApp (NC.funDirImg fn) [arg])
 
   -- -------------------------------------------------------------------------
   -- 5. Image function declarations: f_dir_img, f_inv_img
@@ -345,17 +348,6 @@ mkAxiomSets pt = concat
              [(tupleName f, ABDeclFunc arity)]
 
   -- -------------------------------------------------------------------------
-  -- 9. FOL inverse declarations: g_inv, h_inv, ...
-  -- -------------------------------------------------------------------------
-  folInverseDeclAxiomSets :: [AxiomSet]
-  folInverseDeclAxiomSets = map mkInvDecl folSingleArgFunctions
-    where
-      mkInvDecl f =
-        axiomSet [SFunction (IR.funcName f), SInverse]
-                 (tags [TagFunction, TagFOLFunction, TagInverse, TagDecl])
-          [(invName f, ABDeclFunc 1)]
-
-  -- -------------------------------------------------------------------------
   -- 10. IR predicate declarations: IR_f
   -- -------------------------------------------------------------------------
   irPredicateDeclAxiomSets :: [AxiomSet]
@@ -383,22 +375,6 @@ mkAxiomSets pt = concat
                       (tags tFun)
                [(sanitizeName (IR.mereoName obj), ABDeclProp)]
            | Just obj <- [IR.funcResObject f]
-           ]
-
-  -- -------------------------------------------------------------------------
-  -- 12. FOL inverse arg/res object declarations
-  -- -------------------------------------------------------------------------
-  folInverseArgResDeclAxiomSets :: [AxiomSet]
-  folInverseArgResDeclAxiomSets = concatMap mkInvObjDecls folSingleArgFunctions
-    where
-      mkInvObjDecls f =
-        let fInv = invName f
-        in [ axiomSet [SFunction (IR.funcName f), SInverse, SArgObject 1]
-                      (tags [TagFunction, TagFOLFunction, TagInverse, TagDecl])
-               [(NC.funArgN fInv 1, ABDeclProp)]
-           , axiomSet [SFunction (IR.funcName f), SInverse, SResObject]
-                      (tags [TagFunction, TagFOLFunction, TagInverse, TagDecl])
-               [(NC.funRes fInv, ABDeclProp)]
            ]
 
   -- -------------------------------------------------------------------------
@@ -503,8 +479,6 @@ mkAxiomSets pt = concat
     SB.SBCFunctionTupleArg fn          -> ([SFunction fn, STuple, SArgObject 0], [TagFunction, TagFOLFunction, TagTuple, TagSorting])
     SB.SBCFunctionImageArg fn          -> ([SFunction fn, SImage, SArgObject 1], [TagFunction, TagFOLFunction, TagImage, TagSorting])
     SB.SBCFunctionImageRes fn          -> ([SFunction fn, SImage, SResObject], [TagFunction, TagFOLFunction, TagImage, TagSorting])
-    SB.SBCFunctionInverseArg fn        -> ([SFunction fn, SInverse, SArgObject 1], [TagFunction, TagFOLFunction, TagInverse, TagSorting])
-    SB.SBCFunctionInverseRes fn        -> ([SFunction fn, SInverse, SResObject], [TagFunction, TagFOLFunction, TagInverse, TagSorting])
     SB.SBCFunctionProjectionArg fn k   -> ([SFunction fn, SProjection k, SArgObject 1], [TagFunction, TagFOLFunction, TagProjection, TagSorting])
     SB.SBCFunctionProjectionRes fn k   -> ([SFunction fn, SProjection k, SResObject], [TagFunction, TagFOLFunction, TagProjection, TagSorting])
     SB.SBCRelationObj rn               -> ([SSet rn], [TagSet, TagSorting])
@@ -524,10 +498,8 @@ mkAxiomSets pt = concat
   factContextToPathAndTags :: FF.FunctionFactContext -> ([SubjectNode], [Tag])
   factContextToPathAndTags ctx = case ctx of
     FF.FFCFunctionConnection fn        -> ([SFunction fn],                      [TagFunction, TagConnection])
-    FF.FFCInverseConnection  fn        -> ([SFunction fn, SInverse],            [TagFunction, TagFOLFunction, TagInverse, TagConnection])
     FF.FFCDirImageConnection fn        -> ([SFunction fn, SImage],              [TagFunction, TagFOLFunction, TagImage,   TagConnection])
     FF.FFCInvImageConnection fn        -> ([SFunction fn, SImage],              [TagFunction, TagFOLFunction, TagImage,   TagConnection])
-    FF.FFCInverseAdjunction  fn        -> ([SFunction fn, SInverse],            [TagFunction, TagFOLFunction, TagInverse, TagAdjunction])
     FF.FFCImageAdjunction    fn        -> ([SFunction fn, SImage],              [TagFunction, TagFOLFunction, TagImage,   TagAdjunction])
     FF.FFCDecomposition      fn        -> ([SFunction fn],                      [TagFunction, TagFOLFunction, TagDecomposition])
     FF.FFCTupleConnection    fn        -> ([SFunction fn, STuple],              [TagFunction, TagFOLFunction, TagTuple,   TagConnection])

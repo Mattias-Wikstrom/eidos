@@ -30,10 +30,8 @@ import qualified Eidos.Pipeline.IRProcessing.NamingConventions as NC
 -- assign 'SubjectPath' and tag sets.
 data FunctionFactContext
   = FFCFunctionConnection String          -- fn;   [SFunction fn],               [TagFunction, TagConnection]
-  | FFCInverseConnection  String          -- fn;   [SFunction fn, SInverse],      [TagFunction, TagFOLFunction, TagInverse, TagConnection]
   | FFCDirImageConnection String          -- fn;   [SFunction fn, SImage],        [TagFunction, TagFOLFunction, TagImage, TagConnection]
   | FFCInvImageConnection String          -- fn;   [SFunction fn, SImage],        [TagFunction, TagFOLFunction, TagImage, TagConnection]
-  | FFCInverseAdjunction  String          -- fn;   [SFunction fn, SInverse],      [TagFunction, TagFOLFunction, TagInverse, TagAdjunction]
   | FFCImageAdjunction    String          -- fn;   [SFunction fn, SImage],        [TagFunction, TagFOLFunction, TagImage, TagAdjunction]
   | FFCDecomposition      String          -- fn;   [SFunction fn],                [TagFunction, TagFOLFunction, TagDecomposition]
   | FFCTupleConnection    String          -- fn;   [SFunction fn, STuple],        [TagFunction, TagFOLFunction, TagTuple, TagConnection]
@@ -61,8 +59,7 @@ data FunctionFactEntry = FunctionFactEntry
 -- Private name helpers
 -- ---------------------------------------------------------------------------
 
-invN, dirImgN, invImgN, tupleN, irPredN :: String -> String
-invN    = NC.funInv
+dirImgN, invImgN, tupleN, irPredN :: String -> String
 dirImgN = NC.funDirImg
 invImgN = NC.funInvImg
 tupleN  = NC.funTuple
@@ -108,10 +105,8 @@ domSort f = maybe (error "FunctionFacts: function has no domain sort") id (IR.fu
 theoryFunctionFactEntries :: IR.Theory -> [FunctionFactEntry]
 theoryFunctionFactEntries theory = concat
   [ functionConnections
-  , inverseConnections
   , dirImageConnections
   , invImageConnections
-  , inverseAdjunctions
   , imageAdjunctions
   , decompositions
   , tupleConnections
@@ -128,8 +123,6 @@ theoryFunctionFactEntries theory = concat
     folFunctions   = IR.theoryFOLFunctions theory
 
     userDeclFol    = filter (\f -> IR.funcOrigin f == IR.FromSignature) folFunctions
-    singleArgFol   = filter (\f -> length (IR.funcArgSorts f) == 1
-                                && IR.funcOrigin f == IR.FromSignature) folFunctions
     multiArgFol    = filter (\f -> length (IR.funcArgSorts f) > 1
                                 && IR.funcOrigin f == IR.FromSignature) folFunctions
 
@@ -162,26 +155,6 @@ theoryFunctionFactEntries theory = concat
                         (bounded resVarN (IR.mereoSort resObj) body)
                         (zip argVarNs argObjs)
             in [FunctionFactEntry (FFCFunctionConnection fN) [(NC.axiomFact fN, quantified)]]
-
-    -- -----------------------------------------------------------------------
-    -- 23. FOL inverse connection axioms
-    -- -----------------------------------------------------------------------
-    inverseConnections = map mkInvConn singleArgFol
-      where
-        mkInvConn f =
-          let fN      = IR.funcName f
-              fInvN   = invN fN
-              argSort = head (IR.funcArgSorts f)
-              resSort = IR.funcResSort f
-              n1      = NC.funArgN fInvN 1
-              nr      = NC.funRes fInvN
-              lhs     = conj (bicond (var "X1") (var n1))
-                             (bicond (var "X2") (var nr))
-              rhs     = bicond (var "X2") (app fInvN [var "X1"])
-              body    = bicond lhs rhs
-              q2      = bounded "X2" argSort body
-              q1      = bounded "X1" resSort q2
-          in FunctionFactEntry (FFCInverseConnection fN) [(NC.axiomFact fInvN, q1)]
 
     -- -----------------------------------------------------------------------
     -- 24. Direct image connection axioms
@@ -225,23 +198,6 @@ theoryFunctionFactEntries theory = concat
               qB      = bounded "B" dom body
               qA      = bounded "A" resSort qB
           in FunctionFactEntry (FFCInvImageConnection fN) [(NC.axiomFact iImgN, qA)]
-
-    -- -----------------------------------------------------------------------
-    -- 26. FOL adjunction axioms
-    -- -----------------------------------------------------------------------
-    inverseAdjunctions = map mkAdj singleArgFol
-      where
-        mkAdj f =
-          let fN      = IR.funcName f
-              fInvN   = invN fN
-              argSort = head (IR.funcArgSorts f)
-              resSort = IR.funcResSort f
-              lhs     = impl (var "Y") (app fN [var "X"])
-              rhs     = impl (app fInvN [var "Y"]) (var "X")
-              body    = bicond lhs rhs
-              qY      = bounded "Y" resSort body
-              qX      = bounded "X" argSort qY
-          in FunctionFactEntry (FFCInverseAdjunction fN) [(NC.axiomAdjunction fN, qX)]
 
     -- -----------------------------------------------------------------------
     -- 27. Image adjunction axioms

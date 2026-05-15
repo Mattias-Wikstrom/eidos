@@ -53,8 +53,6 @@ data SortBoundContext
   | SBCFunctionTupleArg String         -- [SFunction fn, STuple, SArgObject 0], tags [TagFunction, TagFOLFunction, TagTuple, TagSorting]
   | SBCFunctionImageArg String         -- [SFunction fn, SImage, SArgObject 1], tags [TagFunction, TagFOLFunction, TagImage, TagSorting]
   | SBCFunctionImageRes String         -- [SFunction fn, SImage, SResObject], tags [TagFunction, TagFOLFunction, TagImage, TagSorting]
-  | SBCFunctionInverseArg String       -- [SFunction fn, SInverse, SArgObject 1], tags [TagFunction, TagFOLFunction, TagInverse, TagSorting]
-  | SBCFunctionInverseRes String       -- [SFunction fn, SInverse, SResObject], tags [TagFunction, TagFOLFunction, TagInverse, TagSorting]
   | SBCFunctionProjectionArg String Int -- [SFunction fn, SProjection k, SArgObject 1], tags [TagFunction, TagFOLFunction, TagProjection, TagSorting]
   | SBCFunctionProjectionRes String Int -- [SFunction fn, SProjection k, SResObject], tags [TagFunction, TagFOLFunction, TagProjection, TagSorting]
   | SBCRelationObj String              -- [SSet rn], tags [TagSet, TagSorting]
@@ -120,7 +118,6 @@ theorySortBoundEntries opts theory = concat
   , dSetBounds
   , userSortSetBounds
   , functionArgResBounds
-  , folInverseBounds
   , productArgBounds
   , invImgWitnessBounds
   , projWitnessBounds
@@ -216,21 +213,6 @@ theorySortBoundEntries opts theory = concat
             in mkEntry opts n lo hi (SBCFunctionObj (IR.funcName f))
           | m <- IR.funcArgObjects f ++ maybe [] (:[]) (IR.funcResObject f)
           ]
-
-    -- -----------------------------------------------------------------------
-    -- 20. FOL inverse arg/res bounds
-    -- -----------------------------------------------------------------------
-    folInverseBounds = concatMap mkForFunc folSingleArg
-      where
-        mkForFunc f =
-          let fInv  = NC.funInv (IR.funcName f)
-              n1    = NC.funArgN fInv 1
-              nr    = NC.funRes fInv
-              (lo1, hi1) = sortMinMaxNames (IR.funcResSort f)
-              (lor, hir) = sortMinMaxNames (head (IR.funcArgSorts f))
-          in [ mkEntry opts n1 lo1 hi1 (SBCFunctionInverseArg (IR.funcName f))
-             , mkEntry opts nr  lor hir (SBCFunctionInverseRes (IR.funcName f))
-             ]
 
     -- -----------------------------------------------------------------------
     -- 13 (sorting). Product tuple argument bounds

@@ -258,23 +258,18 @@ buildSignatureItem th0 th item = do
           shouldInsert <- shouldInsertDeclaration nm (EntityFunction f)
           return (if shouldInsert then addEntityToTh th' (EntityFunction f) else th')
         else do
-          let (f, domSort, invFn, dirImg, invImg) =
+          let (f, domSort, dirImg, invImg) =
                 mkFOLFunction th' nm argSorts resSort FromSignature
           shouldInsert <- shouldInsertDeclaration nm (EntityFunction f)
           if shouldInsert
             then do
-              let th1  = addEntityToTh th'  (EntitySort domSort)
-                  th2  = addEntityToTh th1 (EntityMereological (sortMin domSort))
-                  th3  = addEntityToTh th2 (EntityMereological (sortMax domSort))
-                  invDomSort = case funcDomain invFn of { Just d -> d; Nothing -> domSort }
-                  th4  = addEntityToTh th3 (EntitySort invDomSort)
-                  th5  = addEntityToTh th4 (EntityMereological (sortMin invDomSort))
-                  th6  = addEntityToTh th5 (EntityMereological (sortMax invDomSort))
-                  th7  = addEntityToTh th6 (EntityFunction f)
-                  th8  = addEntityToTh th7 (EntityFunction invFn)
-                  th9  = addEntityToTh th8 (EntityFunction dirImg)
-                  th10 = addEntityToTh th9 (EntityFunction invImg)
-              return th10
+              let th1 = addEntityToTh th'  (EntitySort domSort)
+                  th2 = addEntityToTh th1  (EntityMereological (sortMin domSort))
+                  th3 = addEntityToTh th2  (EntityMereological (sortMax domSort))
+                  th4 = addEntityToTh th3  (EntityFunction f)
+                  th5 = addEntityToTh th4  (EntityFunction dirImg)
+                  th6 = addEntityToTh th5  (EntityFunction invImg)
+              return th6
             else return th'
 
     SigIndividual (IndividualDeclaration nm sortExprAST) -> do
@@ -735,7 +730,7 @@ mkMereoOperation th nm argSorts resSort orig = Function
   }
 
 mkFOLFunction :: Theory -> String -> [Sort] -> Sort -> Origin
-              -> (Function, Sort, Function, Function, Function)
+              -> (Function, Sort, Function, Function)
 mkFOLFunction th nm argSorts resSort orig =
   let auxOrig = FromFunction
       f0 = mkSOLFunction th nm FunctionKindFOLFunctionFromTheory argSorts resSort orig
@@ -758,23 +753,7 @@ mkFOLFunction th nm argSorts resSort orig =
              , funcDirectImage  = Just dirImg
              , funcInverseImage = Just invImg
              }
-      inv0 = mkSOLFunction th (NC.funInv nm) FunctionKindFOLFunctionFromTheory [resSort] domSort auxOrig
-      invDomSort = Sort
-        { sortKind             = SortKindProduct
-        , sortTheory           = th
-        , sortOrigin           = auxOrig
-        , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (NC.sortMin (NC.funInvDom nm)) invDomSort auxOrig
-        , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (NC.sortMax (NC.funInvDom nm)) invDomSort auxOrig
-        , sortName             = NC.funInvDom nm
-        , sortComponentSorts   = [resSort]
-        , sortAssociatedEntity = Just (EntityFunction invFn)
-        , sortReflectedFrom    = Nothing
-        }
-      invArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (NC.funInvArg nm) invDomSort auxOrig
-      invFn = inv0 { funcDomain   = Just invDomSort
-                   , funcArgument = Just invArg
-                   }
-  in (f, domSort, invFn, dirImg, invImg)
+  in (f, domSort, dirImg, invImg)
 
 mkSortLimitFact :: MereologicalObject -> String -> MereologicalObject -> Fact
 mkSortLimitFact l op r = Fact
@@ -1351,15 +1330,19 @@ termToMereo (ResolvedTerm left rests _) =
 applyArithToMereo :: MereoExpr -> ResolvedOperationFollowedByFactor -> MereoExpr
 applyArithToMereo leftExpr off =
   let right = factorToMereo (resolvedOFFRight off)
-  in case resolvedOFFOp off of
+      path  = resolvedOFFTheoryPath off
+      op    = resolvedOFFOp off
+  in if not (null path)
+     then MAbbrevApp (intercalate "." (path ++ [op])) [leftExpr, right]
+     else case op of
        "+"  -> MSum     leftExpr right
        "×"  -> MProd    leftExpr right
-       "-"  -> MDiff    leftExpr right    
+       "-"  -> MDiff    leftExpr right
        "∸"  -> MSymDiff leftExpr right
        "⇒"  -> MRevDiff right leftExpr
        "∪"  -> MSum     leftExpr right
        "∩"  -> MProd    leftExpr right
-       _    -> MVar ("unknown:" ++ resolvedOFFOp off)
+       _    -> MVar ("unknown:" ++ op)
 
 factorToMereo :: ResolvedFactor -> MereoExpr
 factorToMereo (ResolvedFactor base suffixes _) =

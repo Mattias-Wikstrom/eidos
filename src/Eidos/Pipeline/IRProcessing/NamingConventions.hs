@@ -22,9 +22,6 @@ module Eidos.Pipeline.IRProcessing.NamingConventions
   , funArgN
   , funArg
   , funDom
-  , funInv
-  , funInvDom
-  , funInvArg
   , funDirImg
   , funInvImg
   , funSet
@@ -100,20 +97,6 @@ funArg fn = fn ++ "_arg"
 --   Example: @"f"@ → @"f_dom"@
 funDom :: String -> String
 funDom fn = fn ++ "_dom"
-
--- | Inverse function.  Example: @"f"@ → @"f_inv"@
-funInv :: String -> String
-funInv fn = fn ++ "_inv"
-
--- | Domain sort of the inverse function.
---   Example: @"f"@ → @"f_inv_dom"@
-funInvDom :: String -> String
-funInvDom fn = fn ++ "_inv_dom"
-
--- | Argument object of the inverse function.
---   Example: @"f"@ → @"f_inv_arg"@
-funInvArg :: String -> String
-funInvArg fn = fn ++ "_inv_arg"
 
 -- | Direct-image function.  Example: @"f"@ → @"f_dir_img"@
 funDirImg :: String -> String
