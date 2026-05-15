@@ -729,6 +729,53 @@ mkMereoOperation th nm argSorts resSort orig = Function
   , funcReflectedFrom = Nothing
   }
 
+-- | Set up the product-sort / direct-image / inverse-image infrastructure for
+-- a reflected multi-arg FOL function that was added to the theory by
+-- 'propagateSubtheory'.  The function entity is replaced in both
+-- 'theoryObjects' and 'theoryObjectsByName' with an updated version whose
+-- 'funcDomain', 'funcArgument', 'funcDirectImage', and 'funcInverseImage'
+-- fields are populated.
+addFOLInfraForReflected :: Theory -> Entity -> Theory
+addFOLInfraForReflected th (EntityFunction f)
+  | funcKind f == FunctionKindFOLFunctionFromReflection
+  , not (null (funcArgSorts f)) =
+      let nm       = funcName f
+          argSorts = funcArgSorts f
+          resSort  = funcResSort f
+          auxOrig  = FromReflection
+          domSort  = Sort
+            { sortKind             = SortKindProduct
+            , sortTheory           = th
+            , sortOrigin           = auxOrig
+            , sortMin              = mkMereo th MereologicalEntityKindLowerLimitForSort (NC.sortMin (NC.funDom nm)) domSort auxOrig
+            , sortMax              = mkMereo th MereologicalEntityKindUpperLimitForSort (NC.sortMax (NC.funDom nm)) domSort auxOrig
+            , sortName             = NC.funDom nm
+            , sortComponentSorts   = argSorts
+            , sortAssociatedEntity = Just (EntityFunction f')
+            , sortReflectedFrom    = Nothing
+            }
+          domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (NC.funArg nm) domSort auxOrig
+          dirImg = mkSOLFunction th (NC.funDirImg nm) FunctionKindDirectImageFunction [domSort] resSort auxOrig
+          invImg = mkSOLFunction th (NC.funInvImg nm) FunctionKindInverseImageFunction [resSort] domSort auxOrig
+          f'     = f { funcDomain      = Just domSort
+                     , funcArgument    = Just domArg
+                     , funcDirectImage  = Just dirImg
+                     , funcInverseImage = Just invImg
+                     }
+          replaceF e = case e of
+            EntityFunction g | funcName g == nm -> EntityFunction f'
+            _                                   -> e
+          th1 = th  { theoryObjects      = map replaceF (theoryObjects th)
+                     , theoryObjectsByName = Map.adjust (map replaceF) nm (theoryObjectsByName th)
+                     }
+          th2 = addEntityToTh th1 (EntitySort domSort)
+          th3 = addEntityToTh th2 (EntityMereological (sortMin domSort))
+          th4 = addEntityToTh th3 (EntityMereological (sortMax domSort))
+          th5 = addEntityToTh th4 (EntityFunction dirImg)
+          th6 = addEntityToTh th5 (EntityFunction invImg)
+      in th6
+addFOLInfraForReflected th _ = th
+
 mkFOLFunction :: Theory -> String -> [Sort] -> Sort -> Origin
               -> (Function, Sort, Function, Function)
 mkFOLFunction th nm argSorts resSort orig =
@@ -970,7 +1017,8 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
       let th2
             | isReflection =
                 let renamed = map (renameEntity qualifiedName) localToSub
-                in th1 { theoryObjects = theoryObjects th1 ++ renamed }
+                    thBase  = th1 { theoryObjects = theoryObjects th1 ++ renamed }
+                in foldl addFOLInfraForReflected thBase renamed
             | isImplicit && not (all isInternalEntity transformed) && not (null localToSub) =
                 let existingNames = map entityName (theoryObjects th1)
                     fresh = filter (\e -> entityName e `notElem` existingNames) localToSub

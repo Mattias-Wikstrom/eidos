@@ -136,7 +136,7 @@ mkAxiomSets pt = concat
   multiArgFolFunctions =
     filter (\f -> length (IR.funcArgSorts f) > 1) folFunctions
 
-  userDeclaredFolFunctions = filter (\f -> IR.funcOrigin f == IR.FromSignature) folFunctions
+  userDeclaredFolFunctions = filter (\f -> IR.funcOrigin f `elem` [IR.FromSignature, IR.FromReflection]) folFunctions
 
   individualObjects =
     [ m | IR.EntityMereological m <- IR.theoryObjects theory
