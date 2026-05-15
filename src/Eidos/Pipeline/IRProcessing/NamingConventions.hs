@@ -16,6 +16,8 @@ module Eidos.Pipeline.IRProcessing.NamingConventions
   ( -- * Sort limit names
     sortMin
   , sortMax
+  , sortMinElem
+  , sortMaxElem
 
     -- * FOL function derived names
   , funRes
@@ -75,6 +77,14 @@ sortMin s = s ++ "_Min"
 -- | Upper limit of a sort.  Example: @"S"@ → @"S_Max"@
 sortMax :: String -> String
 sortMax s = s ++ "_Max"
+
+-- | Reflected lower-limit individual of a sort.  Example: @"S"@ → @"S_min_elem"@
+sortMinElem :: String -> String
+sortMinElem s = s ++ "_min_elem"
+
+-- | Reflected upper-limit individual of a sort.  Example: @"S"@ → @"S_max_elem"@
+sortMaxElem :: String -> String
+sortMaxElem s = s ++ "_max_elem"
 
 -- ---------------------------------------------------------------------------
 -- FOL function derived names

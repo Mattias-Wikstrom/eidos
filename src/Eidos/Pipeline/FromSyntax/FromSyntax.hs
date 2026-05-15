@@ -1162,42 +1162,74 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
   foldM addEntry parentTh (Map.toList (theoryObjectsByName subTh))
   where
     addEntry th (name, entities) = do
-      let transformed = if isReflection
-                          then map (qualifySortRefs subName . reflectEntity) entities
-                          else entities
-          qualifiedName = if null subName then name else subName ++ "." ++ name
-          localToSub = [e | e <- transformed, theoryFullyQualifiedName (entityTheory e) == theoryFullyQualifiedName subTh]
+      let qualifiedName = if null subName then name else subName ++ "." ++ name
 
-      -- Update the name map (existing behaviour).
-      let th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
+      -- Special case: reflecting a sort → create a fresh sort with proper sort limits.
+      -- The original sort's min/max (S_Min, S_Max) are reflected separately as individuals
+      -- named S_min_elem / S_max_elem (see case below), so no name clash arises.
+      case (isReflection, entities) of
+        (True, [EntitySort s])
+          | theoryFullyQualifiedName (sortTheory s) == theoryFullyQualifiedName subTh ->
+              let reflectedSort = (mkSort th SortKindFromReflection qualifiedName FromReflection)
+                                    { sortReflectedFrom = Just subTh }
+              in Right (addSortToTh th reflectedSort)
 
-      -- Also register in theoryObjects so the pipeline sees these entities:
-      --   Reflection subtheories are skipped in block generation, so their
-      --   reflected entities must be owned by the parent under a qualified name.
-      --   Implicit subtheory entities enter under their original name; dedup
-      --   ensures an entity shared by multiple implicit subtheories appears once.
-      let th2
-            | isReflection =
-                let renamed = map (renameEntity qualifiedName) localToSub
-                    -- Also update theoryObjectsByName so qualified lookups return
-                    -- the renamed entity (with the qualified sortName) rather than
-                    -- the transformed entity (with the original unqualified name)
-                    -- that was stored by addEntityToParent above.
-                    thBase  = foldl (\t e -> t { theoryObjects      = theoryObjects t ++ [e]
-                                               , theoryObjectsByName = Map.insert (entityName e) [e] (theoryObjectsByName t) })
-                                    th1 renamed
-                in foldl addFOLInfraForReflected thBase renamed
-            | isImplicit && not (all isInternalEntity transformed) && not (null localToSub) =
-                let existingNames = map entityName (theoryObjects th1)
-                    fresh = filter (\e -> entityName e `notElem` existingNames) localToSub
-                in th1 { theoryObjects = theoryObjects th1 ++ fresh }
-            | otherwise = th1
+        -- Special case: reflecting a sort limit → emit as an individual named
+        -- S_min_elem / S_max_elem rather than S_Min / S_Max, which are reserved
+        -- for the limits of the reflected sort itself (created in the case above).
+        (True, [EntityMereological m])
+          | theoryFullyQualifiedName (mereoTheory m) == theoryFullyQualifiedName subTh
+          , mereoKind m `elem` [ MereologicalEntityKindLowerLimitForSort
+                                , MereologicalEntityKindUpperLimitForSort ]
+          , Just limitSort <- mereoLimitForSort m ->
+              let mkElemName = if mereoKind m == MereologicalEntityKindLowerLimitForSort
+                               then NC.sortMinElem else NC.sortMaxElem
+                  elemName  = if null subName then mkElemName (sortName limitSort)
+                              else subName ++ "." ++ mkElemName (sortName limitSort)
+                  reflected = qualifySortRefs subName (reflectEntity (EntityMereological m))
+                  renamed   = renameEntity elemName reflected
+                  th1 = addEntityToParent th elemName reflected
+                  th2 = th1 { theoryObjects      = theoryObjects th1 ++ [renamed]
+                             , theoryObjectsByName = Map.insert elemName [renamed]
+                                                      (theoryObjectsByName th1) }
+              in Right th2
 
-      if isImplicit && not (all isInternalEntity transformed) && not (null transformed)
-        then if not (null localToSub)
-               then foldM (addUnqualified name qualifiedName) th2 localToSub
-               else Right $ foldl (\t e -> addEntityToParent t name e) th2 transformed
-        else Right th2
+        _ -> do
+          let transformed = if isReflection
+                              then map (qualifySortRefs subName . reflectEntity) entities
+                              else entities
+              localToSub = [e | e <- transformed, theoryFullyQualifiedName (entityTheory e) == theoryFullyQualifiedName subTh]
+
+          -- Update the name map (existing behaviour).
+          let th1 = foldl (\t e -> addEntityToParent t qualifiedName e) th transformed
+
+          -- Also register in theoryObjects so the pipeline sees these entities:
+          --   Reflection subtheories are skipped in block generation, so their
+          --   reflected entities must be owned by the parent under a qualified name.
+          --   Implicit subtheory entities enter under their original name; dedup
+          --   ensures an entity shared by multiple implicit subtheories appears once.
+          let th2
+                | isReflection =
+                    let renamed = map (renameEntity qualifiedName) localToSub
+                        -- Also update theoryObjectsByName so qualified lookups return
+                        -- the renamed entity (with the qualified sortName) rather than
+                        -- the transformed entity (with the original unqualified name)
+                        -- that was stored by addEntityToParent above.
+                        thBase  = foldl (\t e -> t { theoryObjects      = theoryObjects t ++ [e]
+                                                   , theoryObjectsByName = Map.insert (entityName e) [e] (theoryObjectsByName t) })
+                                        th1 renamed
+                    in foldl addFOLInfraForReflected thBase renamed
+                | isImplicit && not (all isInternalEntity transformed) && not (null localToSub) =
+                    let existingNames = map entityName (theoryObjects th1)
+                        fresh = filter (\e -> entityName e `notElem` existingNames) localToSub
+                    in th1 { theoryObjects = theoryObjects th1 ++ fresh }
+                | otherwise = th1
+
+          if isImplicit && not (all isInternalEntity transformed) && not (null transformed)
+            then if not (null localToSub)
+                   then foldM (addUnqualified name qualifiedName) th2 localToSub
+                   else Right $ foldl (\t e -> addEntityToParent t name e) th2 transformed
+            else Right th2
 
 termFromEntityWithName :: String -> Entity -> ResolvedTerm
 termFromEntityWithName displayName entity =
