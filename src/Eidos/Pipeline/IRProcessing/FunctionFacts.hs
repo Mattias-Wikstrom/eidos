@@ -122,9 +122,9 @@ theoryFunctionFactEntries theory = concat
     solFunctions   = IR.theorySOLFunctions theory
     folFunctions   = IR.theoryFOLFunctions theory
 
-    userDeclFol    = filter (\f -> IR.funcOrigin f == IR.FromSignature) folFunctions
-    multiArgFol    = filter (\f -> length (IR.funcArgSorts f) > 1
-                                && IR.funcOrigin f == IR.FromSignature) folFunctions
+    isUserOrReflected f = IR.funcOrigin f `elem` [IR.FromSignature, IR.FromReflection]
+    userDeclFol    = filter isUserOrReflected folFunctions
+    multiArgFol    = filter (\f -> length (IR.funcArgSorts f) > 1 && isUserOrReflected f) folFunctions
 
     userRelations  = [ r | IR.EntityRelation r <- IR.theoryObjects theory
                          , IR.relOrigin r == IR.FromSignature ]

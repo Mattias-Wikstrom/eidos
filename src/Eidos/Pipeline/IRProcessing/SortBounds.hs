@@ -128,11 +128,10 @@ theorySortBoundEntries opts theory = concat
 
     solFunctions = IR.theorySOLFunctions theory
     folFunctions = IR.theoryFOLFunctions theory
-    userDeclFol  = filter (\f -> IR.funcOrigin f == IR.FromSignature) folFunctions
-    folSingleArg = filter (\f -> length (IR.funcArgSorts f) == 1
-                              && IR.funcOrigin f == IR.FromSignature) folFunctions
-    multiArgFol  = filter (\f -> length (IR.funcArgSorts f) > 1
-                              && IR.funcOrigin f == IR.FromSignature) folFunctions
+    isUserOrReflected f = IR.funcOrigin f `elem` [IR.FromSignature, IR.FromReflection]
+    userDeclFol  = filter isUserOrReflected folFunctions
+    folSingleArg = filter (\f -> length (IR.funcArgSorts f) == 1 && isUserOrReflected f) folFunctions
+    multiArgFol  = filter (\f -> length (IR.funcArgSorts f) > 1  && isUserOrReflected f) folFunctions
 
     uniMinName = IR.mereoName (IR.sortMin (IR.theoryUniverse theory))
     uniMaxName = IR.mereoName (IR.sortMax (IR.theoryUniverse theory))
@@ -337,7 +336,7 @@ theorySortOrderEntries theory = concat
 
     multiArgFols =
       filter (\f -> length (IR.funcArgSorts f) > 1
-                 && IR.funcOrigin f == IR.FromSignature)
+                 && IR.funcOrigin f `elem` [IR.FromSignature, IR.FromReflection])
              (IR.theoryFOLFunctions theory)
 
     userRelations =

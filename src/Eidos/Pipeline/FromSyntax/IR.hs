@@ -744,7 +744,7 @@ isDomainSort s = sortKind s == SortKindDomain
 theoryFOLFunctions :: Theory -> [Function]
 theoryFOLFunctions th =
   [ f | EntityFunction f <- theoryObjects th
-      , funcKind f == FunctionKindFOLFunctionFromTheory ]
+      , funcKind f `elem` [FunctionKindFOLFunctionFromTheory, FunctionKindFOLFunctionFromReflection] ]
 
 -- | All SOL functions declared directly in this theory (uppercase names).
 theorySOLFunctions :: Theory -> [Function]
