@@ -730,11 +730,12 @@ mkMereoOperation th nm argSorts resSort orig = Function
   }
 
 -- | Set up the product-sort / direct-image / inverse-image infrastructure for
--- a reflected multi-arg FOL function that was added to the theory by
--- 'propagateSubtheory'.  The function entity is replaced in both
--- 'theoryObjects' and 'theoryObjectsByName' with an updated version whose
--- 'funcDomain', 'funcArgument', 'funcDirectImage', and 'funcInverseImage'
--- fields are populated.
+-- a reflected FOL function that was added to the theory by
+-- 'propagateSubtheory'.  Applies to any reflected function with at least one
+-- argument (single-arg and multi-arg alike).  The function entity is replaced
+-- in both 'theoryObjects' and 'theoryObjectsByName' with an updated version
+-- whose 'funcDomain', 'funcArgument', 'funcDirectImage', and
+-- 'funcInverseImage' fields are populated.
 addFOLInfraForReflected :: Theory -> Entity -> Theory
 addFOLInfraForReflected th (EntityFunction f)
   | funcKind f == FunctionKindFOLFunctionFromReflection
