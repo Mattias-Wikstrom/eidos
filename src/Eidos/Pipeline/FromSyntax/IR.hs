@@ -381,7 +381,7 @@ data Relation = Relation
   , relDomain        :: Sort
   , relArgObjects    :: [MereologicalObject]
   , relArgument      :: MereologicalObject
-  , relAssociatedSet :: Maybe MereologicalObject
+  , relAssociatedSet :: MereologicalObject
   , relReflectedFrom :: Maybe Theory   -- ^ Just originalTheory when this is a reflected copy
   }
 

@@ -828,7 +828,8 @@ addFOLInfraForReflected th (EntityRelation r)
           th2 = addSortToTh th1 domSort
           th3 = foldl (\t o -> addEntityToTh t (EntityMereological o)) th2 argObjs
           th4 = addEntityToTh th3 (EntityMereological domArg)
-      in th4
+          th5 = addEntityToTh th4 (EntityMereological (relAssociatedSet r'))
+      in th5
 addFOLInfraForReflected th _ = th
 
 mkFOLFunction :: Theory -> String -> [Sort] -> Sort -> Origin
@@ -1080,7 +1081,7 @@ mkRelation th nm argSorts orig =
         , relArgObjects    = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
                                               (NC.funArgN nm i) s orig) argSorts [1..]
         , relArgument      = domArg
-        , relAssociatedSet = Just assocSet
+        , relAssociatedSet = assocSet
         , relReflectedFrom = Nothing
         }
   in rel
@@ -1108,7 +1109,7 @@ reflectEntity (EntityMereological m) =
 reflectEntity (EntityRelation r) =
   EntityRelation (r { relKind          = MereologicalEntityKindRelationFromReflection
                     , relOrigin        = FromReflection
-                    , relAssociatedSet = Nothing
+                    , relAssociatedSet = (relAssociatedSet r) { mereoKind = MereologicalEntityKindIndividual }
                     , relReflectedFrom = Just (relTheory r) })
 reflectEntity e = e
 
@@ -1134,7 +1135,7 @@ qualifySortRefs subName (EntityRelation r) =
                     , relDomain        = qualSort (relDomain r)
                     , relArgObjects    = map qualMereo (relArgObjects r)
                     , relArgument      = qualMereo (relArgument r)
-                    , relAssociatedSet = fmap qualMereo (relAssociatedSet r) })
+                    , relAssociatedSet = qualMereo (relAssociatedSet r) })
   where
     qualSort  s = s { sortName  = subName ++ "." ++ sortName s }
     qualMereo m = m { mereoName = subName ++ "." ++ mereoName m }
