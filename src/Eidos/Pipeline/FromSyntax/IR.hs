@@ -45,6 +45,9 @@ data EntityKind
   | FunctionKindInverseImageFunction       -- ^ Auto-generated inverse-image SOL function f#inv_img
   | FunctionKindMereologicalOperation      -- ^ Built-in mereological op (+, ×, -, ⇒, ∸)
   | FunctionKindUserAbbreviation           -- ^ User-defined abbreviation from @abbreviations { }@ section
+  | FunctionKindProjectionFunction         -- ^ Auto-generated projection f_pi_k (product sort → component sort)
+  | FunctionKindProjectionInverse          -- ^ Auto-generated inverse projection f_pi_k_inv (component → product)
+  | FunctionKindTupleFormation             -- ^ Auto-generated tuple formation f_tuple (components → product)
   -- Mereological object kinds
   | MereologicalEntityKindMereological          -- ^ Bare mereological object (no subtype)
   | MereologicalEntityKindIndividual            -- ^ An individual element of a sort
@@ -326,9 +329,12 @@ data Function = Function
   , funcArgObjects   :: [MereologicalObject]
   , funcDomain       :: Maybe Sort
   , funcArgument     :: Maybe MereologicalObject
-  , funcDirectImage  :: Maybe Function
-  , funcInverseImage :: Maybe Function
-  , funcReflectedFrom :: Maybe Theory   -- ^ Just originalTheory when this is a reflected copy
+  , funcDirectImage     :: Maybe Function
+  , funcInverseImage    :: Maybe Function
+  , funcReflectedFrom   :: Maybe Theory   -- ^ Just originalTheory when this is a reflected copy
+  , funcSeparationAxiom :: Maybe MereoExpr
+    -- ^ For multi-arg FOL functions: the mereological expression for the Separation axiom
+    --   (∀X,Y∈dom. X↔Y ↔ ∀Z∈dom. IR(Z)→((X⇒Z)↔(Y⇒Z))).  Nothing for all other functions.
   }
 
 instance Show Function where

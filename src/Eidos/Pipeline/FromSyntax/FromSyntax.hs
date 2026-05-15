@@ -269,7 +269,8 @@ buildSignatureItem th0 th item = do
                   th4 = addEntityToTh th3  (EntityFunction f)
                   th5 = addEntityToTh th4  (EntityFunction dirImg)
                   th6 = addEntityToTh th5  (EntityFunction invImg)
-              return th6
+                  th7 = addMultiArgFOLExtras th6 f domSort FromFunction
+              return th7
             else return th'
 
     SigIndividual (IndividualDeclaration nm sortExprAST) -> do
@@ -696,20 +697,21 @@ mkMereo th k nm s orig = MereologicalObject
 
 mkSOLFunction :: Theory -> String -> EntityKind -> [Sort] -> Sort -> Origin -> Function
 mkSOLFunction th nm k argSorts resSort orig = Function
-  { funcKind          = k
-  , funcOrigin        = orig
-  , funcTheory        = th
-  , funcName          = nm
-  , funcArgSorts      = argSorts
-  , funcResSort       = resSort
-  , funcResObject     = Just (mkMereo th MereologicalEntityKindResultOfSOLFunction (NC.funRes nm) resSort orig)
-  , funcArgObjects    = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
-                                          (NC.funArgN nm i) s orig) argSorts [1..]
-  , funcDomain        = Nothing
-  , funcArgument      = Nothing
-  , funcDirectImage   = Nothing
-  , funcInverseImage  = Nothing
-  , funcReflectedFrom = Nothing
+  { funcKind            = k
+  , funcOrigin          = orig
+  , funcTheory          = th
+  , funcName            = nm
+  , funcArgSorts        = argSorts
+  , funcResSort         = resSort
+  , funcResObject       = Just (mkMereo th MereologicalEntityKindResultOfSOLFunction (NC.funRes nm) resSort orig)
+  , funcArgObjects      = zipWith (\s i -> mkMereo th MereologicalEntityKindArgumentOfSOLFunction
+                                            (NC.funArgN nm i) s orig) argSorts [1..]
+  , funcDomain          = Nothing
+  , funcArgument        = Nothing
+  , funcDirectImage     = Nothing
+  , funcInverseImage    = Nothing
+  , funcReflectedFrom   = Nothing
+  , funcSeparationAxiom = Nothing
   }
 
 mkMereoOperation :: Theory -> String -> [Sort] -> Sort -> Origin -> Function
@@ -778,10 +780,11 @@ addFOLInfraForReflected th (EntityFunction f)
                domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (NC.funArg nm) domSort auxOrig
                dirImg = mkSOLFunction th (NC.funDirImg nm) FunctionKindDirectImageFunction [domSort] resSort auxOrig
                invImg = mkSOLFunction th (NC.funInvImg nm) FunctionKindInverseImageFunction [resSort] domSort auxOrig
-               f'     = f { funcDomain      = Just domSort
-                          , funcArgument    = Just domArg
-                          , funcDirectImage  = Just dirImg
-                          , funcInverseImage = Just invImg
+               f'     = f { funcDomain           = Just domSort
+                          , funcArgument         = Just domArg
+                          , funcDirectImage      = Just dirImg
+                          , funcInverseImage     = Just invImg
+                          , funcSeparationAxiom  = Just (buildSeparationAxiom nm domSort)
                           }
                replaceF e = case e of
                  EntityFunction g | funcName g == nm -> EntityFunction f'
@@ -794,7 +797,8 @@ addFOLInfraForReflected th (EntityFunction f)
                th4 = addEntityToTh th3 (EntityMereological (sortMax domSort))
                th5 = addEntityToTh th4 (EntityFunction dirImg)
                th6 = addEntityToTh th5 (EntityFunction invImg)
-           in th6
+               th7 = addMultiArgFOLExtras th6 f' domSort auxOrig
+           in th7
 addFOLInfraForReflected th _ = th
 
 mkFOLFunction :: Theory -> String -> [Sort] -> Sort -> Origin
@@ -816,12 +820,104 @@ mkFOLFunction th nm argSorts resSort orig =
       domArg = mkMereo th MereologicalEntityKindArgumentOfSOLFunction (NC.funArg nm) domSort auxOrig
       dirImg = mkSOLFunction th (NC.funDirImg nm) FunctionKindDirectImageFunction [domSort] resSort auxOrig
       invImg = mkSOLFunction th (NC.funInvImg nm) FunctionKindInverseImageFunction [resSort] domSort auxOrig
-      f = f0 { funcDomain      = Just domSort
-             , funcArgument    = Just domArg
-             , funcDirectImage  = Just dirImg
-             , funcInverseImage = Just invImg
+      f = f0 { funcDomain           = Just domSort
+             , funcArgument         = Just domArg
+             , funcDirectImage      = Just dirImg
+             , funcInverseImage     = Just invImg
+             , funcSeparationAxiom  = if length argSorts > 1
+                                      then Just (buildSeparationAxiom nm domSort)
+                                      else Nothing
              }
   in (f, domSort, dirImg, invImg)
+
+-- | Build the mereological expression for the Separation axiom of a multi-arg FOL function:
+-- ∀X,Y∈dom. (X↔Y) ↔ ∀Z∈dom. IR(Z)→((X⇒Z)↔(Y⇒Z))
+buildSeparationAxiom :: String -> Sort -> MereoExpr
+buildSeparationAxiom fn dom =
+  let irN   = NC.irPredicate fn
+      lo    = MVar (mereoName (sortMin dom))
+      hi    = MVar (mereoName (sortMax dom))
+      bsum v body = MBoundedSum v lo hi body
+      irZ   = MAbbrevApp irN [MVar "Z"]
+      inner = MRevDiff irZ (MSymDiff (MRevDiff (MVar "X") (MVar "Z"))
+                                      (MRevDiff (MVar "Y") (MVar "Z")))
+      qZ    = bsum "Z" inner
+      sep   = MSymDiff (MSymDiff (MVar "X") (MVar "Y")) qZ
+  in bsum "X" (bsum "Y" sep)
+
+-- | Create the k-th projection function f_pi_k: product sort → component sort k.
+mkProjectionFunction :: Theory -> String -> Int -> Sort -> Sort -> Origin -> Function
+mkProjectionFunction th fnm k domSort compSort orig = Function
+  { funcKind            = FunctionKindProjectionFunction
+  , funcOrigin          = orig
+  , funcTheory          = th
+  , funcName            = NC.funPi fnm k
+  , funcArgSorts        = [domSort]
+  , funcResSort         = compSort
+  , funcResObject       = Nothing
+  , funcArgObjects      = []
+  , funcDomain          = Nothing
+  , funcArgument        = Nothing
+  , funcDirectImage     = Nothing
+  , funcInverseImage    = Nothing
+  , funcReflectedFrom   = Nothing
+  , funcSeparationAxiom = Nothing
+  }
+
+-- | Create the k-th inverse projection f_pi_k_inv: component sort k → product sort.
+mkProjectionInverse :: Theory -> String -> Int -> Sort -> Sort -> Origin -> Function
+mkProjectionInverse th fnm k compSort domSort orig = Function
+  { funcKind            = FunctionKindProjectionInverse
+  , funcOrigin          = orig
+  , funcTheory          = th
+  , funcName            = NC.funPiInv fnm k
+  , funcArgSorts        = [compSort]
+  , funcResSort         = domSort
+  , funcResObject       = Nothing
+  , funcArgObjects      = []
+  , funcDomain          = Nothing
+  , funcArgument        = Nothing
+  , funcDirectImage     = Nothing
+  , funcInverseImage    = Nothing
+  , funcReflectedFrom   = Nothing
+  , funcSeparationAxiom = Nothing
+  }
+
+-- | Create the tuple formation function f_tuple: component sorts → product sort.
+mkTupleFormation :: Theory -> String -> [Sort] -> Sort -> Origin -> Function
+mkTupleFormation th fnm compSorts domSort orig = Function
+  { funcKind            = FunctionKindTupleFormation
+  , funcOrigin          = orig
+  , funcTheory          = th
+  , funcName            = NC.funTuple fnm
+  , funcArgSorts        = compSorts
+  , funcResSort         = domSort
+  , funcResObject       = Nothing
+  , funcArgObjects      = []
+  , funcDomain          = Nothing
+  , funcArgument        = Nothing
+  , funcDirectImage     = Nothing
+  , funcInverseImage    = Nothing
+  , funcReflectedFrom   = Nothing
+  , funcSeparationAxiom = Nothing
+  }
+
+-- | Add projection functions, inverse projections, and tuple formation function to the theory
+-- for a multi-arg FOL function.  No-op for single-arg functions.
+addMultiArgFOLExtras :: Theory -> Function -> Sort -> Origin -> Theory
+addMultiArgFOLExtras th f domSort orig
+  | length (funcArgSorts f) <= 1 = th
+  | otherwise =
+      let fnm      = funcName f
+          argSorts = funcArgSorts f
+          arity    = length argSorts
+          addProjPair t k =
+            let piK    = mkProjectionFunction t fnm k domSort (argSorts !! (k-1)) orig
+                piKInv = mkProjectionInverse  t fnm k (argSorts !! (k-1)) domSort orig
+            in addEntityToTh (addEntityToTh t (EntityFunction piK)) (EntityFunction piKInv)
+          th1 = foldl addProjPair th [1 .. arity]
+          th2 = addEntityToTh th1 (EntityFunction (mkTupleFormation th1 fnm argSorts domSort orig))
+      in th2
 
 mkSortLimitFact :: MereologicalObject -> String -> MereologicalObject -> Fact
 mkSortLimitFact l op r = Fact
