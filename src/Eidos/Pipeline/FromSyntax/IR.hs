@@ -309,6 +309,9 @@ data Sort = Sort
   , sortReflectedFrom    :: Maybe Theory
   , sortRelationship     :: SortRelationship
   , sortParent           :: Maybe Sort
+  , sortSeparationAxiom  :: Maybe MereoExpr
+    -- ^ For 'SortKindProduct' sorts: the mereological expression for the Separation axiom
+    --   (∀X,Y∈dom. X↔Y ↔ ∀Z∈dom. IR(Z)→((X⇒Z)↔(Y⇒Z))).  'Nothing' for all other sorts.
   }
 
 instance Show Sort where
@@ -332,9 +335,6 @@ data Function = Function
   , funcDirectImage     :: Maybe Function
   , funcInverseImage    :: Maybe Function
   , funcReflectedFrom   :: Maybe Theory   -- ^ Just originalTheory when this is a reflected copy
-  , funcSeparationAxiom :: Maybe MereoExpr
-    -- ^ For multi-arg FOL functions: the mereological expression for the Separation axiom
-    --   (∀X,Y∈dom. X↔Y ↔ ∀Z∈dom. IR(Z)→((X⇒Z)↔(Y⇒Z))).  Nothing for all other functions.
   }
 
 instance Show Function where
