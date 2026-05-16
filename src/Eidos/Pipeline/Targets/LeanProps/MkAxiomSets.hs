@@ -99,6 +99,8 @@ mereoExprToLean' abbrevHandler resolve = go
     go IR.MZero          = LTop
     go (IR.MAbbrevApp name args) =
       abbrevHandler name (map go args)
+    go (IR.MFOLApp name args) =
+      LApp (LVar (resolve name)) (map go args)
     go (IR.MBoundedSum var lo hi body) =
       case (lo, hi) of
         (IR.MVar loName, IR.MVar hiName) ->

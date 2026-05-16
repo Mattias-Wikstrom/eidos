@@ -125,9 +125,15 @@ renderFact level i f =
     renderFactExpr fact = case factPropExpr fact of
       Just pe -> prettyResolvedPropExpr pe
       Nothing -> case factMereoExpr fact of
-        Just me -> renderSortLimitMereo me
+        Just me -> renderMe me
         Nothing -> "<no expression>"
-    renderSortLimitMereo (MDiff    (MVar l) (MVar r)) = " " ++ l ++ " ≤ " ++ r
-    renderSortLimitMereo (MSymDiff (MVar l) (MVar r)) = " " ++ l ++ " = " ++ r
-    renderSortLimitMereo me                            = "[mereo] " ++ show me
+    renderMe (MDiff    l r)   = renderMe l ++ " - " ++ renderMe r
+    renderMe (MSymDiff l r)   = renderMe l ++ " ∸ " ++ renderMe r
+    renderMe (MSum     l r)   = renderMe l ++ " + " ++ renderMe r
+    renderMe (MProd    l r)   = renderMe l ++ " × " ++ renderMe r
+    renderMe (MRevDiff l r)   = renderMe l ++ " ⇒ " ++ renderMe r
+    renderMe (MFOLApp f [l, r]) = renderMe l ++ " " ++ f ++ " " ++ renderMe r
+    renderMe (MFOLApp f args)   = f ++ "(" ++ intercalate ", " (map renderMe args) ++ ")"
+    renderMe (MVar name)      = name
+    renderMe me               = show me
     ind n = replicate (n * 2) ' '

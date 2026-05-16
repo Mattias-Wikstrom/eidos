@@ -104,6 +104,7 @@ irMereoExprToMereo nm = go
     go (IR.MAbbrevApp "ProjectIntoInterval" [x, lo, hi]) =
       MProjectIntoInterval (go x) (go lo) (go hi)
     go (IR.MAbbrevApp n args) = MAbbrevApp n (map go args)
+    go (IR.MFOLApp n args)    = MAbbrevApp n (map go args)
     go (IR.MBoundedSum var lo hi body) =
       let var'  = rewriteSpecialVar var  -- applies Var_ prefix for lowercase names
           mk    = mkBoundedQuantifier False False

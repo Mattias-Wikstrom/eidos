@@ -954,7 +954,7 @@ addMultiArgFOLExtras th f domSort orig
 mkSortLimitFact :: MereologicalObject -> String -> MereologicalObject -> Fact
 mkSortLimitFact l op r = Fact
   { factKind      = FactKindSortLimitation
-  , factPropExpr  = Just (twoTermPropExpr l op r)
+  , factPropExpr  = Nothing
   , factMereoExpr = Just (opCtor (MVar (mereoName l)) (MVar (mereoName r)))
   , factFreeVars  = []
   }
@@ -1237,10 +1237,13 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
             else Right th2
 
 -- | Reflect sort-limitation facts from a reflected subtheory into the parent.
--- Each fact's MereoExpr (MDiff or MSymDiff) has its MVar names remapped:
--- sort-limit objects (X_Min, X_Max) become the reflected individuals
--- (subName.X_min_elem, subName.X_max_elem); all other names get the
--- subName prefix.
+--
+-- Each binary mereological operation in the fact's MereoExpr is replaced by
+-- a FOL function application (MFOLApp) naming the reflected function in the
+-- parent (e.g. @"inner_theory.-"@).  Leaf MVar names are remapped: sort-limit
+-- objects (X_Min, X_Max) become the reflected individuals
+-- (subName.X_min_elem, subName.X_max_elem); all other names get the subName
+-- prefix.
 reflectSortLimitFacts :: String -> Theory -> Theory -> Theory
 reflectSortLimitFacts subName subTh parentTh =
   foldl addReflected parentTh sortLimitFacts
@@ -1248,13 +1251,19 @@ reflectSortLimitFacts subName subTh parentTh =
     sortLimitFacts = filter (\f -> factKind f == FactKindSortLimitation) (theoryFacts subTh)
 
     addReflected th f = case factMereoExpr f of
-      Just me -> addFactToTh th (f { factMereoExpr = Just (reflectMe me) })
+      Just me -> addFactToTh th (f { factMereoExpr = Just (reflectMe me)
+                                   , factPropExpr  = Nothing })
       Nothing -> th
 
-    reflectMe (MDiff l r)    = MDiff    (reflectMe l) (reflectMe r)
-    reflectMe (MSymDiff l r) = MSymDiff (reflectMe l) (reflectMe r)
+    reflectMe (MSum     l r) = MFOLApp (qualify "+") [reflectMe l, reflectMe r]
+    reflectMe (MProd    l r) = MFOLApp (qualify "×") [reflectMe l, reflectMe r]
+    reflectMe (MDiff    l r) = MFOLApp (qualify "-") [reflectMe l, reflectMe r]
+    reflectMe (MRevDiff l r) = MFOLApp (qualify "⇒") [reflectMe l, reflectMe r]
+    reflectMe (MSymDiff l r) = MFOLApp (qualify "∸") [reflectMe l, reflectMe r]
     reflectMe (MVar name)    = MVar (reflectName name)
     reflectMe e              = e
+
+    qualify n = subName ++ "." ++ n
 
     reflectName name =
       case Map.lookup name (theoryObjectsByName subTh) of

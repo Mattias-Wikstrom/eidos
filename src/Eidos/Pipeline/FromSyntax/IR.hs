@@ -163,6 +163,11 @@ data MereoExpr
   | MAbbrevApp String [MereoExpr]
     -- ^ Application of a compiler-internal abbreviation:
     --   IsWithinBounds(lo, hi, x), WrapFact(x, y), etc.
+  | MFOLApp String [MereoExpr]
+    -- ^ Application of a reflected FOL function (e.g. @"inner_theory.-"@) to
+    --   its arguments.  Used when a mereological binary operation is reflected
+    --   into a parent theory: the operation becomes a first-order function and
+    --   must be applied, not written in infix mereological notation.
     -- | MBoundedSum Bool Bool String MereoExpr MereoExpr MereoExpr
     -- ^ Bounded quantification: (isExists, isIndividual, varName, lo, hi, body).
     --   When @isExists = False@, this is universal (∀ varName ∈ [lo, hi]. body).
