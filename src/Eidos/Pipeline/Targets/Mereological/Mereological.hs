@@ -7,7 +7,6 @@ import qualified Data.Map.Strict as Map
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
 import qualified Eidos.Pipeline.IRProcessing.MereologicalOpDefs as MOD
 import qualified Eidos.Pipeline.PipelineCore as PC
-import qualified Eidos.Pipeline.IRProcessing.SortBounds as SB
 import           Eidos.Pipeline.Targets.Mereological.MereoExpr
 import           Eidos.Pipeline.Targets.Mereological.MkAxiomSets
                    (irMereoExprToMereo, abbrevBodyToMereo)
@@ -198,19 +197,16 @@ mkAxiomsSection prepared nameMap =
       | (idx, f) <- zip [1 :: Int ..] userTranslatedFacts
       , Just me <- [IR.factMereoExpr f] ]
 
-    sortBoundLines =
+    sortLimitLines =
       [ rewriteAxiomName nm ++ " : "
           ++ renderMereoExpr (irMereoExprToMereo nameMap me) ++ ";"
-      | e <- PC.ptSortBounds prepared
-      , (nm, me) <- SB.sbeAxioms e ]
+      | f <- IR.theoryFacts (PC.ptTheory prepared)
+      , IR.factCategory (IR.factKind f) == IR.FCSortStructure
+      , IR.factSubkind  (IR.factKind f) == IR.FSSortLimitation
+      , Just nm <- [IR.factName f]
+      , Just me <- [IR.factMereoExpr f] ]
 
-    sortOrderLines =
-      [ rewriteAxiomName nm ++ " : "
-          ++ renderMereoExpr (irMereoExprToMereo nameMap me) ++ ";"
-      | e <- PC.ptSortOrder prepared
-      , (nm, me) <- SB.soeAxioms e ]
-
-    allMetafactLines = L.nub (sortBoundLines ++ sortOrderLines ++ metafactUserLines)
+    allMetafactLines = L.nub (sortLimitLines ++ metafactUserLines)
 
     metafactBlock =
       [ "    metafacts {" ]

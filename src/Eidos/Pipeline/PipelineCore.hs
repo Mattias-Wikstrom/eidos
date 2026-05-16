@@ -6,7 +6,6 @@ module Eidos.Pipeline.PipelineCore
   ) where
 
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
-import qualified Eidos.Pipeline.IRProcessing.SortBounds as SB
 import qualified Eidos.Pipeline.IRProcessing.FunctionFacts as FF
 import qualified Eidos.Pipeline.IRProcessing.MereologicalOpDefs as MOD
 
@@ -18,7 +17,7 @@ defaultPipelineOptions :: PipelineOptions
 defaultPipelineOptions = PipelineOptions
   { pipeCollapseSortBounds = False
   }
-  
+
 -- ---------------------------------------------------------------------------
 -- PreparedTheory
 -- ---------------------------------------------------------------------------
@@ -26,13 +25,10 @@ defaultPipelineOptions = PipelineOptions
 -- | A theory together with all pre-computed, backend-agnostic derived data.
 --
 -- Backends receive a 'PreparedTheory' rather than a raw 'IR.Theory' so that
--- the pipeline-level transformations (sort-bound computation, future passes)
--- are performed exactly once, outside the backend.
+-- the pipeline-level transformations are performed exactly once, outside the backend.
 data PreparedTheory = PreparedTheory
   { ptOptions            :: PipelineOptions
   , ptTheory             :: IR.Theory
-  , ptSortBounds         :: [SB.SortBoundEntry]
-  , ptSortOrder          :: [SB.SortOrderEntry]
   , ptFunctionFacts      :: [FF.FunctionFactEntry]
   , ptMereologicalOpDefs :: [MOD.MereoOpDefEntry]
     -- ^ Per-theory definitions of +, ×, −, ⇒, ∸ relativized to the
@@ -48,11 +44,7 @@ prepareTheory :: PipelineOptions -> IR.Theory -> PreparedTheory
 prepareTheory opts theory = PreparedTheory
   { ptOptions            = opts
   , ptTheory             = theory
-  , ptSortBounds         = SB.theorySortBoundEntries sbOpts theory
-  , ptSortOrder          = SB.theorySortOrderEntries theory
   , ptFunctionFacts      = FF.theoryFunctionFactEntries theory
   , ptMereologicalOpDefs = MOD.theoryMereoOpDefEntries theory
   , ptUserAbbrevDefs     = IR.theoryUserAbbrevDefs theory
   }
-  where
-    sbOpts = SB.SortBoundOptions { SB.sboCollapse = pipeCollapseSortBounds opts }

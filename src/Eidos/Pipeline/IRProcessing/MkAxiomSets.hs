@@ -18,7 +18,6 @@ module Eidos.Pipeline.IRProcessing.MkAxiomSets
 import           Data.Maybe (fromJust)
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
 import qualified Eidos.Pipeline.PipelineCore as PL
-import qualified Eidos.Pipeline.IRProcessing.SortBounds as SB
 import qualified Eidos.Pipeline.IRProcessing.FunctionFacts as FF
 import           Eidos.Pipeline.IRProcessing.AxiomSet
 import qualified Eidos.Pipeline.IRProcessing.MereologicalOpDefs as MOD
@@ -113,8 +112,7 @@ mkAxiomSets pt = concat
   , setDeclAxiomSets
   , functionFactAxiomSets
   , individualDeclAxiomSets
-  , sortBoundAxiomSets
-  , sortOrderAxiomSets
+  , sortLimitFactAxiomSets
   , userFactAxiomSets
   , implicitMergeAxiomSets
   ]
@@ -459,29 +457,20 @@ mkAxiomSets pt = concat
           [(IR.mereoName m, ABDeclProp)]
 
   -- -------------------------------------------------------------------------
-  -- 19-21 + 36-39. Sort bounds.  Delegates to Pipeline.SortBounds.
+  -- 19-21 + 36-41 + R6. Sort-limit facts stored directly in the IR.
+  -- These are FCSortStructure/FSSortLimitation facts with a 'factName' and
+  -- a 'factMereoExpr'; they replace the old SortBounds reconstruction.
   -- -------------------------------------------------------------------------
-  sortBoundAxiomSets :: [AxiomSet]
-  sortBoundAxiomSets = map sortBoundToAxiomSet (PL.ptSortBounds pt)
-
-  sortBoundToAxiomSet :: SB.SortBoundEntry -> AxiomSet
-  sortBoundToAxiomSet entry =
-    let (path, tgs) = contextToPathAndTags (SB.sbeContext entry)
-    in axiomSet path (tags tgs)
-         (map (\(nm, expr) -> (nm, ABMereo expr)) (SB.sbeAxioms entry))
-
-  contextToPathAndTags :: SB.SortBoundContext -> ([SubjectNode], [Tag])
-  contextToPathAndTags ctx = case ctx of
-    SB.SBCGlobal                      -> ([SGlobal], [TagSorting])
-    SB.SBCIndividual n                 -> ([SIndividual n], [TagIndividual, TagSorting])
-    SB.SBCSet n                        -> ([SSet n], [TagSet, TagSorting])
-    SB.SBCFunctionObj fn               -> ([SFunction fn], [TagFunction, TagSorting])
-    SB.SBCFunctionTupleArg fn          -> ([SFunction fn, STuple, SArgObject 0], [TagFunction, TagFOLFunction, TagTuple, TagSorting])
-    SB.SBCFunctionImageArg fn          -> ([SFunction fn, SImage, SArgObject 1], [TagFunction, TagFOLFunction, TagImage, TagSorting])
-    SB.SBCFunctionImageRes fn          -> ([SFunction fn, SImage, SResObject], [TagFunction, TagFOLFunction, TagImage, TagSorting])
-    SB.SBCFunctionProjectionArg fn k   -> ([SFunction fn, SProjection k, SArgObject 1], [TagFunction, TagFOLFunction, TagProjection, TagSorting])
-    SB.SBCFunctionProjectionRes fn k   -> ([SFunction fn, SProjection k, SResObject], [TagFunction, TagFOLFunction, TagProjection, TagSorting])
-    SB.SBCRelationObj rn               -> ([SSet rn], [TagSet, TagSorting])
+  sortLimitFactAxiomSets :: [AxiomSet]
+  sortLimitFactAxiomSets =
+    [ axiomSet [SGlobal] (tags [TagSorting])
+        [(nm, ABMereo me)]
+    | f <- IR.theoryFacts theory
+    , IR.factCategory (IR.factKind f) == IR.FCSortStructure
+    , IR.factSubkind  (IR.factKind f) == IR.FSSortLimitation
+    , Just nm <- [IR.factName f]
+    , Just me <- [IR.factMereoExpr f]
+    ]
 
   -- -------------------------------------------------------------------------
   -- 22-35 + R6. Function facts.  Delegates to Pipeline.FunctionFacts.
@@ -520,25 +509,6 @@ mkAxiomSets pt = concat
       mkIndividualDecl m =
         axiomSet [SIndividual (IR.mereoName m)] (tags tIndividual)
           [(IR.mereoName m, ABDeclProp)]
-
-  -- -------------------------------------------------------------------------
-  -- 40-41 + R7. Sort ordering axioms.  Delegates to Pipeline.SortBounds.
-  -- -------------------------------------------------------------------------
-  sortOrderAxiomSets :: [AxiomSet]
-  sortOrderAxiomSets = map sortOrderToAxiomSet (PL.ptSortOrder pt)
-
-  sortOrderToAxiomSet :: SB.SortOrderEntry -> AxiomSet
-  sortOrderToAxiomSet entry =
-    let (path, tgs) = orderContextToPathAndTags (SB.soeContext entry)
-    in axiomSet path (tags tgs)
-         (map (\(nm, expr) -> (nm, ABMereo expr)) (SB.soeAxioms entry))
-
-  orderContextToPathAndTags :: SB.SortOrderContext -> ([SubjectNode], [Tag])
-  orderContextToPathAndTags ctx = case ctx of
-    SB.SOCBuiltinSort n           -> ([SSort n],              [TagSort, TagOrdering])
-    SB.SOCUserSort    n           -> ([SSort n],              [TagSort, TagOrdering])
-    SB.SOCProductSort fn          -> ([SFunction fn, STuple], [TagSort, TagFunction, TagFOLFunction, TagTuple, TagOrdering])
-    SB.SOCRelationProductSort rn  -> ([SSet rn],              [TagSort, TagSet, TagOrdering])
 
   -- -------------------------------------------------------------------------
   -- R1. Relation product-sort limit declarations

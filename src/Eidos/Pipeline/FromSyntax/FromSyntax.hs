@@ -257,21 +257,26 @@ buildSignatureItem th0 th item = do
         then do
           let f = mkSOLFunction th' nm FunctionKindSOLFunctionFromTheory argSorts resSort FromSignature
           shouldInsert <- shouldInsertDeclaration nm (EntityFunction f)
-          return (if shouldInsert then addEntityToTh th' (EntityFunction f) else th')
+          let th'' = if shouldInsert then addEntityToTh th' (EntityFunction f) else th'
+          return (if shouldInsert then addFunctionBoundFacts th'' f else th'')
         else do
           let (f, domSort, dirImg, invImg) =
                 mkFOLFunction th' nm argSorts resSort FromSignature
           shouldInsert <- shouldInsertDeclaration nm (EntityFunction f)
           if shouldInsert
             then do
-              let th1 = addEntityToTh th'  (EntitySort domSort)
-                  th2 = addEntityToTh th1  (EntityMereological (sortMin domSort))
-                  th3 = addEntityToTh th2  (EntityMereological (sortMax domSort))
-                  th4 = addEntityToTh th3  (EntityFunction f)
-                  th5 = addEntityToTh th4  (EntityFunction dirImg)
-                  th6 = addEntityToTh th5  (EntityFunction invImg)
-                  th7 = addMultiArgFOLExtras th6 f domSort FromFunction
-              return th7
+              let th1  = addEntityToTh th'  (EntitySort domSort)
+                  th2  = addEntityToTh th1  (EntityMereological (sortMin domSort))
+                  th3  = addEntityToTh th2  (EntityMereological (sortMax domSort))
+                  th4  = addProductSortOrderingFacts th3 nm domSort
+                  th5  = addEntityToTh th4  (EntityFunction f)
+                  th6  = addFunctionBoundFacts th5 f
+                  th7  = addEntityToTh th6  (EntityFunction dirImg)
+                  th8  = addFunctionBoundFacts th7 dirImg
+                  th9  = addEntityToTh th8  (EntityFunction invImg)
+                  th10 = addFunctionBoundFacts th9 invImg
+                  th11 = addMultiArgFOLExtras th10 f domSort FromFunction
+              return th11
             else return th'
 
     SigIndividual (IndividualDeclaration nm sortExprAST) -> do
@@ -296,7 +301,8 @@ buildSignatureItem th0 th item = do
           mo     = mkMereo th' moKind nm s FromSignature
           entity = EntityMereological mo
       shouldInsert <- shouldInsertDeclaration nm entity
-      return (if shouldInsert then addEntityToTh th' entity else th')
+      let th'' = if shouldInsert then addEntityToTh th' entity else th'
+      return (if shouldInsert then addObjectBoundFacts th'' mo else th'')
 
     SigSet (SetDeclaration nm sortExprs) -> do
       when (not (firstLetterIsUppercase nm)) $
@@ -308,11 +314,13 @@ buildSignatureItem th0 th item = do
           let mo     = mkMereo th' MereologicalEntityKindSet nm (head argSorts) FromSignature
               entity = EntityMereological mo
           shouldInsert <- shouldInsertDeclaration nm entity
-          return (if shouldInsert then addEntityToTh th' entity else th')
+          let th'' = if shouldInsert then addEntityToTh th' entity else th'
+          return (if shouldInsert then addObjectBoundFacts th'' mo else th'')
         else do
           let rel = mkRelation th' nm argSorts FromSignature
           shouldInsert <- shouldInsertDeclaration nm (EntityRelation rel)
-          return (if shouldInsert then addEntityToTh th' (EntityRelation rel) else th')
+          let th'' = if shouldInsert then addEntityToTh th' (EntityRelation rel) else th'
+          return (if shouldInsert then addProductSortOrderingFacts th'' nm (relDomain rel) else th'')
 
 -- ---------------------------------------------------------------------------
 -- Pass 2.5 — Abbreviations
@@ -503,6 +511,7 @@ addPropFact th0 fk th prop = do
 
   let fact = Fact
         { factKind      = fk
+        , factName      = Nothing
         , factPropExpr  = Just resolvedExpr
         , factMereoExpr = Nothing
         , factFreeVars  = freeVars
@@ -763,8 +772,10 @@ addFOLInfraForReflected th (EntityFunction f)
                          , theoryObjectsByName = Map.adjust (map replaceF) nm (theoryObjectsByName th)
                          }
                th2 = addEntityToTh th1 (EntityFunction dirImg)
-               th3 = addEntityToTh th2 (EntityFunction invImg)
-           in th3
+               th3 = addFunctionBoundFacts th2 dirImg
+               th4 = addEntityToTh th3 (EntityFunction invImg)
+               th5 = addFunctionBoundFacts th4 invImg
+           in th5
          else
            -- multi-arg: create product domain sort with limits, domArg, dirImg, invImg
            let domSort  = Sort
@@ -798,10 +809,13 @@ addFOLInfraForReflected th (EntityFunction f)
                th2 = addEntityToTh th1 (EntitySort domSort)
                th3 = addEntityToTh th2 (EntityMereological (sortMin domSort))
                th4 = addEntityToTh th3 (EntityMereological (sortMax domSort))
-               th5 = addEntityToTh th4 (EntityFunction dirImg)
-               th6 = addEntityToTh th5 (EntityFunction invImg)
-               th7 = addMultiArgFOLExtras th6 f' domSort auxOrig
-           in th7
+               th5 = addProductSortOrderingFacts th4 nm domSort
+               th6 = addEntityToTh th5 (EntityFunction dirImg)
+               th7 = addFunctionBoundFacts th6 dirImg
+               th8 = addEntityToTh th7 (EntityFunction invImg)
+               th9 = addFunctionBoundFacts th8 invImg
+               th10 = addMultiArgFOLExtras th9 f' domSort auxOrig
+           in th10
 addFOLInfraForReflected th (EntityRelation r)
   | relKind r == MereologicalEntityKindRelationFromReflection =
       let nm       = relName r
@@ -829,11 +843,15 @@ addFOLInfraForReflected th (EntityRelation r)
           th1 = th { theoryObjects      = map replaceR (theoryObjects th)
                    , theoryObjectsByName = Map.adjust (map replaceR) nm (theoryObjectsByName th)
                    }
-          th2 = addSortToTh th1 domSort
-          th3 = foldl (\t o -> addEntityToTh t (EntityMereological o)) th2 argObjs
-          th4 = addEntityToTh th3 (EntityMereological domArg)
-          th5 = addEntityToTh th4 (EntityMereological (relAssociatedSet r'))
-      in th5
+          th2  = addSortToTh th1 domSort
+          th3  = addProductSortOrderingFacts th2 nm domSort
+          th4  = foldl (\t o -> addEntityToTh t (EntityMereological o)) th3 argObjs
+          th5  = foldl (\t o -> addObjectBoundFacts t o) th4 argObjs
+          th6  = addEntityToTh th5 (EntityMereological domArg)
+          th7  = addObjectBoundFacts th6 domArg
+          th8  = addEntityToTh th7 (EntityMereological (relAssociatedSet r'))
+          th9  = addObjectBoundFacts th8 (relAssociatedSet r')
+      in th9
 addFOLInfraForReflected th _ = th
 
 mkFOLFunction :: Theory -> String -> [Sort] -> Sort -> Origin
@@ -943,19 +961,49 @@ addMultiArgFOLExtras th f domSort orig
       let fnm      = funcName f
           argSorts = funcArgSorts f
           arity    = length argSorts
+          domMinN  = NC.sortMin  (sortName domSort)
+          domMaxN  = NC.sortMax  (sortName domSort)
+          resSortN = sortName (funcResSort f)
           addProjPair t k =
-            let piK    = mkProjectionFunction t fnm k domSort (argSorts !! (k-1)) orig
-                piKInv = mkProjectionInverse  t fnm k (argSorts !! (k-1)) domSort orig
-            in addEntityToTh (addEntityToTh t (EntityFunction piK)) (EntityFunction piKInv)
+            let piK     = mkProjectionFunction t fnm k domSort (argSorts !! (k-1)) orig
+                piKInv  = mkProjectionInverse  t fnm k (argSorts !! (k-1)) domSort orig
+                piN     = NC.funPi fnm k
+                argSortN = sortName (argSorts !! (k-1))
+                n1      = NC.funArgN piN 1
+                nr      = NC.funRes  piN
+                t1 = addEntityToTh (addEntityToTh t (EntityFunction piK)) (EntityFunction piKInv)
+                t2 = foldl addFactToTh t1
+                       [ mkSortLimitFactByName (NC.boundMin n1) domMinN "≤" n1
+                       , mkSortLimitFactByName (NC.boundMax n1) n1      "≤" domMaxN
+                       , mkSortLimitFactByName (NC.boundMin nr) (NC.sortMin argSortN) "≤" nr
+                       , mkSortLimitFactByName (NC.boundMax nr) nr      "≤" (NC.sortMax argSortN)
+                       ]
+            in t2
+          addInvImgBounds t =
+            -- bounds for the witness object f_inv_img_arg (separate from funcArgObjects)
+            let invN = NC.funInvImg fnm
+                argN = NC.funArg invN
+            in foldl addFactToTh t
+                 [ mkSortLimitFactByName (NC.boundMin argN) (NC.sortMin resSortN) "≤" argN
+                 , mkSortLimitFactByName (NC.boundMax argN) argN "≤" (NC.sortMax resSortN)
+                 ]
           th1 = foldl addProjPair th [1 .. arity]
           th2 = addEntityToTh th1 (EntityFunction (mkTupleFormation th1 fnm argSorts domSort orig))
-      in th2
+          th3 = addInvImgBounds th2
+      in th3
 
-mkSortLimitFact :: MereologicalObject -> String -> MereologicalObject -> Fact
-mkSortLimitFact l op r = Fact
+mkSortLimitFact :: String -> MereologicalObject -> String -> MereologicalObject -> Fact
+mkSortLimitFact nm l op r =
+  mkSortLimitFactByName nm (mereoName l) op (mereoName r)
+
+-- | Like 'mkSortLimitFact' but takes raw object names instead of 'MereologicalObject's.
+-- Use this when the participants are witness names not tracked in the IR object table.
+mkSortLimitFactByName :: String -> String -> String -> String -> Fact
+mkSortLimitFactByName nm lName op rName = Fact
   { factKind      = FactKindSortLimitation
+  , factName      = Just nm
   , factPropExpr  = Nothing
-  , factMereoExpr = Just (opCtor (MVar (mereoName l)) (MVar (mereoName r)))
+  , factMereoExpr = Just (opCtor (MVar lName) (MVar rName))
   , factFreeVars  = []
   }
   where
@@ -1009,29 +1057,74 @@ addEntityToTh th e =
 addFactToTh :: Theory -> Fact -> Theory
 addFactToTh th f = th { theoryFacts = theoryFacts th ++ [f] }
 
+-- | Add the three sort-ordering facts (ordering, upper, lower) for a product
+-- sort (domain sort of a multi-arg FOL function or relation).
+addProductSortOrderingFacts :: Theory -> String -> Sort -> Theory
+addProductSortOrderingFacts th fnm domSort =
+  let u    = theoryUniverse th
+      p    = theoryProp th
+      dN   = sortName domSort
+  in foldl addFactToTh th
+       [ mkSortLimitFact (NC.funDomOrdering fnm) (sortMin domSort) "≤" (sortMax domSort)
+       , mkSortLimitFact (NC.funDomUpper    fnm) (sortMax domSort) "≤" (sortMax u)
+       , mkSortLimitFact (NC.funDomLower    fnm) (sortMax p)       "≤" (sortMin domSort)
+       ]
+
+-- | Add the lower and upper bound facts for a mereological object within its sort.
+-- boundMin: (obj → sort_Min) — the sort minimum is below the object
+-- boundMax: (sort_Max → obj) — the object is below the sort maximum
+addObjectBoundFacts :: Theory -> MereologicalObject -> Theory
+addObjectBoundFacts th obj =
+  let nm  = NC.sanitizeHash (mereoName obj)
+      s   = mereoSort obj
+  in foldl addFactToTh th
+       [ mkSortLimitFact (NC.boundMin nm) (sortMin s) "≤" obj
+       , mkSortLimitFact (NC.boundMax nm) obj         "≤" (sortMax s)
+       ]
+
+-- | Add bound facts for all arg/res objects associated with a function.
+-- Covers: funcArgObjects, funcResObject, funcArgument (product arg),
+-- inv-img arg+res, and projection witnesses.
+addFunctionBoundFacts :: Theory -> Function -> Theory
+addFunctionBoundFacts th f =
+  foldl addObjectBoundFacts th allObjs
+  where
+    allObjs = concat
+      [ funcArgObjects f
+      , maybe [] (:[]) (funcResObject f)
+      , maybe [] (:[]) (funcArgument f)
+      ]
+
 relateSortToUniverse :: Theory -> Sort -> Theory
 relateSortToUniverse th s
   | sortKind s == SortKindUniverse = th
   | otherwise =
-      let u = theoryUniverse th
+      let u  = theoryUniverse th
+          sN = sortName s
       in addFactToTh (addFactToTh th
-           (mkSortLimitFact (sortMin u) "≤" (sortMin s)))
-           (mkSortLimitFact (sortMax s) "≤" (sortMax u))
+           (mkSortLimitFact (NC.sortUniversalLower sN) (sortMin u) "≤" (sortMin s)))
+           (mkSortLimitFact (NC.sortUpper sN)          (sortMax s) "≤" (sortMax u))
 
 relateSortToProp :: Theory -> Sort -> Theory
 relateSortToProp th s
   | sortKind s == SortKindUniverse = th
   | sortKind s == SortKindProp     = th
-  | otherwise = addFactToTh th (mkSortLimitFact (sortMax (theoryProp th)) "≤" (sortMin s))
+  | otherwise =
+      let sN = sortName s
+      in addFactToTh th
+           (mkSortLimitFact (NC.sortLower sN) (sortMax (theoryProp th)) "≤" (sortMin s))
 
 addSortToTh :: Theory -> Sort -> Theory
 addSortToTh th s =
-  let th1 = addEntityToTh th  (EntitySort s)
+  let sN  = sortName s
+      th1 = addEntityToTh th  (EntitySort s)
       th2 = addEntityToTh th1 (EntityMereological (sortMin s))
       th3 = addEntityToTh th2 (EntityMereological (sortMax s))
-      th4 = relateSortToProp    th3 s
-      th5 = relateSortToUniverse th4 s
-  in th5
+      th4 = addFactToTh th3
+              (mkSortLimitFact (NC.sortOrdering sN) (sortMin s) "≤" (sortMax s))
+      th5 = relateSortToProp    th4 s
+      th6 = relateSortToUniverse th5 s
+  in th6
 
 mkRelatedSort :: Theory -> String -> String -> Sort -> Sort
 mkRelatedSort th rel nm parentS =
@@ -1046,20 +1139,22 @@ mkRelatedSort th rel nm parentS =
        }
 
 relationalSortFacts :: Theory -> String -> Sort -> Sort -> Theory
-relationalSortFacts th rel newS parentS = case rel of
-  "subsort" ->
-    addFactToTh (addFactToTh th
-      (mkSortLimitFact (sortMin newS) "=" (sortMin parentS)))
-      (mkSortLimitFact (sortMax newS) "≤" (sortMax parentS))
-  "quotient" ->
-    addFactToTh (addFactToTh th
-      (mkSortLimitFact (sortMin parentS) "≤" (sortMin newS)))
-      (mkSortLimitFact (sortMax newS) "=" (sortMax parentS))
-  "subquotient" ->
-    addFactToTh (addFactToTh th
-      (mkSortLimitFact (sortMin parentS) "≤" (sortMin newS)))
-      (mkSortLimitFact (sortMax newS) "≤" (sortMax parentS))
-  _ -> th
+relationalSortFacts th rel newS parentS =
+  let sN = sortName newS
+  in case rel of
+    "subsort" ->
+      addFactToTh (addFactToTh th
+        (mkSortLimitFact (NC.sortLower sN) (sortMin newS) "=" (sortMin parentS)))
+        (mkSortLimitFact (NC.sortUpper sN) (sortMax newS) "≤" (sortMax parentS))
+    "quotient" ->
+      addFactToTh (addFactToTh th
+        (mkSortLimitFact (NC.sortLower sN) (sortMin parentS) "≤" (sortMin newS)))
+        (mkSortLimitFact (NC.sortUpper sN) (sortMax newS)    "=" (sortMax parentS))
+    "subquotient" ->
+      addFactToTh (addFactToTh th
+        (mkSortLimitFact (NC.sortLower sN) (sortMin parentS) "≤" (sortMin newS)))
+        (mkSortLimitFact (NC.sortUpper sN) (sortMax newS)    "≤" (sortMax parentS))
+    _ -> th
 
 mkRelation :: Theory -> String -> [Sort] -> Origin -> Relation
 mkRelation th nm argSorts orig =
@@ -1252,7 +1347,8 @@ reflectSortLimitFacts subName subTh parentTh =
 
     addReflected th f = case factMereoExpr f of
       Just me -> addFactToTh th (f { factMereoExpr = Just (reflectMe me)
-                                   , factPropExpr  = Nothing })
+                                   , factPropExpr  = Nothing
+                                   , factName      = fmap qualify (factName f) })
       Nothing -> th
 
     reflectMe (MSum     l r) = MFOLApp (qualify "+") [reflectMe l, reflectMe r]
@@ -1318,6 +1414,7 @@ addMergeEqualityFact th lhsName lhsEntity rhsName rhsEntity =
             ]))
   in addFactToTh th (Fact
         { factKind      = kind
+        , factName      = Nothing
         , factPropExpr  = Just (ResolvedPropBicond rightImpl [])
         , factMereoExpr = mereo
         , factFreeVars  = []
@@ -1453,6 +1550,7 @@ mereologicalTranslation th fact = case factKind fact of
   FactKindFact ->
     let origExpr = fromJust (factPropExpr fact)
     in [ Fact { factKind      = factKindMereoOfFact
+              , factName      = Nothing
               , factPropExpr  = Nothing
               , factMereoExpr = Just (wrapAsFact th (factFreeVars fact) origExpr)
               , factFreeVars  = factFreeVars fact
@@ -1460,6 +1558,7 @@ mereologicalTranslation th fact = case factKind fact of
   FactKindAssertion ->
     let origExpr = fromJust (factPropExpr fact)
     in [ Fact { factKind      = factKindMereoOfAssertion
+              , factName      = Nothing
               , factPropExpr  = Nothing
               , factMereoExpr = Just (wrapAsAssertion th (factFreeVars fact) origExpr)
               , factFreeVars  = factFreeVars fact
@@ -1467,6 +1566,7 @@ mereologicalTranslation th fact = case factKind fact of
   FactKindMetafactsFact ->
     let origExpr = fromJust (factPropExpr fact)
     in [ Fact { factKind      = factKindMereoOfMetafact
+              , factName      = Nothing
               , factPropExpr  = Nothing
               , factMereoExpr = Just (wrapAsMetafact th (factFreeVars fact) origExpr)
               , factFreeVars  = factFreeVars fact

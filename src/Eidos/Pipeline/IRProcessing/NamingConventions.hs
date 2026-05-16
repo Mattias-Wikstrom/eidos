@@ -45,6 +45,7 @@ module Eidos.Pipeline.IRProcessing.NamingConventions
   , sortOrdering
   , sortUpper
   , sortLower
+  , sortUniversalLower
   , funDomOrdering
   , funDomUpper
   , funDomLower
@@ -184,6 +185,11 @@ sortUpper s = s ++ "_upper"
 -- | Lower-bound placement axiom for a sort.  Example: @"S"@ → @"S_lower"@
 sortLower :: String -> String
 sortLower s = s ++ "_lower"
+
+-- | Auxiliary lower-bound axiom placing a sort's minimum within the universe minimum.
+--   Example: @"S"@ → @"S_u_lower"@
+sortUniversalLower :: String -> String
+sortUniversalLower s = s ++ "_u_lower"
 
 -- | Domain-ordering axiom for a multi-arg function.
 --   Example: @"f"@ → @"f_dom_ordering"@

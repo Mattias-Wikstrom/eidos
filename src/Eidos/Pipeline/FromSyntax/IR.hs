@@ -439,14 +439,18 @@ instance Show Theory where
 
 data Fact = Fact
   { factKind      :: FactKind
+  , factName      :: Maybe String
+    -- ^ Axiom name for output.
+    --   'Just' for 'FCSortStructure' facts (set by FromSyntax at creation time).
+    --   'Nothing' for all other fact kinds (named by the backend at emission time).
   , factPropExpr  :: Maybe ResolvedPropExpr
     -- ^ The logical expression for this fact.
-    --   'Just' for 'FCUserInput', 'FCSortStructure', and 'FCImplicitMerge' facts.
-    --   'Nothing' for 'FCMereologicalTranslation' facts (use 'factMereoExpr').
+    --   'Just' for 'FCUserInput' and 'FCImplicitMerge' facts.
+    --   'Nothing' for 'FCMereologicalTranslation' and 'FCSortStructure' facts.
   , factMereoExpr :: Maybe MereoExpr
     -- ^ The mereological expression for this fact.
-    --   'Just' for 'FCMereologicalTranslation' facts.
-    --   'Nothing' for facts that have no mereological representation yet.
+    --   'Just' for 'FCMereologicalTranslation' and 'FCSortStructure' facts.
+    --   'Nothing' for 'FCUserInput' facts (use 'factPropExpr').
   , factFreeVars  :: [ResolvedVarDecl]
   }
   deriving (Show)
