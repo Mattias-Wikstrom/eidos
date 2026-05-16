@@ -1118,7 +1118,7 @@ reflectEntity e = e
 
 -- | After reflection, patch all sort references inside an entity to use the
 -- qualified name (i.e. prefix each sort name with @subName ++ "."@).
--- This ensures that sort fields point to the reflected (renamed) sorts rather
+-- This ensures that sort fields point to the newly created reflected sorts rather
 -- than the originals.
 qualifySortRefs :: String -> Entity -> Entity
 qualifySortRefs subName (EntitySort s) =
@@ -1212,15 +1212,15 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
           --   ensures an entity shared by multiple implicit subtheories appears once.
           let th2
                 | isReflection =
-                    let renamed = map (renameEntity qualifiedName) localToSub
+                    let qualified = map (renameEntity qualifiedName) localToSub
                         -- Also update theoryObjectsByName so qualified lookups return
-                        -- the renamed entity (with the qualified sortName) rather than
+                        -- the entity with its qualified internal name rather than
                         -- the transformed entity (with the original unqualified name)
                         -- that was stored by addEntityToParent above.
                         thBase  = foldl (\t e -> t { theoryObjects      = theoryObjects t ++ [e]
                                                    , theoryObjectsByName = Map.insert (entityName e) [e] (theoryObjectsByName t) })
-                                        th1 renamed
-                    in foldl addFOLInfraForReflected thBase renamed
+                                        th1 qualified
+                    in foldl addFOLInfraForReflected thBase qualified
                 | isImplicit && not (all isInternalEntity transformed) && not (null localToSub) =
                     let existingNames = map entityName (theoryObjects th1)
                         fresh = filter (\e -> entityName e `notElem` existingNames) localToSub
