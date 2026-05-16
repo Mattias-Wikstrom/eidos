@@ -1329,7 +1329,7 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
           if isImplicit && not (all isInternalEntity transformed) && not (null transformed)
             then if not (null localToSub)
                    then foldM (addUnqualified name qualifiedName) th2 localToSub
-                   else Right $ foldl (\t e -> addEntityToParent t name e) th2 transformed
+                   else foldM (addUnqualified name qualifiedName) th2 transformed
             else Right th2
 
 -- | Reflect sort-limitation facts from a reflected subtheory into the parent.
