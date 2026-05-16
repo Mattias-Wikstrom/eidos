@@ -1093,28 +1093,36 @@ mkRelation th nm argSorts orig =
 -- Reflection: entity kind transformation
 -- ---------------------------------------------------------------------------
 
-reflectEntity :: Entity -> Entity
-reflectEntity (EntityFunction f) =
-  EntityFunction (f { funcKind          = FunctionKindFOLFunctionFromReflection
+reflectEntity :: String -> Entity -> Entity
+reflectEntity subName (EntityFunction f) =
+  EntityFunction (f { funcName          = qualify (funcName f)
+                    , funcKind          = FunctionKindFOLFunctionFromReflection
                     , funcOrigin        = FromReflection
                     , funcReflectedFrom = Just (funcTheory f) })
-reflectEntity (EntitySort s) =
-  EntitySort (s { sortKind          = SortKindFromReflection
+  where qualify n = if null subName then n else subName ++ "." ++ n
+reflectEntity subName (EntitySort s) =
+  EntitySort (s { sortName         = qualify (sortName s)
+                , sortKind          = SortKindFromReflection
                 , sortOrigin        = FromReflection
                 , sortReflectedFrom = Just (sortTheory s)
                 , sortRelationship  = NotRelational
                 , sortParent        = Nothing
                 })
-reflectEntity (EntityMereological m) =
-  EntityMereological (m { mereoKind           = MereologicalEntityKindIndividual
+  where qualify n = if null subName then n else subName ++ "." ++ n
+reflectEntity subName (EntityMereological m) =
+  EntityMereological (m { mereoName          = qualify (mereoName m)
+                        , mereoKind           = MereologicalEntityKindIndividual
                         , mereoOrigin         = FromReflection
                         , mereoReflectedFrom  = Just (mereoTheory m) })
-reflectEntity (EntityRelation r) =
-  EntityRelation (r { relKind          = MereologicalEntityKindRelationFromReflection
+  where qualify n = if null subName then n else subName ++ "." ++ n
+reflectEntity subName (EntityRelation r) =
+  EntityRelation (r { relName          = qualify (relName r)
+                    , relKind          = MereologicalEntityKindRelationFromReflection
                     , relOrigin        = FromReflection
                     , relAssociatedSet = (relAssociatedSet r) { mereoKind = MereologicalEntityKindIndividual }
                     , relReflectedFrom = Just (relTheory r) })
-reflectEntity e = e
+  where qualify n = if null subName then n else subName ++ "." ++ n
+reflectEntity _ e = e
 
 -- | After reflection, patch all sort references inside an entity to use the
 -- qualified name (i.e. prefix each sort name with @subName ++ "."@).
@@ -1144,14 +1152,6 @@ qualifySortRefs subName (EntityRelation r) =
     qualMereo m = m { mereoName = subName ++ "." ++ mereoName m }
 qualifySortRefs _ e = e
 
--- | Patch the primary name field of an entity.  Used when a reflected entity
--- enters the parent theory's object list under its qualified name.
-renameEntity :: String -> Entity -> Entity
-renameEntity nm (EntityMereological m) = EntityMereological (m { mereoName = nm })
-renameEntity nm (EntitySort s)         = EntitySort         (s { sortName  = nm })
-renameEntity nm (EntityFunction f)     = EntityFunction     (f { funcName  = nm })
-renameEntity nm (EntityRelation r)     = EntityRelation     (r { relName   = nm })
-renameEntity _  e                      = e
 
 -- ---------------------------------------------------------------------------
 -- Subtheory propagation
@@ -1186,19 +1186,18 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
                                then NC.sortMinElem else NC.sortMaxElem
                   elemName  = if null subName then mkElemName (sortName limitSort)
                               else subName ++ "." ++ mkElemName (sortName limitSort)
-                  reflected = case qualifySortRefs subName (reflectEntity (EntityMereological m)) of
-                                EntityMereological m' -> EntityMereological (m' { mereoLimitForSort = Nothing })
+                  reflected = case qualifySortRefs subName (reflectEntity subName (EntityMereological m)) of
+                                EntityMereological m' -> EntityMereological (m' { mereoName = elemName, mereoLimitForSort = Nothing })
                                 e                     -> e
-                  renamed   = renameEntity elemName reflected
                   th1 = addEntityToParent th elemName reflected
-                  th2 = th1 { theoryObjects      = theoryObjects th1 ++ [renamed]
-                             , theoryObjectsByName = Map.insert elemName [renamed]
+                  th2 = th1 { theoryObjects      = theoryObjects th1 ++ [reflected]
+                             , theoryObjectsByName = Map.insert elemName [reflected]
                                                       (theoryObjectsByName th1) }
               in Right th2
 
         _ -> do
           let transformed = if isReflection
-                              then map (qualifySortRefs subName . reflectEntity) entities
+                              then map (qualifySortRefs subName . reflectEntity subName) entities
                               else entities
               localToSub = [e | e <- transformed, theoryFullyQualifiedName (entityTheory e) == theoryFullyQualifiedName subTh]
 
@@ -1212,15 +1211,14 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
           --   ensures an entity shared by multiple implicit subtheories appears once.
           let th2
                 | isReflection =
-                    let qualified = map (renameEntity qualifiedName) localToSub
-                        -- Also update theoryObjectsByName so qualified lookups return
-                        -- the entity with its qualified internal name rather than
-                        -- the transformed entity (with the original unqualified name)
-                        -- that was stored by addEntityToParent above.
-                        thBase  = foldl (\t e -> t { theoryObjects      = theoryObjects t ++ [e]
-                                                   , theoryObjectsByName = Map.insert (entityName e) [e] (theoryObjectsByName t) })
-                                        th1 qualified
-                    in foldl addFOLInfraForReflected thBase qualified
+                    -- reflectEntity already set the qualified name; just register in
+                    -- theoryObjects and update theoryObjectsByName so qualified lookups
+                    -- return the transformed entity rather than the one stored by
+                    -- addEntityToParent above (which used the original unqualified name).
+                    let thBase = foldl (\t e -> t { theoryObjects      = theoryObjects t ++ [e]
+                                                  , theoryObjectsByName = Map.insert (entityName e) [e] (theoryObjectsByName t) })
+                                       th1 localToSub
+                    in foldl addFOLInfraForReflected thBase localToSub
                 | isImplicit && not (all isInternalEntity transformed) && not (null localToSub) =
                     let existingNames = map entityName (theoryObjects th1)
                         fresh = filter (\e -> entityName e `notElem` existingNames) localToSub
