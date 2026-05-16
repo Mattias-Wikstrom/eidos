@@ -168,13 +168,14 @@ processItem refMap constraints kw (th, subs) item = do
 
   let th'    = addSubtheoryToTheory th sub
   th''      <- propagateSubtheory th' subName isImplicit isRefl sub
+  let th''' = if isRefl then reflectSortLimitFacts subName sub th'' else th''
   let thFinal =
         if isImplicit
-          then th''
-            { theoryUsesDomain = theoryUsesDomain th'' || theoryUsesDomain sub
-            , theoryUsesProp   = theoryUsesProp th'' || theoryUsesProp sub
+          then th'''
+            { theoryUsesDomain = theoryUsesDomain th''' || theoryUsesDomain sub
+            , theoryUsesProp   = theoryUsesProp th''' || theoryUsesProp sub
             }
-          else th''
+          else th'''
 
   return (thFinal, subs ++ [sub])
 
@@ -954,9 +955,13 @@ mkSortLimitFact :: MereologicalObject -> String -> MereologicalObject -> Fact
 mkSortLimitFact l op r = Fact
   { factKind      = FactKindSortLimitation
   , factPropExpr  = Just (twoTermPropExpr l op r)
-  , factMereoExpr = Nothing
+  , factMereoExpr = Just (opCtor (MVar (mereoName l)) (MVar (mereoName r)))
   , factFreeVars  = []
   }
+  where
+    opCtor = case op of
+      "=" -> MSymDiff
+      _   -> MDiff
 
 twoTermPropExpr :: MereologicalObject -> String -> MereologicalObject -> ResolvedPropExpr
 twoTermPropExpr l op r =
@@ -1230,6 +1235,37 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
                    then foldM (addUnqualified name qualifiedName) th2 localToSub
                    else Right $ foldl (\t e -> addEntityToParent t name e) th2 transformed
             else Right th2
+
+-- | Reflect sort-limitation facts from a reflected subtheory into the parent.
+-- Each fact's MereoExpr (MDiff or MSymDiff) has its MVar names remapped:
+-- sort-limit objects (X_Min, X_Max) become the reflected individuals
+-- (subName.X_min_elem, subName.X_max_elem); all other names get the
+-- subName prefix.
+reflectSortLimitFacts :: String -> Theory -> Theory -> Theory
+reflectSortLimitFacts subName subTh parentTh =
+  foldl addReflected parentTh sortLimitFacts
+  where
+    sortLimitFacts = filter (\f -> factKind f == FactKindSortLimitation) (theoryFacts subTh)
+
+    addReflected th f = case factMereoExpr f of
+      Just me -> addFactToTh th (f { factMereoExpr = Just (reflectMe me) })
+      Nothing -> th
+
+    reflectMe (MDiff l r)    = MDiff    (reflectMe l) (reflectMe r)
+    reflectMe (MSymDiff l r) = MSymDiff (reflectMe l) (reflectMe r)
+    reflectMe (MVar name)    = MVar (reflectName name)
+    reflectMe e              = e
+
+    reflectName name =
+      case Map.lookup name (theoryObjectsByName subTh) of
+        Just [EntityMereological m]
+          | mereoKind m == MereologicalEntityKindLowerLimitForSort
+          , Just limitSort <- mereoLimitForSort m ->
+              subName ++ "." ++ NC.sortMinElem (sortName limitSort)
+          | mereoKind m == MereologicalEntityKindUpperLimitForSort
+          , Just limitSort <- mereoLimitForSort m ->
+              subName ++ "." ++ NC.sortMaxElem (sortName limitSort)
+        _ -> subName ++ "." ++ name
 
 termFromEntityWithName :: String -> Entity -> ResolvedTerm
 termFromEntityWithName displayName entity =

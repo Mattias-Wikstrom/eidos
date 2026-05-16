@@ -122,9 +122,12 @@ renderFact :: Int -> Int -> Fact -> String
 renderFact level i f =
   ind level ++ show i ++ ": " ++ show (factKind f) ++ " => " ++ renderFactExpr f
   where
-    renderFactExpr fact = case factMereoExpr fact of
-      Just me -> "[mereo] " ++ show me
-      Nothing -> case factPropExpr fact of
-        Just pe -> prettyResolvedPropExpr pe
+    renderFactExpr fact = case factPropExpr fact of
+      Just pe -> prettyResolvedPropExpr pe
+      Nothing -> case factMereoExpr fact of
+        Just me -> renderSortLimitMereo me
         Nothing -> "<no expression>"
+    renderSortLimitMereo (MDiff    (MVar l) (MVar r)) = " " ++ l ++ " ≤ " ++ r
+    renderSortLimitMereo (MSymDiff (MVar l) (MVar r)) = " " ++ l ++ " = " ++ r
+    renderSortLimitMereo me                            = "[mereo] " ++ show me
     ind n = replicate (n * 2) ' '
