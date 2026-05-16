@@ -7,11 +7,12 @@ module Eidos.Pipeline.FromSyntax.FromSyntax
   , BuildError
   ) where
 
+import           Control.Applicative   ((<|>))
 import           Control.Monad        (forM_, when, unless, foldM)
 import           Data.Char            (isUpper)
 import           Data.List            (find, intercalate, isSuffixOf)
 import qualified Data.Map.Strict      as Map
-import           Data.Maybe           (fromJust, fromMaybe, mapMaybe)
+import           Data.Maybe           (fromJust, fromMaybe, listToMaybe, mapMaybe)
 import           System.FilePath      (takeDirectory)
 
 import           Eidos.Pipeline.Parse.AST            hiding (theoryBody, theoryName, funcName, funcDomain, relName)
@@ -96,7 +97,7 @@ decorateTheoryBody refMap body parentMaybe name isReflection constraints = do
 
   -- ── Pass 1: subtheories ───────────────────────────────────────────────
   (th1, subtheories) <- foldM (buildSubtheoryEntry refMap constraints) (thC, []) (sections body)
-  let th2 = th1 { theorySubtheories = subtheories }
+  let th2 = addCanonicals (th1 { theorySubtheories = subtheories })
 
   -- ── Pass 2: signature ─────────────────────────────────────────────────
   th3 <- foldM (buildSignatureSection th2) th2 (sections body)
@@ -1430,21 +1431,12 @@ addMergeEqualityFacts
 addMergeEqualityFacts th lhsName lhsEntity rhsName rhsEntity =
   foldl (\acc (l, r) -> addMergeEqualityFact acc l lhsEntity r rhsEntity) th mergePairs
   where
-    rhsWithLeaf :: String -> String
-    rhsWithLeaf leaf =
-      case break (== '.') (reverse rhsName) of
-        (_, "")      -> leaf
-        (_, revRest) -> reverse revRest ++ leaf
-
     mergePairs
       | isSort lhsEntity =
-          [ (NC.sortMin lhsName, rhsWithLeaf (NC.sortMin lhsName))
-          , (NC.sortMax lhsName, rhsWithLeaf (NC.sortMax lhsName))
+          [ (NC.sortMin lhsName, NC.sortMin rhsName)
+          , (NC.sortMax lhsName, NC.sortMax rhsName)
           ]
-      | otherwise = case lhsName of
-          "⊤" -> [(NC.sortMin "ℙ", rhsWithLeaf (NC.sortMin "ℙ"))]
-          "⊥" -> [(NC.sortMax "ℙ", rhsWithLeaf (NC.sortMax "ℙ"))]
-          _   -> [(lhsName, rhsName)]
+      | otherwise = [(lhsName, rhsName)]
 
     isSort (EntitySort _) = True
     isSort _ = False
@@ -1473,38 +1465,62 @@ addUnqualified name qualifiedName th entity
           Right $ addMergeEqualityFacts th name parentEntity qualifiedName subEntity
         _ -> Right th
   | Nothing <- Map.lookup name (theoryObjectsByName th) =
-      let canonical = createCanonicalEntity th entity
-          th1       = addEntityToParent th name canonical
-      in Right $ addMergeEqualityFacts th1 name canonical qualifiedName entity
-  | Just (canonical : _) <- Map.lookup name (theoryObjectsByName th) =
-      if entitiesCompatible canonical entity
-        then Right $ addMergeEqualityFacts th name canonical qualifiedName entity
+      let th1 = addEntityToParent th name entity
+      in Right $ addMergeEqualityFacts th1 name entity qualifiedName entity
+  | Just (existing : _) <- Map.lookup name (theoryObjectsByName th) =
+      if entitiesCompatible existing entity
+        then Right $ addMergeEqualityFacts th name existing qualifiedName entity
         else Left $ "Name conflict: '" ++ name
                ++ "' is defined in multiple implicit subtheories with incompatible signatures"
   | otherwise = Right th
 
-createCanonicalEntity :: Theory -> Entity -> Entity
-createCanonicalEntity parentTh (EntitySort s) =
-  EntitySort s { sortTheory       = parentTh
+-- | After all subtheories have been processed, ensure that every multi-entry
+-- key in 'theoryObjectsByName' has a canonical entity — one whose own name
+-- field equals the map key.  This makes qualified lookups order-independent:
+-- regardless of whether a named or implicit subtheory registered the key first,
+-- the canonical is always found by 'lookupEntity' / 'lookupEntityInPath'.
+-- Single-entry keys are left untouched; they are returned directly by the
+-- singleton path in the lookup functions and need no canonical.
+addCanonicals :: Theory -> Theory
+addCanonicals th =
+  th { theoryObjectsByName = Map.mapWithKey ensureCanonical (theoryObjectsByName th) }
+  where
+    ensureCanonical key es = case es of
+      [_] -> es  -- singleton: returned as-is by lookup; no canonical needed
+      _   -> case find (\e -> entityName e == key) es of
+               Just _  -> es  -- canonical already present
+               Nothing -> createCanonicalEntity th key (head es) : es
+
+-- | Create a canonical representative of an entity in the parent theory.
+-- The entity's own name field is set to @canonicalName@ (the map key under
+-- which it will be stored), so that lookups can identify the canonical among
+-- a list of duplicates by checking @entityName e == key@.
+createCanonicalEntity :: Theory -> String -> Entity -> Entity
+createCanonicalEntity parentTh canonicalName (EntitySort s) =
+  EntitySort s { sortName         = canonicalName
+               , sortTheory       = parentTh
                , sortOrigin       = FromSubtheory
                , sortReflectedFrom = Nothing
                }
-createCanonicalEntity parentTh (EntityFunction f) =
-  EntityFunction f { funcTheory       = parentTh
+createCanonicalEntity parentTh canonicalName (EntityFunction f) =
+  EntityFunction f { funcName         = canonicalName
+                   , funcTheory       = parentTh
                    , funcOrigin       = FromSubtheory
                    , funcReflectedFrom = Nothing
                    }
-createCanonicalEntity parentTh (EntityMereological m) =
-  EntityMereological m { mereoTheory       = parentTh
+createCanonicalEntity parentTh canonicalName (EntityMereological m) =
+  EntityMereological m { mereoName         = canonicalName
+                        , mereoTheory       = parentTh
                         , mereoOrigin       = FromSubtheory
                         , mereoReflectedFrom = Nothing
                         }
-createCanonicalEntity parentTh (EntityRelation r) =
-  EntityRelation r { relTheory       = parentTh
-                   , relOrigin       = FromSubtheory
-                   , relReflectedFrom = Nothing
+createCanonicalEntity parentTh canonicalName (EntityRelation r) =
+  EntityRelation r { relName           = canonicalName
+                   , relTheory         = parentTh
+                   , relOrigin         = FromSubtheory
+                   , relReflectedFrom  = Nothing
                    }
-createCanonicalEntity _ e = e
+createCanonicalEntity _ _ e = e
 
 isInternalEntity :: Entity -> Bool
 isInternalEntity (EntitySort s) =
@@ -1928,8 +1944,13 @@ lookupSort th nm = case nm of
   "ℙ"    -> Right (theoryProp th)
   "Prop" -> Right (theoryProp th)
   _ -> case Map.lookup nm (theoryObjectsByName th) of
-    Just (EntitySort s : _) -> Right s
-    _ ->
+    Just es ->
+      let sorts = [s | EntitySort s <- es]
+          canonical = find (\s -> sortName s == nm) sorts
+      in case canonical <|> listToMaybe sorts of
+           Just s  -> Right s
+           Nothing -> Left $ "Unknown sort: " ++ nm
+    Nothing ->
       case mapMaybe (\sub -> case Map.lookup nm (theoryObjectsByName sub) of
                                 Just (EntitySort s : _) -> Just s
                                 _                       -> Nothing)
@@ -1940,8 +1961,13 @@ lookupSort th nm = case nm of
 lookupFunction :: Theory -> String -> Either BuildError Function
 lookupFunction th nm =
   case Map.lookup nm (theoryObjectsByName th) of
-    Just (EntityFunction f : _) -> Right f
-    _ ->
+    Just es ->
+      let fns = [f | EntityFunction f <- es]
+          canonical = find (\f -> funcName f == nm) fns
+      in case canonical <|> listToMaybe fns of
+           Just f  -> Right f
+           Nothing -> Left $ "Unknown function: '" ++ nm ++ "'"
+    Nothing ->
       case mapMaybe (\sub -> case Map.lookup nm (theoryObjectsByName sub) of
                                 Just (EntityFunction f : _) -> Just f
                                 _                           -> Nothing)
@@ -1968,16 +1994,27 @@ lookupSortByExpr th sexpr = do
       -- reflected sorts live here under their qualified name.
       let qualifiedName = intercalate "." (map theoryRefName specs ++ [sortConstant sr])
       case Map.lookup qualifiedName (theoryObjectsByName th) of
-        Just (EntitySort s : _) -> Right s
-        _                       -> Left $ "Unknown sort: " ++ qualifiedName
+        Just es ->
+          let sorts = [s | EntitySort s <- es]
+              canonical = find (\s -> sortName s == qualifiedName) sorts
+          in case canonical <|> listToMaybe sorts of
+               Just s  -> Right s
+               Nothing -> Left $ "Unknown sort: " ++ qualifiedName
+        Nothing -> Left $ "Unknown sort: " ++ qualifiedName
 
+-- | Look up an entity by its unqualified name in the given theory's name map.
+-- When multiple entities share the key (the same name registered from different
+-- subtheory paths), the canonical representative is identified by having its
+-- own @entityName@ equal to the key.  A single entry is returned directly.
+-- Multiple entries with no canonical is a genuine ambiguity error.
 lookupEntity :: Theory -> String -> Either BuildError Entity
 lookupEntity th nm =
   case Map.lookup nm (theoryObjectsByName th) of
-    Just [e]   -> Right (resolveEntityAlias e)
-    Just []    -> Left $ "Unknown reference: '" ++ nm ++ "'"
-    Just (_:_) -> Left $ "Ambiguous name: '" ++ nm ++ "'"
-    Nothing    -> Left $ "Unknown reference: '" ++ nm ++ "'"
+    Just [e] -> Right (resolveEntityAlias e)
+    Just es  -> case find (\e -> entityName e == nm) es of
+                  Just canonical -> Right (resolveEntityAlias canonical)
+                  Nothing        -> Left $ "Ambiguous name: '" ++ nm ++ "'"
+    Nothing  -> Left $ "Unknown reference: '" ++ nm ++ "'"
 
 lookupEntityInPath :: Theory -> [String] -> String -> Either BuildError Entity
 lookupEntityInPath th [] nm = lookupEntity th nm
@@ -1988,10 +2025,11 @@ lookupEntityInPath th path nm =
   -- (unreflected) entity.  Descending into the subtheory would find the wrong one.
   let qualifiedName = intercalate "." (path ++ [nm])
   in case Map.lookup qualifiedName (theoryObjectsByName th) of
-    Just [e]   -> Right (resolveEntityAlias e)
-    Just []    -> Left $ "Unknown reference: '" ++ qualifiedName ++ "'"
-    Just (_:_) -> Left $ "Ambiguous name: '" ++ qualifiedName ++ "'"
-    Nothing    -> do
+    Just [e] -> Right (resolveEntityAlias e)
+    Just es  -> case find (\e -> entityName e == qualifiedName) es of
+                  Just canonical -> Right (resolveEntityAlias canonical)
+                  Nothing        -> Left $ "Ambiguous name: '" ++ qualifiedName ++ "'"
+    Nothing  -> do
       subTh <- findSubtheoryByPath th path
       lookupEntity subTh nm
 
