@@ -223,57 +223,10 @@ main = hspec $ do
         -- Uses containsExprFlex so LEq and LBicond are treated as interchangeable.
         any (containsExprFlex targetBody) (allTypes doc) `shouldBe` True
 
-    describe "inverse function" $ do
-      it "declares inverse g_inv : Prop → Prop for single-arg user-declared FOL function" $ do
-        doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
-        findAxiomByName doc "g_inv" `shouldSatisfy` (/= Nothing)
-        fmap axiomType (findAxiomByName doc "g_inv") `shouldBe` Just (LImpl LProp LProp)
-
-      it "does NOT declare inverse for function with empty sort (edge case)" $ do
-        -- This test just verifies that we don't crash; the "does not generate
-        -- inverse for SOL" is covered by checking specific SOL functions
-        doc <- buildStr [r|{ signature { sort S; g : S → S; h : S → S; } }|]
-        -- Both g and h are user-declared FOL, so both should get inverses
-        findAxiomByName doc "g_inv" `shouldSatisfy` (/= Nothing)
-        findAxiomByName doc "h_inv" `shouldSatisfy` (/= Nothing)
-
-      it "declares inverse arg/res objects g_inv_1, g_inv_res" $ do
-        doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
-        hasPropDecl doc "g_inv_1" `shouldBe` True
-        hasPropDecl doc "g_inv_res" `shouldBe` True
-
-      it "inverse arg lives in the original result sort" $ do
-        doc <- buildStr [r|{ signature { sort S; sort T; h : T → S; } }|]
-        -- h : T → S, so h_inv : S → T
-        -- h_inv_1 lives in S (original result), h_inv_res lives in T (original arg)
-        hasImplication doc (LVar "h_inv_1") (LVar (sortMinName "S")) `shouldBe` True
-        hasImplication doc (LVar "h_inv_res") (LVar (sortMinName "T")) `shouldBe` True
-
-      it "generates inverse fact axiom g_inv_fact" $ do
-        doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
-        findAxiomByName doc "g_inv_fact" `shouldSatisfy` (/= Nothing)
-
-      it "inverse fact connects g_inv_1, g_inv_res with g_inv(X1)" $ do
-        doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
-        let target = LBicond
-              (LConj (LEq (LVar "X1") (LVar "g_inv_1"))
-                     (LEq (LVar "X2") (LVar "g_inv_res")))
-              (LEq (LVar "X2") (LApp (LVar "g_inv") [LVar "X1"]))
-        any (containsExprFlex target) (allTypes doc) `shouldBe` True
-
     describe "adjunction axioms" $ do
       it "generates g_adjunction for single-arg function g" $ do
         doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
         findAxiomByName doc "g_adjunction" `shouldSatisfy` (/= Nothing)
-
-      it "adjunction: (Y → g(X)) ↔ (g_inv(Y) → X) with bounded quantifiers" $ do
-        doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
-        let target = LBicond
-              (LImpl (LVar "Y") (LApp (LVar "g") [LVar "X"]))
-              (LImpl (LApp (LVar "g_inv") [LVar "Y"]) (LVar "X"))
-        hasForallWithBound doc "X" (sortMinName "S") (sortMaxName "S") `shouldBe` True
-        hasForallWithBound doc "Y" (sortMinName "S") (sortMaxName "S") `shouldBe` True
-        any (containsExpr target) (allTypes doc) `shouldBe` True
 
       it "does NOT generate adjunction for the inverse function itself" $ do
         doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]

@@ -995,7 +995,8 @@ addMultiArgFOLExtras th f domSort orig
 
 mkSortLimitFact :: String -> MereologicalObject -> String -> MereologicalObject -> Fact
 mkSortLimitFact nm l op r =
-  mkSortLimitFactByName nm (mereoName l) op (mereoName r)
+  (mkSortLimitFactByName nm (mereoName l) op (mereoName r))
+    { factPropExpr = Just (twoTermPropExpr l op r) }
 
 -- | Like 'mkSortLimitFact' but takes raw object names instead of 'MereologicalObject's.
 -- Use this when the participants are witness names not tracked in the IR object table.
@@ -1465,8 +1466,9 @@ addUnqualified name qualifiedName th entity
           Right $ addMergeEqualityFacts th name parentEntity qualifiedName subEntity
         _ -> Right th
   | Nothing <- Map.lookup name (theoryObjectsByName th) =
-      let th1 = addEntityToParent th name entity
-      in Right $ addMergeEqualityFacts th1 name entity qualifiedName entity
+      let canonical = createCanonicalEntity th name entity
+          th1 = addEntityToParent th name canonical
+      in Right $ addMergeEqualityFacts th1 name canonical qualifiedName entity
   | Just (existing : _) <- Map.lookup name (theoryObjectsByName th) =
       if entitiesCompatible existing entity
         then Right $ addMergeEqualityFacts th name existing qualifiedName entity

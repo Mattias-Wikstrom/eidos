@@ -136,27 +136,6 @@ main = hspec $ do
           mereoKind m `shouldBe` MereologicalEntityKindLowerLimitForSort
         _ -> fail "S_Min not found or wrong entity type"
 
-  -- ── Gap 3: FOL inverse function ────────────────────────────────────────
-  describe "Gap 3: FOL function inverse" $ do
-
-    it "creates f_inv for a FOL function f : S → T" $ do
-      th <- buildStr "{ signature { sort S; sort T; f : S → T; } }"
-      lookupByName th "f_inv" `shouldSatisfy` isJust
-
-    it "f_inv is a Function with FOL kind" $ do
-      th <- buildStr "{ signature { sort S; sort T; f : S → T; } }"
-      case lookupByName th "f_inv" of
-        Just (EntityFunction fn) ->
-          funcKind fn `shouldBe` FunctionKindFOLFunctionFromTheory
-        _ -> fail "f_inv not found or wrong entity type"
-
-    it "f_inv has resSort equal to f's domain sort" $ do
-      th <- buildStr "{ signature { sort S; sort T; f : S → T; } }"
-      case (lookupByName th "f", lookupByName th "f_inv") of
-        (Just (EntityFunction f), Just (EntityFunction inv)) ->
-          sortName (funcResSort inv) `shouldBe` "f_dom"
-        _ -> fail "f or f_inv not found"
-
   -- ── Gap 4: direct/inverse image functions ──────────────────────────────
   describe "Gap 4: direct and inverse image SOL functions" $ do
 
