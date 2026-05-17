@@ -146,6 +146,17 @@ findAxiomByName doc name =
     (a:_) -> Just a
     _     -> Nothing
 
+-- | All defs in a doc.
+defs :: LeanDoc -> [LeanDef]
+defs doc = [ df | blk <- leanDocBlocks doc, DeclDef df <- blockDecls blk ]
+
+-- | Find a def by exact name.
+findDefByName :: LeanDoc -> String -> Maybe LeanDef
+findDefByName doc name =
+  case filter (\df -> leanDefName df == name) (defs doc) of
+    (d:_) -> Just d
+    _     -> Nothing
+
 -- ---------------------------------------------------------------------------
 -- Main
 -- ---------------------------------------------------------------------------
@@ -158,16 +169,16 @@ main = hspec $ do
   -- =========================================================================
 
     describe "function declaration" $ do
-      it "declares a single-arg function as Prop → Prop" $ do
+      it "declares a single-arg function as a def with one parameter" $ do
         doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
-        let gAxiom = findAxiomByName doc "g"
-        gAxiom `shouldSatisfy` (/= Nothing)
-        fmap axiomType gAxiom `shouldBe` Just (LImpl LProp LProp)
+        let gDef = findDefByName doc "g"
+        gDef `shouldSatisfy` (/= Nothing)
+        fmap (length . leanDefParams) gDef `shouldBe` Just 1
 
       it "declares multiple single-arg functions independently" $ do
         doc <- buildStr [r|{ signature { sort S; sort T; g : S → S; h : T → S; } }|]
-        findAxiomByName doc "g" `shouldSatisfy` (/= Nothing)
-        findAxiomByName doc "h" `shouldSatisfy` (/= Nothing)
+        findDefByName doc "g" `shouldSatisfy` (/= Nothing)
+        findDefByName doc "h" `shouldSatisfy` (/= Nothing)
 
     describe "argument/result object declarations" $ do
       it "declares arg object g_1 as Prop" $ do
@@ -224,9 +235,9 @@ main = hspec $ do
         any (containsExprFlex targetBody) (allTypes doc) `shouldBe` True
 
     describe "adjunction axioms" $ do
-      it "generates g_adjunction for single-arg function g" $ do
+      it "generates g_image_adjunction for single-arg function g" $ do
         doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
-        findAxiomByName doc "g_adjunction" `shouldSatisfy` (/= Nothing)
+        findAxiomByName doc "g_image_adjunction" `shouldSatisfy` (/= Nothing)
 
       it "does NOT generate adjunction for the inverse function itself" $ do
         doc <- buildStr [r|{ signature { sort S; g : S → S; } }|]
@@ -237,17 +248,16 @@ main = hspec $ do
   -- =========================================================================
 
     describe "function declaration" $ do
-      it "declares multi-arg function with arity n as Prop → Prop → ... → Prop" $ do
+      it "declares multi-arg function as a def with arity-many parameters" $ do
         doc <- buildStr [r|{ signature { sort S; f : S, S → S; } }|]
-        findAxiomByName doc "f" `shouldSatisfy` \case
-          Just ax -> axiomType ax == LImpl LProp (LImpl LProp LProp)
+        findDefByName doc "f" `shouldSatisfy` \case
+          Just df -> length (leanDefParams df) == 2
           Nothing -> False
 
-      it "declares ternary function with correct arity" $ do
+      it "declares ternary function as a def with three parameters" $ do
         doc <- buildStr [r|{ signature { sort S; sort T; k : S, T, T → S; } }|]
-        let ty3 = LImpl LProp (LImpl LProp (LImpl LProp LProp))
-        findAxiomByName doc "k" `shouldSatisfy` \case
-          Just ax -> axiomType ax == ty3
+        findDefByName doc "k" `shouldSatisfy` \case
+          Just df -> length (leanDefParams df) == 3
           Nothing -> False
 
     describe "product sort limit objects" $ do

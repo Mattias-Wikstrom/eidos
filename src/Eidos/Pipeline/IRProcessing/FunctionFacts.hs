@@ -202,7 +202,7 @@ theoryFunctionFactEntries theory = concat
     -- -----------------------------------------------------------------------
     -- 27. Image adjunction axioms
     -- -----------------------------------------------------------------------
-    imageAdjunctions = map mkAdj multiArgFol
+    imageAdjunctions = map mkAdj userDeclFol
       where
         mkAdj f =
           let fN      = IR.funcName f

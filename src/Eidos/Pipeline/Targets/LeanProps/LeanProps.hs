@@ -25,6 +25,7 @@ module Eidos.Pipeline.Targets.LeanProps.LeanProps
   , LeanBlock (..)
   , LeanDecl (..)
   , LeanAxiom (..)
+  , LeanDef (..)
   , LeanExpr (..)
     -- * Pipeline stages
   , renderLeanDoc

@@ -763,7 +763,8 @@ addFOLInfraForReflected th (EntityFunction f)
            let argSort = head argSorts
                dirImg  = mkSOLFunction th (NC.funDirImg nm) FunctionKindDirectImageFunction [argSort] resSort auxOrig
                invImg  = mkSOLFunction th (NC.funInvImg nm) FunctionKindInverseImageFunction [resSort] argSort auxOrig
-               f'      = f { funcDirectImage  = Just dirImg
+               f'      = f { funcDomain       = Just argSort
+                           , funcDirectImage  = Just dirImg
                            , funcInverseImage = Just invImg
                            }
                replaceF e = case e of
