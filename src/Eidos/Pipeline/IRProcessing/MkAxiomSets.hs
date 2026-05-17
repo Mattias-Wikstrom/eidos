@@ -461,6 +461,17 @@ mkAxiomSets pt = concat
   -- These are FCSortStructure/FSSortLimitation facts with a 'factName' and
   -- a 'factMereoExpr'; they replace the old SortBounds reconstruction.
   -- -------------------------------------------------------------------------
+  -- Names of the four structural facts that addSortToTh unconditionally
+  -- generates for the 𝔻 sort.  When 𝔻 is unused we suppress them so that
+  -- no D_Min/D_Max axioms appear in the output.
+  dSortStructuralFactNames :: [String]
+  dSortStructuralFactNames =
+    [ NC.sortOrdering       dSortName
+    , NC.sortLower          dSortName
+    , NC.sortUpper          dSortName
+    , NC.sortUniversalLower dSortName
+    ]
+
   sortLimitFactAxiomSets :: [AxiomSet]
   sortLimitFactAxiomSets =
     [ axiomSet [SGlobal] (tags [TagSorting])
@@ -470,6 +481,7 @@ mkAxiomSets pt = concat
     , IR.factSubkind  (IR.factKind f) == IR.FSSortLimitation
     , Just nm <- [IR.factName f]
     , Just me <- [IR.factMereoExpr f]
+    , usesDomain || nm `notElem` dSortStructuralFactNames
     ]
 
   -- -------------------------------------------------------------------------
