@@ -29,8 +29,9 @@ jobs:
           curl -sSfL https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta/-/raw/master/bootstrap.sh | bash
           # Strip 'export ' prefix so $GITHUB_ENV can parse the file
           sed 's/^export //' "$HOME/.ghc-wasm/env" >> "$GITHUB_ENV"
-          # Also prepend the wasm bin dir to PATH for subsequent steps
-          echo "PATH=$HOME/.ghc-wasm/bin:$PATH" >> "$GITHUB_ENV"
+          # Add all wasm tool bin dirs to PATH for subsequent steps
+          echo "$HOME/.ghc-wasm/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.ghc-wasm/wasm32-wasi-cabal/bin" >> "$GITHUB_PATH"
 
       - name: Cache wasm Cabal store
         uses: actions/cache@v4
@@ -40,8 +41,11 @@ jobs:
           restore-keys: wasm-cabal-${{ runner.os }}-
 
       # ── Build Wasm binary ──────────────────────────────────────────────────
-      - name: Find wasm32-wasi-cabal
-        run: find ~/.ghc-wasm -name 'wasm32-wasi-cabal' 2>/dev/null || echo "not found"
+      - name: Find wasm toolchain binaries
+        run: |
+          find ~/.ghc-wasm -name 'wasm32-wasi-cabal' 2>/dev/null || echo "wasm32-wasi-cabal not found"
+          find ~/.ghc-wasm -name 'wasm-opt' 2>/dev/null || echo "wasm-opt not found"
+          ls ~/.ghc-wasm/bin/ || echo "bin dir missing"
 
       - name: Build eidos-wasm
         run: wasm32-wasi-cabal build exe:eidos-wasm
