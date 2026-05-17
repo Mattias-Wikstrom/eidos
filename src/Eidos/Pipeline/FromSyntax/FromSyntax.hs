@@ -1466,9 +1466,8 @@ addUnqualified name qualifiedName th entity
           Right $ addMergeEqualityFacts th name parentEntity qualifiedName subEntity
         _ -> Right th
   | Nothing <- Map.lookup name (theoryObjectsByName th) =
-      let canonical = createCanonicalEntity th name entity
-          th1 = addEntityToParent th name canonical
-      in Right $ addMergeEqualityFacts th1 name canonical qualifiedName entity
+      let th1 = addEntityToParent th name entity
+      in Right $ addMergeEqualityFacts th1 name entity qualifiedName entity
   | Just (existing : _) <- Map.lookup name (theoryObjectsByName th) =
       if entitiesCompatible existing entity
         then Right $ addMergeEqualityFacts th name existing qualifiedName entity
@@ -1488,7 +1487,9 @@ addCanonicals th =
   th { theoryObjectsByName = Map.mapWithKey ensureCanonical (theoryObjectsByName th) }
   where
     ensureCanonical key es = case es of
-      [_] -> es  -- singleton: returned as-is by lookup; no canonical needed
+      [e] | theoryFullyQualifiedName (entityTheory e) /= theoryFullyQualifiedName th ->
+              [createCanonicalEntity th key e]
+          | otherwise -> es
       _   -> case find (\e -> entityName e == key) es of
                Just _  -> es  -- canonical already present
                Nothing -> createCanonicalEntity th key (head es) : es
