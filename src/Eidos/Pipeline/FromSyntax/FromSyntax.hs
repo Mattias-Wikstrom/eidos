@@ -1552,8 +1552,7 @@ isInternalEntity (EntityMereological m) =
 isInternalEntity _ = False
 
 entitiesCompatible :: Entity -> Entity -> Bool
-entitiesCompatible (EntitySort s1) (EntitySort s2) =
-  sortName s1 == sortName s2
+entitiesCompatible (EntitySort _) (EntitySort _) = True
 entitiesCompatible (EntityFunction f1) (EntityFunction f2) =
   length (funcArgSorts f1) == length (funcArgSorts f2) &&
   sortName (funcResSort f1) == sortName (funcResSort f2) &&
