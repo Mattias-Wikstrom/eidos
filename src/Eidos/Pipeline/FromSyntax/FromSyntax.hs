@@ -1328,17 +1328,9 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
                 | otherwise = th1
 
           if isImplicit && not (all isInternalEntity transformed) && not (null transformed)
-            then let entitiesToPropagate
-                       | not (null localToSub) = localToSub
-                       | otherwise =
-                           -- When no entity is directly owned by subTh, select the
-                           -- canonical(s) relative to subTh.  Passing all of
-                           -- transformed would include renamed canonicals alongside
-                           -- originals with different sortNames, causing a false
-                           -- "incompatible signatures" conflict.
-                           let canonicals = filter (\e -> entityFullyQualifiedName subTh e == name) transformed
-                           in if not (null canonicals) then canonicals else transformed
-                 in foldM (addUnqualified name) th2 entitiesToPropagate
+            then if not (null localToSub)
+                   then foldM (addUnqualified name) th2 localToSub
+                   else foldM (addUnqualified name) th2 transformed
             else Right th2
 
 -- | Reflect sort-limitation facts from a reflected subtheory into the parent.
