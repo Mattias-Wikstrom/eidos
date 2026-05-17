@@ -27,8 +27,10 @@ jobs:
       - name: Install GHC Wasm toolchain
         run: |
           curl -sSfL https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta/-/raw/master/bootstrap.sh | bash
-          echo "$HOME/.ghc-wasm/bin" >> "$GITHUB_PATH"
-          cat "$HOME/.ghc-wasm/env" >> "$GITHUB_ENV"
+          # Strip 'export ' prefix so $GITHUB_ENV can parse the file
+          sed 's/^export //' "$HOME/.ghc-wasm/env" >> "$GITHUB_ENV"
+          # Also prepend the wasm bin dir to PATH for subsequent steps
+          echo "PATH=$HOME/.ghc-wasm/bin:$PATH" >> "$GITHUB_ENV"
 
       - name: Cache wasm Cabal store
         uses: actions/cache@v4
