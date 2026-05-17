@@ -30,6 +30,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Format: "name:flag:extra_flags:extension"
 TARGETS=(
+  "dump_ir:--dump-ir::irdump"
   "lean_using_props:--lean_using_props::lean"
   "coq_using_props:--coq_using_props::v"
   "mereological:--mereological::mereo.theory"
