@@ -97,7 +97,7 @@ decorateTheoryBody refMap body parentMaybe name isReflection constraints = do
 
   -- ── Pass 1: subtheories ───────────────────────────────────────────────
   (th1, subtheories) <- foldM (buildSubtheoryEntry refMap constraints) (thC, []) (sections body)
-  let th2 = addImplicitMergeFacts (addCanonicals (th1 { theorySubtheories = subtheories }))
+  let th2 = trimToCanonicals (addImplicitMergeFacts (addCanonicals (th1 { theorySubtheories = subtheories })))
 
   -- ── Pass 2: signature ─────────────────────────────────────────────────
   th3 <- foldM (buildSignatureSection th2) th2 (sections body)
@@ -1497,7 +1497,7 @@ createCanonicalEntity parentTh canonicalName (EntityFunction f) =
   EntityFunction f { funcName         = canonicalName
                    , funcTheory       = parentTh
                    , funcOrigin       = FromSubtheory
-                   , funcReflectedFrom = Nothing
+                   , funcReflectedFrom = funcReflectedFrom f
                    }
 createCanonicalEntity parentTh canonicalName (EntityMereological m) =
   EntityMereological m { mereoName         = canonicalName
@@ -1531,6 +1531,22 @@ addImplicitMergeFacts th =
                then acc'
                else addMergeEqualityFacts acc' key canonical eName e
           ) acc es
+
+-- | After 'addImplicitMergeFacts', discard all non-canonical entries from
+-- 'theoryObjectsByName'.  Each key retains exactly the entity whose FQN
+-- relative to @th@ equals the key; the non-canonical duplicates served only
+-- to drive fact generation and are no longer needed.  Keys that have no
+-- canonical (i.e. purely-navigational dotted-path entries whose entity lives
+-- in a grandchild theory) are left unchanged so that path-qualified lookups
+-- still work.
+trimToCanonicals :: Theory -> Theory
+trimToCanonicals th =
+  th { theoryObjectsByName = Map.mapWithKey trim (theoryObjectsByName th) }
+  where
+    trim key es =
+      case find (\e -> entityFullyQualifiedName th e == key) es of
+        Just canonical -> [canonical]
+        Nothing        -> es
 
 isInternalEntity :: Entity -> Bool
 isInternalEntity (EntitySort s) =
