@@ -25,7 +25,7 @@ jobs:
 
       # ── Wasm binary (use committed binary, skip rebuild) ───────────────────
       - name: Copy committed wasm binary
-        run: cp wasm/eidos.wasm eidos-ui/public/wasm/eidos.wasm
+        run: cp --remove-destination wasm/eidos.wasm eidos-ui/public/wasm/eidos.wasm
 
       # ── Build UI ───────────────────────────────────────────────────────────
       - name: Set up Node
