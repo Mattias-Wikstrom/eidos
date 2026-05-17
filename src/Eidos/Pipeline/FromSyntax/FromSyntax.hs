@@ -2020,7 +2020,7 @@ lookupEntity :: Theory -> String -> Either BuildError Entity
 lookupEntity th nm =
   case Map.lookup nm (theoryObjectsByName th) of
     Just [e] -> Right (resolveEntityAlias e)
-    Just es  -> case find (\e -> entityName e == nm) es of
+    Just es  -> case find (\e -> entityFullyQualifiedName th e == nm) es of
                   Just canonical -> Right (resolveEntityAlias canonical)
                   Nothing        -> Left $ "Ambiguous name: '" ++ nm ++ "'"
     Nothing  -> Left $ "Unknown reference: '" ++ nm ++ "'"
@@ -2028,19 +2028,13 @@ lookupEntity th nm =
 lookupEntityInPath :: Theory -> [String] -> String -> Either BuildError Entity
 lookupEntityInPath th [] nm = lookupEntity th nm
 lookupEntityInPath th path nm =
-  -- Always check the parent theory's map under the fully-qualified name first.
-  -- This is essential for reflection subtheories: the reflected entity lives in
-  -- the parent under the qualified key, while the subtheory holds the original
-  -- (unreflected) entity.  Descending into the subtheory would find the wrong one.
   let qualifiedName = intercalate "." (path ++ [nm])
   in case Map.lookup qualifiedName (theoryObjectsByName th) of
     Just [e] -> Right (resolveEntityAlias e)
-    Just es  -> case find (\e -> entityName e == qualifiedName) es of
+    Just es  -> case find (\e -> entityFullyQualifiedName th e == qualifiedName) es of
                   Just canonical -> Right (resolveEntityAlias canonical)
                   Nothing        -> Left $ "Ambiguous name: '" ++ qualifiedName ++ "'"
-    Nothing  -> do
-      subTh <- findSubtheoryByPath th path
-      lookupEntity subTh nm
+    Nothing  -> Left $ "Unknown reference: '" ++ qualifiedName ++ "'"
 
 lookupInPath :: Theory -> [String] -> (Theory -> a) -> a
 lookupInPath th [] f    = f th
