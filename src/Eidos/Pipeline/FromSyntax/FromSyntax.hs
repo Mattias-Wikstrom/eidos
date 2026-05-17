@@ -97,7 +97,7 @@ decorateTheoryBody refMap body parentMaybe name isReflection constraints = do
 
   -- ── Pass 1: subtheories ───────────────────────────────────────────────
   (th1, subtheories) <- foldM (buildSubtheoryEntry refMap constraints) (thC, []) (sections body)
-  let th2 = addCanonicals (th1 { theorySubtheories = subtheories })
+  let th2 = addImplicitMergeFacts (addCanonicals (th1 { theorySubtheories = subtheories }))
 
   -- ── Pass 2: signature ─────────────────────────────────────────────────
   th3 <- foldM (buildSignatureSection th2) th2 (sections body)
@@ -1329,8 +1329,8 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
 
           if isImplicit && not (all isInternalEntity transformed) && not (null transformed)
             then if not (null localToSub)
-                   then foldM (addUnqualified name qualifiedName) th2 localToSub
-                   else foldM (addUnqualified name qualifiedName) th2 transformed
+                   then foldM (addUnqualified name) th2 localToSub
+                   else foldM (addUnqualified name) th2 transformed
             else Right th2
 
 -- | Reflect sort-limitation facts from a reflected subtheory into the parent.
@@ -1442,57 +1442,45 @@ addMergeEqualityFacts th lhsName lhsEntity rhsName rhsEntity =
     isSort (EntitySort _) = True
     isSort _ = False
 
-builtInSortNames :: [String]
-builtInSortNames = ["𝔻", "ℙ", "𝕌", "⊤", "⊥"]
-
-isBuiltInSort :: String -> Bool
-isBuiltInSort n = n `elem` builtInSortNames
-
 isSortLimit :: Entity -> Bool
 isSortLimit (EntityMereological m) = case mereoLimitForSort m of
   Just _  -> True
   Nothing -> False
 isSortLimit _ = False
 
-addUnqualified :: String -> String -> Theory -> Entity -> Either BuildError Theory
-addUnqualified name qualifiedName th entity
+-- | Register an implicit-subtheory entity under its bare name in the parent theory.
+-- Simply appends the entity to the list for that key; merge facts are generated later
+-- by 'addImplicitMergeFacts' after 'addCanonicals' has run.
+addUnqualified :: String -> Theory -> Entity -> Either BuildError Theory
+addUnqualified name th entity
   | isSortLimit entity = Right th
   | name == "⊤" = Right th
   | name == "⊥" = Right th
-  | isBuiltInSort name =
-      case ( Map.lookup name      (theoryObjectsByName th)
-           , Map.lookup qualifiedName (theoryObjectsByName th) ) of
-        (Just (parentEntity:_), Just (subEntity:_)) ->
-          Right $ addMergeEqualityFacts th name parentEntity qualifiedName subEntity
-        _ -> Right th
-  | Nothing <- Map.lookup name (theoryObjectsByName th) =
-      let th1 = addEntityToParent th name entity
-      in Right $ addMergeEqualityFacts th1 name entity qualifiedName entity
-  | Just (existing : _) <- Map.lookup name (theoryObjectsByName th) =
-      if entitiesCompatible existing entity
-        then Right $ addMergeEqualityFacts th name existing qualifiedName entity
-        else Left $ "Name conflict: '" ++ name
-               ++ "' is defined in multiple implicit subtheories with incompatible signatures"
-  | otherwise = Right th
+  | otherwise =
+      case Map.lookup name (theoryObjectsByName th) of
+        Nothing ->
+          Right $ addEntityToParent th name entity
+        Just existing ->
+          if all (entitiesCompatible entity) existing
+            then Right $ th { theoryObjectsByName =
+                                Map.adjust (++ [entity]) name (theoryObjectsByName th) }
+            else Left $ "Name conflict: '" ++ name
+                   ++ "' is defined in multiple implicit subtheories with incompatible signatures"
 
--- | After all subtheories have been processed, ensure that every multi-entry
--- key in 'theoryObjectsByName' has a canonical entity — one whose own name
--- field equals the map key.  This makes qualified lookups order-independent:
--- regardless of whether a named or implicit subtheory registered the key first,
+-- | After all subtheories have been processed, ensure that every key in
+-- 'theoryObjectsByName' has a canonical entity — one whose fully-qualified name
+-- relative to @th@ equals the map key.  This makes qualified lookups
+-- order-independent: regardless of which subtheory registered the key first,
 -- the canonical is always found by 'lookupEntity' / 'lookupEntityInPath'.
--- Single-entry keys are left untouched; they are returned directly by the
--- singleton path in the lookup functions and need no canonical.
+-- Merge equality facts are generated in a separate pass by 'addImplicitMergeFacts'.
 addCanonicals :: Theory -> Theory
 addCanonicals th =
   th { theoryObjectsByName = Map.mapWithKey ensureCanonical (theoryObjectsByName th) }
   where
-    ensureCanonical key es = case es of
-      [e] | theoryFullyQualifiedName (entityTheory e) /= theoryFullyQualifiedName th ->
-              [createCanonicalEntity th key e]
-          | otherwise -> es
-      _   -> case find (\e -> entityName e == key) es of
-               Just _  -> es  -- canonical already present
-               Nothing -> createCanonicalEntity th key (head es) : es
+    ensureCanonical key es =
+      case find (\e -> entityFullyQualifiedName th e == key) es of
+        Just _  -> es  -- canonical already present
+        Nothing -> createCanonicalEntity th key (head es) : es
 
 -- | Create a canonical representative of an entity in the parent theory.
 -- The entity's own name field is set to @canonicalName@ (the map key under
@@ -1524,6 +1512,25 @@ createCanonicalEntity parentTh canonicalName (EntityRelation r) =
                    , relReflectedFrom  = Nothing
                    }
 createCanonicalEntity _ _ e = e
+
+-- | After 'addCanonicals', generate implicit merge equality facts for every
+-- key in 'theoryObjectsByName' that has non-canonical entries.  For each such
+-- key, the canonical entity (whose FQN relative to @th@ equals the key) gets
+-- one merge-equality fact per non-canonical entry.
+addImplicitMergeFacts :: Theory -> Theory
+addImplicitMergeFacts th =
+  Map.foldlWithKey' addFactsForKey th (theoryObjectsByName th)
+  where
+    addFactsForKey acc key es =
+      case find (\e -> entityFullyQualifiedName th e == key) es of
+        Nothing        -> acc
+        Just canonical ->
+          foldl (\acc' e ->
+            let eName = entityFullyQualifiedName th e
+            in if eName == key
+               then acc'
+               else addMergeEqualityFacts acc' key canonical eName e
+          ) acc es
 
 isInternalEntity :: Entity -> Bool
 isInternalEntity (EntitySort s) =
@@ -1767,7 +1774,7 @@ applySuffixToMereo expr suffix = case suffix of
   ResolvedSuffixCall args ->
     MAbbrevApp (flattenMereoName expr) (map termToMereo args)
   ResolvedSuffixSpecialOp _ (Just entity) ->
-    MVar (entityFullyQualifiedName entity)
+    MVar (entityAbsoluteFQN entity)
   ResolvedSuffixSpecialOp op Nothing ->
     MVar (flattenMereoName expr ++ "_" ++ op)
 
@@ -2454,7 +2461,7 @@ resolveConstantRef th ctx (ConstantRef specs ref) = do
           -- resolution this may differ from 'ref', e.g. "⊤" → "ℙ_Min").
           -- For cross-theory lookups, use the fully-qualified name.
           name = if null path then entityName entity
-                 else entityFullyQualifiedName entity
+                 else entityAbsoluteFQN entity
       return (ResolvedConstantRef name entity ty)
 
 -- ---------------------------------------------------------------------------
@@ -2686,4 +2693,4 @@ qualifyPropExprConstants (ResolvedPropBicond l rs) =
     goBase (ResolvedBTDescription (ResolvedDescription v p)) =
       ResolvedBTDescription (ResolvedDescription v (qualifyPropExprConstants p))
 
-    qualifyConst cr = cr { resolvedConstRefName = entityFullyQualifiedName (resolvedConstEntity cr) }
+    qualifyConst cr = cr { resolvedConstRefName = entityAbsoluteFQN (resolvedConstEntity cr) }

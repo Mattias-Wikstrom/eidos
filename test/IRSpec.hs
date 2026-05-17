@@ -71,8 +71,8 @@ lookupByName th nm = case Map.lookup nm (theoryObjectsByName th) of
 lookupInParentByName :: Theory -> String -> Maybe Entity
 lookupInParentByName th nm = case Map.lookup nm (theoryObjectsByName th) of
   Just [e] -> Just e
-  Just (_:_) -> Nothing   -- ambiguous, return Nothing
-  _ -> Nothing
+  Just es  -> find (\e -> entityFullyQualifiedName th e == nm) es
+  Nothing  -> Nothing
 
 -- ---------------------------------------------------------------------------
 -- Main
@@ -319,10 +319,8 @@ main = hspec $ do
         }
       }|]
       th <- buildStr input
-      -- Should have one entry for S (merged)
-      case Map.lookup "S" (theoryObjectsByName th) of
-        Just [e] -> return ()  -- exactly one entity
-        _ -> fail "Expected merged entity"
+      -- Should have a canonical entity for S (FQN relative to th equals "S")
+      lookupInParentByName th "S" `shouldSatisfy` isJust
 
     it "no error when two implicit subtheories define same name" $ do
       let input = [r|{

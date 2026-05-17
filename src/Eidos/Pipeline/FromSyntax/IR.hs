@@ -815,13 +815,23 @@ theoryFunctionAuxEntities th =
 theoryFQN :: Theory -> String
 theoryFQN = theoryFullyQualifiedName
 
--- | Return the fully-qualified name of an entity, prefixing ancestor
---   theory names when the entity is nested inside subtheories.
-entityFullyQualifiedName :: Entity -> String
-entityFullyQualifiedName e =
-  let nm = entityName e
-      th = entityTheory e
-  in qualifyWithAncestors th nm
+-- | Return the fully-qualified name of an entity relative to a root theory.
+-- Stops at @root@ (inclusive) rather than walking all the way to the absolute top.
+-- Example: if T has subtheory S1 which has entity e, then
+-- @entityFullyQualifiedName T e == "S1.e"@.
+entityFullyQualifiedName :: Theory -> Entity -> String
+entityFullyQualifiedName root e = qualifyUpTo (entityTheory e) (entityName e)
+  where
+    rootFQN = theoryFullyQualifiedName root
+    qualifyUpTo th nm
+      | theoryFullyQualifiedName th == rootFQN = nm
+      | otherwise = case theoryParent th of
+          Nothing  -> nm
+          Just par -> qualifyUpTo par (theoryName th ++ "." ++ nm)
+
+-- | Return the absolute fully-qualified name of an entity (walks all the way to the top).
+entityAbsoluteFQN :: Entity -> String
+entityAbsoluteFQN e = qualifyWithAncestors (entityTheory e) (entityName e)
   where
     qualifyWithAncestors th nm =
       case theoryParent th of
