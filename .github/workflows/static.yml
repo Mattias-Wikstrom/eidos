@@ -26,7 +26,7 @@ jobs:
       # ── Haskell Wasm toolchain ─────────────────────────────────────────────
       - name: Install GHC Wasm toolchain
         run: |
-          curl -sSf https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/raw/master/bootstrap.sh | sh
+          curl -sSf https://gitlab.haskell.org/ghc/ghc-wasm-meta/-/raw/master/bootstrap.sh | bash
           echo "$HOME/.ghc-wasm/bin" >> "$GITHUB_PATH"
           cat "$HOME/.ghc-wasm/env" >> "$GITHUB_ENV"
 
