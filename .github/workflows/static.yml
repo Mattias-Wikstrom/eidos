@@ -40,6 +40,9 @@ jobs:
           restore-keys: wasm-cabal-${{ runner.os }}-
 
       # ── Build Wasm binary ──────────────────────────────────────────────────
+      - name: Find wasm32-wasi-cabal
+        run: find ~/.ghc-wasm -name 'wasm32-wasi-cabal' 2>/dev/null || echo "not found"
+
       - name: Build eidos-wasm
         run: wasm32-wasi-cabal build exe:eidos-wasm
 
