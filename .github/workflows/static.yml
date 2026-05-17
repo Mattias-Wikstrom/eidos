@@ -23,29 +23,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── Haskell Wasm toolchain ─────────────────────────────────────────────
-      - name: Install GHC Wasm toolchain
-        run: |
-          curl -sSfL https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta/-/raw/master/bootstrap.sh | bash
-
-      - name: Cache wasm Cabal store
-        uses: actions/cache@v4
-        with:
-          path: ~/.ghc-wasm/.cabal/store
-          key: wasm-cabal-${{ runner.os }}-${{ hashFiles('eidos-parser.cabal', 'cabal.project') }}
-          restore-keys: wasm-cabal-${{ runner.os }}-
-
-      # ── Build Wasm binary ──────────────────────────────────────────────────
-      - name: Build eidos-wasm
-        run: |
-          source ~/.ghc-wasm/env
-          wasm32-wasi-cabal build exe:eidos-wasm
-
-      - name: Copy and optimise wasm binary
-        run: |
-          source ~/.ghc-wasm/env
-          cp "$(wasm32-wasi-cabal list-bin exe:eidos-wasm)" eidos-ui/public/wasm/eidos.wasm
-          wasm-opt -O2 eidos-ui/public/wasm/eidos.wasm -o eidos-ui/public/wasm/eidos.wasm
+      # ── Wasm binary (use committed binary, skip rebuild) ───────────────────
+      - name: Copy committed wasm binary
+        run: cp wasm/eidos.wasm eidos-ui/public/wasm/eidos.wasm
 
       # ── Build UI ───────────────────────────────────────────────────────────
       - name: Set up Node
