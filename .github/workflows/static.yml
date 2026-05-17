@@ -23,9 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── Wasm binary (use committed binary, skip rebuild) ───────────────────
-      - name: Copy committed wasm binary
-        run: cp --remove-destination wasm/eidos.wasm eidos-ui/public/wasm/eidos.wasm
+      # ── Wasm binary (use committed binary, symlink already points to wasm/) ─
 
       # ── Build UI ───────────────────────────────────────────────────────────
       - name: Set up Node
