@@ -6,7 +6,7 @@ Although the Eidos compiler has (or will have) the ability to translate Eidos in
 
 This ties into the basic philosophy of Eidos that logics such as (classical or intuitionistic) first-order or second-order logic are to be understood in a /mereological/ way. For example, a sort S is represented internally via two mereological objects: S#min and S#max.
 
-As an alternative to generating output in Lean 4, the user can request output in Eidos itself, with the result being that you get to see the elaborated version of the input.
+As an alternative to generating output in Lean 4, the user can request output in Eidos itself (using the --mereological option), with the result being that you get to see the elaborated version of the input.
 
 From the viewpoint of Eidos, the mereological interpretation of a theory is what is truly important while things such as sorts, FOL functions, and SOL functions are 'syntactic sugar' on top of the mereological core. Elaboration of a theory makes the mereological view explicit.
 
