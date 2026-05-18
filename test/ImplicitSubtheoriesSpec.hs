@@ -175,15 +175,17 @@ main = hspec $ do
         mergeIsMetafactWrapped doc "D_Min" "sub" `shouldBe` True
         mergeIsMetafactWrapped doc "D_Max" "sub" `shouldBe` True
 
-      it "mereological operations get merge facts" $ do
+      it "mereological operations do not get merge facts" $ do
         doc <- buildStr [r|{
           subtheories { implicit {
             sub: { signature { sort D; } }
           }}
         }|]
-        hasMergeFact doc "plus" "sub" `shouldBe` True
-        hasMergeFact doc "times" "sub" `shouldBe` True
-        hasMergeFact doc "sub" "sub" `shouldBe` True
+        hasMergeFact doc "plus" "sub" `shouldBe` False
+        hasMergeFact doc "times" "sub" `shouldBe` False
+        hasMergeFact doc "sub" "sub" `shouldBe` False
+        hasMergeFact doc "minus" "sub" `shouldBe` False
+        hasMergeFact doc "impl" "sub" `shouldBe` False
 
     describe "Two implicit children" $ do
 

@@ -652,17 +652,23 @@ mkAxiomSets pt = concat
           getTermName _ = Nothing
 
           emitMergeAxiom :: String -> String -> [AxiomSet]
-          emitMergeAxiom lhsName rhsName =
-            let axName = mergeAxiomName lhsName rhsName
-            in case IR.factSubkind (IR.factKind fact) of
-              IR.FSImplicitMergeFunction ->
-                [ axiomSet [SGlobal] (tags [TagImplicitMerge])
-                    [(axName, ABFuncEq lhsName rhsName)]
-                ]
-              _ ->
-                [ axiomSet [SGlobal] (tags [TagImplicitMerge])
-                    [(axName, ABMereo (fromJust (IR.factMereoExpr fact)))]
-                ]
+          emitMergeAxiom lhsName rhsName
+            | isMereologicalBuiltinOp lhsName = []
+            | otherwise =
+                let axName = mergeAxiomName lhsName rhsName
+                in case IR.factSubkind (IR.factKind fact) of
+                  IR.FSImplicitMergeFunction ->
+                    [ axiomSet [SGlobal] (tags [TagImplicitMerge])
+                        [(axName, ABFuncEq lhsName rhsName)]
+                    ]
+                  _ ->
+                    [ axiomSet [SGlobal] (tags [TagImplicitMerge])
+                        [(axName, ABMereo (fromJust (IR.factMereoExpr fact)))]
+                    ]
+
+          isMereologicalBuiltinOp :: String -> Bool
+          isMereologicalBuiltinOp name =
+            name `elem` ["+", "-", "×", "⇒", "∸", "plus", "minus", "times", "impl", "sub"]
 
       mergeAxiomName :: String -> String -> String
       mergeAxiomName lhsName rhsName =
