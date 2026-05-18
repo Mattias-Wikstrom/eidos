@@ -238,20 +238,12 @@ pSubtheoriesSection = do
     getGroupKeyword (SubtheoryEntryGroup (SubtheoryGroup kw _)) = Just kw
     getGroupKeyword _ = Nothing
 
-    collectAliases :: [SubtheoryEntry] -> [String]
-    collectAliases = concatMap go
-      where
-        go (SubtheoryEntryItem (SubtheoryItem _ (Just n) _)) = [n]
-        go (SubtheoryEntryItem _) = []
-        go (SubtheoryEntryGroup (SubtheoryGroup _ items)) = 
-          mapMaybe (\(SubtheoryItem _ n _) -> n) items
-
 collectAliases :: [SubtheoryEntry] -> [String]
 collectAliases = concatMap go
   where
     go (SubtheoryEntryItem (SubtheoryItem _ (Just n) _)) = [n]
     go (SubtheoryEntryItem _) = []
-    go (SubtheoryEntryGroup (SubtheoryGroup _ items)) = 
+    go (SubtheoryEntryGroup (SubtheoryGroup _ items)) =
       mapMaybe (\(SubtheoryItem _ n _) -> n) items
 
 pSubtheoryEntry :: Parser SubtheoryEntry
