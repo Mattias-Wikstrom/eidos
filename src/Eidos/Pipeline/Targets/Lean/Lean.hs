@@ -21,8 +21,10 @@ module Eidos.Pipeline.Targets.Lean.Lean
   ) where
 
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
+import           Eidos.Pipeline.IRProcessing.AxiomSet (AxiomBody (..), Tag (..), asAxioms, hasTag)
+import           Eidos.Pipeline.IRProcessing.MkAxiomSets (theoryBlocks)
+import           Eidos.Pipeline.PipelineCore (PreparedTheory (..), defaultPipelineOptions, prepareTheory)
 import Data.List (intercalate)
-import Debug.Trace (trace) 
 
 -- ---------------------------------------------------------------------------
 -- Internal representation for type-based Lean export
@@ -54,12 +56,16 @@ data LeanTypeExpr
 -- ---------------------------------------------------------------------------
 
 theoryToLeanTypeDoc :: IR.Theory -> LeanTypeDoc
-theoryToLeanTypeDoc theory =
+theoryToLeanTypeDoc theory = theoryToLeanTypeDocP (prepareTheory defaultPipelineOptions theory)
+
+theoryToLeanTypeDocP :: PreparedTheory -> LeanTypeDoc
+theoryToLeanTypeDocP prepared =
   LeanTypeDoc
     { ltdTheoryName = "_Main"
     , ltdDecls      = structureDecls
     }
   where
+    theory = ptTheory prepared
     structureDecls :: [LeanTypeDecl]
     structureDecls =
       [ LTDStructure "_Main" fields
@@ -83,7 +89,7 @@ theoryToLeanTypeDoc theory =
       , map subsetToField userSubsets
       , map folFuncToField userFOLFunctions
       , map solFuncToField userSOLFunctions
-      , map factToField (zip [1..] userFacts)
+      , userFactFields
       ]
         where
         uBinOp = LTArrow (LTVar "U") (LTArrow (LTVar "U") (LTVar "U"))
@@ -136,133 +142,43 @@ theoryToLeanTypeDoc theory =
           funcType = foldr LTArrow resType argTypes
       in LTDField (IR.funcName f) funcType
     
-    -- User facts (assertions and metafacts)
-    userFacts = [ f | f <- IR.theoryFacts theory
-                    , IR.factCategory (IR.factKind f) == IR.FCUserInput
-                    , IR.factSubkind  (IR.factKind f) `elem` [IR.FSAssertion, IR.FSMetafactsFact] ]
+    -- Fact fields derived from the mereological translation via MkAxiomSets.
+    -- Free variables are already incorporated into the MereoExpr by FromSyntax.
+    allAxiomSets = concatMap snd (theoryBlocks prepared)
 
-    factToField (idx, fact) =
-      let fieldName = "fact" ++ show idx
-          body = propExprToLeanType (maybe (error "factToField: no propExpr") id (IR.factPropExpr fact))
-          foralls = wrapFreeVars (IR.factFreeVars fact)
-          expr = foralls body
-      in LTDField fieldName expr
-    
-    -- Wrap free variables as ∀ quantifiers
-    wrapFreeVars [] body = body
-    wrapFreeVars (vd:rest) body =
-      let varName = IR.resolvedVarName vd
-          -- Determine the type: if it's a subset variable, it's S → P; otherwise it's S
-          varType = if IR.resolvedVarKind vd == IR.VarKindSet
-                    then LTArrow (LTVar (IR.sortName (IR.resolvedVarSort vd))) (LTVar "P")
-                    else LTVar (IR.sortName (IR.resolvedVarSort vd))
-      in LTForall varName varType (wrapFreeVars rest body)
-    
-    -- Convert resolved prop expressions to Lean type expressions
-    propExprToLeanType :: IR.ResolvedPropExpr -> LeanTypeExpr
-    propExprToLeanType (IR.ResolvedPropBicond left rests) =
-      case rests of
-        [] -> rightImplToLeanType left
-        _  -> error "Biconditional chains not yet supported in Lean type export"
-    
-    rightImplToLeanType :: IR.ResolvedRightImpl -> LeanTypeExpr
-    rightImplToLeanType (IR.ResolvedRightImpl left Nothing) =
-      leftImplToLeanType left
-    rightImplToLeanType (IR.ResolvedRightImpl left (Just (_, right))) =
-      LTArrow (leftImplToLeanType left) (rightImplToLeanType right)
-    
-    leftImplToLeanType :: IR.ResolvedLeftImpl -> LeanTypeExpr
-    leftImplToLeanType (IR.ResolvedLeftImpl left []) =
-      disjToLeanType left
-    leftImplToLeanType _ = error "Left implication not yet supported in Lean type export"
-    
-    disjToLeanType :: IR.ResolvedDisj -> LeanTypeExpr
-    disjToLeanType (IR.ResolvedDisj left []) = conjToLeanType left
-    disjToLeanType _ = error "Disjunction not yet supported in Lean type export"
-    
-    conjToLeanType :: IR.ResolvedConj -> LeanTypeExpr
-    conjToLeanType (IR.ResolvedConj left []) = negToLeanType left
-    conjToLeanType _ = error "Conjunction not yet supported in Lean type export"
-    
-    negToLeanType :: IR.ResolvedNeg -> LeanTypeExpr
-    negToLeanType (IR.ResolvedNegNot _) = error "Negation not yet supported in Lean type export"
-    negToLeanType (IR.ResolvedNegChild q) = quantifiedToLeanType q
-    
-    quantifiedToLeanType :: IR.ResolvedQuantified -> LeanTypeExpr
-    quantifiedToLeanType (IR.ResolvedQuantified [] atom) = atomicToLeanType atom
-    quantifiedToLeanType _ = error "Nested quantifiers not yet supported in Lean type export"
-    
-    atomicToLeanType :: IR.ResolvedAtomicProp -> LeanTypeExpr
-    atomicToLeanType (IR.ResolvedAtomicConstant ref) =
-      LTVar (IR.resolvedConstRefName ref)
-    atomicToLeanType (IR.ResolvedAtomicTermPair tp) = termPairToLeanType tp
+    userFactFields =
+      [ LTDField axName (mereoExprToLeanType mereoExpr)
+      | as_ <- allAxiomSets
+      , hasTag TagUserFact as_
+      , (axName, ABMereo mereoExpr) <- asAxioms as_
+      ]
 
-    -- DEBUG: Show the term pair structure
-    debugTermPair :: IR.ResolvedTermPair -> String
-    debugTermPair (IR.ResolvedTermPair left rights _) =
-      "Left: " ++ show (termDebug left) ++ 
-      ", Rights: " ++ show (map debugRFT rights)
-    
-    debugRFT :: IR.ResolvedRelationFollowedByTerm -> String
-    debugRFT (IR.ResolvedRelationFollowedByTerm _ op _ right) =
-      "op=" ++ op ++ " right=" ++ show (termDebug right)
-    
-    termDebug :: IR.ResolvedTerm -> String
-    termDebug (IR.ResolvedTerm factor [] _) = factorDebug factor
-    termDebug _ = "<complex-term>"
-    
-    factorDebug :: IR.ResolvedFactor -> String
-    factorDebug (IR.ResolvedFactor base [] _) = baseDebug base
-    factorDebug (IR.ResolvedFactor base suffixes _) = 
-      baseDebug base ++ show suffixes
-    
-    baseDebug :: IR.ResolvedBaseTerm -> String
-    baseDebug (IR.ResolvedBTAtomic ref) = IR.resolvedConstRefName ref
-    baseDebug _ = "<other>"
+-- ---------------------------------------------------------------------------
+-- MereoExpr → LeanTypeExpr
+-- ---------------------------------------------------------------------------
 
-    termPairToLeanType :: IR.ResolvedTermPair -> LeanTypeExpr
-    termPairToLeanType (IR.ResolvedTermPair left rights _) =
-      case rights of
-        [rft] | IR.resolvedRFTOp rft == "=" -> 
-          LTEq (termToLeanType left) (termToLeanType (IR.resolvedRFTRight rft))
-        [rft] | IR.resolvedRFTOp rft == "↔" ->
-          LTEq (termToLeanType left) (termToLeanType (IR.resolvedRFTRight rft))
-        [] -> termToLeanType left  -- No relation, just a bare term (e.g., parenthesized expr)
-        _ -> LTVar "<multiple-relations>"
-    
-    termToLeanType :: IR.ResolvedTerm -> LeanTypeExpr
-    termToLeanType (IR.ResolvedTerm factor [] _) = factorToLeanType factor
-    termToLeanType _ = LTVar "<complex-term>"
-    
-    factorToLeanType :: IR.ResolvedFactor -> LeanTypeExpr
-    factorToLeanType (IR.ResolvedFactor base [] _) = baseTermToLeanType base
-    factorToLeanType (IR.ResolvedFactor base suffixes _) =
-      foldl applySuffix (baseTermToLeanType base) suffixes
-    
-    applySuffix :: LeanTypeExpr -> IR.ResolvedTermSuffix -> LeanTypeExpr
-    applySuffix expr (IR.ResolvedSuffixCall args) =
-      LTApp expr (map termToLeanType args)
-    applySuffix expr (IR.ResolvedSuffixSpecialOp _ _) = expr
-    applySuffix expr _                                = expr
-    
-    baseTermToLeanType :: IR.ResolvedBaseTerm -> LeanTypeExpr
-    baseTermToLeanType (IR.ResolvedBTAtomic ref) =
-      LTVar (IR.resolvedConstRefName ref)
-    baseTermToLeanType (IR.ResolvedBTPropParen inner) = propExprToLeanType inner
-    baseTermToLeanType (IR.ResolvedBTTermParen term) = termToLeanType term
-    -- Set comprehension { x : A | φ(x) } and description ιx : A φ(x) both
-    -- translate to: ∀ x : A, φ'(x) → x
-    baseTermToLeanType (IR.ResolvedBTSetComprehension sc) =
-      let varN = IR.resolvedVarName (IR.resolvedSCVar sc)
-          sn   = IR.sortName (IR.resolvedVarSort (IR.resolvedSCVar sc))
-          phi  = propExprToLeanType (IR.resolvedSCBody sc)
-      in LTForall varN (LTVar sn) (LTArrow phi (LTVar varN))
-    baseTermToLeanType (IR.ResolvedBTDescription desc) =
-      let varN = IR.resolvedVarName (IR.resolvedDescVar desc)
-          sn   = IR.sortName (IR.resolvedVarSort (IR.resolvedDescVar desc))
-          phi  = propExprToLeanType (IR.resolvedDescBody desc)
-      in LTForall varN (LTVar sn) (LTArrow phi (LTVar varN))
-    baseTermToLeanType _ = LTVar "<unsupported-base>"
+-- | Translate a mereological expression to a Lean type expression.
+--
+-- The structure-based encoding maps implication-like operations to 'LTArrow'.
+-- Operations without a direct type-theoretic reading (sum, product, symmetric
+-- difference, abbreviation applications, bounded quantifiers) are left as
+-- @\<unsupported: ...>@ placeholders.
+mereoExprToLeanType :: IR.MereoExpr -> LeanTypeExpr
+mereoExprToLeanType = go
+  where
+    go (IR.MRevDiff a b)  = LTArrow (go a) (go b)
+    go (IR.MDiff    a b)  = LTArrow (go b) (go a)
+    go (IR.MVar     n)    = LTVar n
+    go  IR.MZero          = LTVar "True"
+    go (IR.MSum     _ _)  = LTVar "<unsupported: mereological sum>"
+    go (IR.MProd    _ _)  = LTVar "<unsupported: mereological product>"
+    go (IR.MSymDiff _ _)  = LTVar "<unsupported: symmetric difference>"
+    go (IR.MAbbrevApp n _) = LTVar ("<unsupported: abbreviation " ++ n ++ ">")
+    go (IR.MFOLApp    n _) = LTVar ("<unsupported: FOL application " ++ n ++ ">")
+    go (IR.MBoundedSum     _ _ _ _) = LTVar "<unsupported: bounded sum>"
+    go (IR.MBoundedProduct _ _ _ _) = LTVar "<unsupported: bounded product>"
+    go (IR.MSumOfIndividuals     _ _ _ _) = LTVar "<unsupported: sum of individuals>"
+    go (IR.MProductOfIndividuals _ _ _ _) = LTVar "<unsupported: product of individuals>"
 
 -- ---------------------------------------------------------------------------
 -- Stage 2 – LeanTypeDoc → String
