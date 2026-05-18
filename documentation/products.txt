@@ -1,0 +1,19 @@
+========
+Products
+========
+
+For n > 1, Eidos supports (a) n-ary FOL functions and (b) n-ary FOL relations.
+
+(a) and (b) involve product sorts /implicitly/. Compare: An introductory textbook in first-order logic may well avoid mentioning that n-ary functions/relations have anything to do with n-tuples, but n-tuples are there /implicitly/.
+
+The theory here is that an n-ary function/relation can be viewed as a 1-ary function/relation that is defined for n-tuples. The function/relation is defined on a product sort.
+
+For an n-ary function f, Eidos allows you do write f#dom for the corresponding product sort. This works even in the case n=1, although things become trivial in that case.
+
+Similarly, for an n-ary relation R, Eidos allows you do write R#dom for the corresponding product sort.
+
+Eidos provides no way to refer to product sorts except as the domains of definition for n-ary FOL functions/relations.
+
+Just as Eidos avoids explicit syntax for product sorts, so it avoids explicit syntax for tuple formation or projections. For example, if S and T are two sorts, then tuple formation takes an object x of sort S and an object y of sort T and gives you the ordered pair (x, y). The first projection pi_1 applied to (x, y) gives you x and the second projection pi_2 applied to (x, y) gives you y. While this is standard stuff in mathematics, Eidos does not have any syntax for either the tuple formation or the projections.
+
+Eidos does, however, provide something that is roughly equivalent. For an n-ary function f, you are able to refer to f#1, f#2, ..., f#n as well as f#arg, with the relationship between these being such that f#arg = (f#1, f#2, ..., f#n). And an n-ary function R gives you the ability to refer to R#1, R#2, ..., R#n as well as R#arg, with the relationship between these being such that R#arg = (R#1, R#2, ..., R#n).
