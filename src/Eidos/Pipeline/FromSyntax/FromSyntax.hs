@@ -12,7 +12,7 @@ import           Control.Monad        (forM_, when, unless, foldM)
 import           Data.Char            (isUpper)
 import           Data.List            (find, intercalate, isSuffixOf)
 import qualified Data.Map.Strict      as Map
-import           Data.Maybe           (fromJust, fromMaybe, listToMaybe, mapMaybe)
+import           Data.Maybe           (fromMaybe, listToMaybe, mapMaybe)
 import           System.FilePath      (takeDirectory)
 
 import           Eidos.Pipeline.Parse.AST            hiding (theoryBody, theoryName, funcName, funcDomain, relName)
@@ -1590,7 +1590,7 @@ mereoOpPrefix th = case theoryClosestReflectionAncestor th of
 mereologicalTranslation :: Theory -> Fact -> [Fact]
 mereologicalTranslation th fact = case factKind fact of
   FactKindFact ->
-    let origExpr = fromJust (factPropExpr fact)
+    let origExpr = fromMaybe (error "mereologicalTranslation: FactKindFact has no propExpr") (factPropExpr fact)
     in [ Fact { factKind      = factKindMereoOfFact
               , factName      = Nothing
               , factPropExpr  = Nothing
@@ -1598,7 +1598,7 @@ mereologicalTranslation th fact = case factKind fact of
               , factFreeVars  = factFreeVars fact
               } ]
   FactKindAssertion ->
-    let origExpr = fromJust (factPropExpr fact)
+    let origExpr = fromMaybe (error "mereologicalTranslation: FactKindAssertion has no propExpr") (factPropExpr fact)
     in [ Fact { factKind      = factKindMereoOfAssertion
               , factName      = Nothing
               , factPropExpr  = Nothing
@@ -1606,7 +1606,7 @@ mereologicalTranslation th fact = case factKind fact of
               , factFreeVars  = factFreeVars fact
               } ]
   FactKindMetafactsFact ->
-    let origExpr = fromJust (factPropExpr fact)
+    let origExpr = fromMaybe (error "mereologicalTranslation: FactKindMetafactsFact has no propExpr") (factPropExpr fact)
     in [ Fact { factKind      = factKindMereoOfMetafact
               , factName      = Nothing
               , factPropExpr  = Nothing

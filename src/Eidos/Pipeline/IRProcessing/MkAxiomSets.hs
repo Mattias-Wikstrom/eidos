@@ -15,7 +15,7 @@ module Eidos.Pipeline.IRProcessing.MkAxiomSets
   , theoryBlocks
   ) where
 
-import           Data.Maybe (fromJust)
+import           Data.Maybe (fromMaybe)
 import qualified Eidos.Pipeline.FromSyntax.IR as IR
 import qualified Eidos.Pipeline.PipelineCore as PL
 import qualified Eidos.Pipeline.IRProcessing.FunctionFacts as FF
@@ -49,9 +49,9 @@ sanitizeName = NC.sanitizeHash
 
 domMinName, domMaxName :: IR.Function -> String
 domMinName f = NC.sortMin (NC.sanitizeHash (IR.sortName dom))
-  where dom = maybe (error "no domain sort") id (IR.funcDomain f)
+  where dom = fromMaybe (error $ "domMinName: function '" ++ IR.funcName f ++ "' has no domain sort") (IR.funcDomain f)
 domMaxName f = NC.sortMax (NC.sanitizeHash (IR.sortName dom))
-  where dom = maybe (error "no domain sort") id (IR.funcDomain f)
+  where dom = fromMaybe (error $ "domMaxName: function '" ++ IR.funcName f ++ "' has no domain sort") (IR.funcDomain f)
 
 dirImgName, invImgName :: IR.Function -> String
 dirImgName f = NC.funDirImg (IR.funcName f)
@@ -594,7 +594,7 @@ mkAxiomSets pt = concat
 
       mkTranslationAS idx fact =
         axiomSet [SGlobal] (tags [TagUserFact])
-          [(mkLabel idx, ABMereo (fromJust (IR.factMereoExpr fact)))]
+          [(mkLabel idx, ABMereo (fromMaybe (error "mkTranslationAS: mereological translation fact has no mereo expression") (IR.factMereoExpr fact)))]
 
   -- -------------------------------------------------------------------------
   -- 43. Implicit merge axioms
@@ -603,7 +603,7 @@ mkAxiomSets pt = concat
   implicitMergeAxiomSets = concatMap mkMergeAS implicitMergeFacts
     where
       mkMergeAS :: IR.Fact -> [AxiomSet]
-      mkMergeAS fact = extractMergeAxioms (fromJust (IR.factPropExpr fact))
+      mkMergeAS fact = extractMergeAxioms (fromMaybe (error "mkMergeAS: implicit merge fact has no prop expression") (IR.factPropExpr fact))
         where
           extractMergeAxioms :: IR.ResolvedPropExpr -> [AxiomSet]
           extractMergeAxioms (IR.ResolvedPropBicond left []) = extractFromRightImpl left
@@ -661,7 +661,7 @@ mkAxiomSets pt = concat
                 ]
               _ ->
                 [ axiomSet [SGlobal] (tags [TagImplicitMerge])
-                    [(axName, ABMereo (fromJust (IR.factMereoExpr fact)))]
+                    [(axName, ABMereo (fromMaybe (error "emitMergeAxiom: implicit merge fact has no mereo expression") (IR.factMereoExpr fact)))]
                 ]
 
       mergeAxiomName :: String -> String -> String
