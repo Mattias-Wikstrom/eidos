@@ -189,10 +189,16 @@ data MereoExpr
 -- | A compiler-internal abbreviation: a named definition with typed parameters
 -- and a body expressed as a 'MereoExpr'.  Backends use the registry to decide
 -- which abbreviations to emit and how to render them.
+--
+-- 'abbrevIsRuntimeProvided' marks definitions that are supplied by the target
+-- runtime library (e.g. EidosRuntime.lean / EidosRuntime.v) and must not be
+-- re-emitted by backends that import that library.  Analogous to @extern@ in C:
+-- the definition is known to the compiler but the binding comes from outside.
 data AbbrevDef = AbbrevDef
-  { abbrevName   :: String
-  , abbrevParams :: [String]
-  , abbrevBody   :: MereoExpr
+  { abbrevName              :: String
+  , abbrevParams            :: [String]
+  , abbrevBody              :: MereoExpr
+  , abbrevIsRuntimeProvided :: Bool
   } deriving (Show, Eq)
 
 -- | Registry of all compiler-internal abbreviation definitions.
@@ -203,21 +209,27 @@ allAbbrevDefs =
   [ AbbrevDef "IsWithinBounds" ["lo", "hi", "x"]
       -- (hi⇒x) + (x⇒lo)
       (MSum (MRevDiff (MVar "hi") (MVar "x")) (MRevDiff (MVar "x") (MVar "lo")))
+      True
   , AbbrevDef "ProjectIntoInterval" ["x", "lo", "hi"]
       -- (x+lo) × hi
       (MProd (MSum (MVar "x") (MVar "lo")) (MVar "hi"))
+      True
   , AbbrevDef "IsIndividual" ["lo", "hi", "x"]
       -- (hi⇒x) + (x⇒lo)  — same structure as IsWithinBounds for now
       (MSum (MRevDiff (MVar "hi") (MVar "x")) (MRevDiff (MVar "x") (MVar "lo")))
+      True
   , AbbrevDef "WrapFact" ["x", "y"]
       -- (x+y) ∸ x
       (MSymDiff (MSum (MVar "x") (MVar "y")) (MVar "x"))
+      True
   , AbbrevDef "WrapAssertion" ["x", "y", "z"]
       -- (x+(y×z)) ∸ x
       (MSymDiff (MSum (MVar "x") (MProd (MVar "y") (MVar "z"))) (MVar "x"))
+      True
   , AbbrevDef "WrapMetafact" ["x", "y"]
       -- (x+y) ∸ x
       (MSymDiff (MSum (MVar "x") (MVar "y")) (MVar "x"))
+      True
   ]
 
 -- | Collect all 'MAbbrevApp' names reachable from a 'MereoExpr'.

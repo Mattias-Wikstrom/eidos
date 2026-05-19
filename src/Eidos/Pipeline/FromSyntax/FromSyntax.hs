@@ -365,7 +365,7 @@ buildAbbrevDefItem th item = do
   -- Convert AST Term body to MereoExpr, with params as bound variable names.
   body <- astTermToMereoExpr nm params knownAbbrevNames bodyT
 
-  let ad = AbbrevDef nm params body
+  let ad = AbbrevDef nm params body False
 
   -- Register as a synthetic SOL-function entity so name resolution finds it.
   let universe = theoryUniverse th
