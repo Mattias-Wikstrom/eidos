@@ -76,29 +76,34 @@ structure ProductSort (n : Nat) (factors : Fin n → EidosSort) (product : Eidos
   projections   : (i : Fin n) → ImageFunctionPair product (factors i)
   tuple         : (Fin n → MereologicalObject) → MereologicalObject
 
-structure FOLRelationTwoArgs (dom1 dom2 relDomain : EidosSort) where
-  arg1             : MereologicalObjectOfSort dom1
-  arg2             : MereologicalObjectOfSort dom2
+structure FOLRelation (n : Nat) (doms : Fin n → EidosSort) (relDomain : EidosSort) where
+  productStructure : ProductSort n doms relDomain
+  argN             : (i : Fin n) → MereologicalObjectOfSort (doms i)
   arg              : MereologicalObjectOfSort relDomain
-  productStructure : ProductSort 2 (fun i : Fin 2 => if i = (0 : Fin 2) then dom1 else dom2) relDomain
-  bounded          : ∀ X1 : MereologicalObject, IsWithinBounds dom1.Min dom1.Max X1 →
-                     ∀ X2 : MereologicalObject, IsWithinBounds dom2.Min dom2.Max X2 →
-                     IsWithinBounds relDomain.Min relDomain.Max arg
+  argRelationship  : ∀ (xs : Fin n → MereologicalObject),
+                     (∀ i, IsWithinBounds (doms i).Min (doms i).Max (xs i)) →
+                     (∀ i, xs i ↔ (argN i).mereologicalObject) ↔
+                     arg.mereologicalObject = productStructure.tuple xs
 
 -- functionDomain is f#dom (the product sort for argument tuples),
 -- which must be declared separately since it cannot be inferred from doms.
 -- For n=1 use FOLFunctionOneArg instead (no product sort needed).
 structure FOLFunction (n : Nat) (doms : Fin n → EidosSort) (cod functionDomain : EidosSort) where
   productStructure : ProductSort n doms functionDomain
-  imagePair        : ImageFunctionPair functionDomain cod
-  arg        : MereologicalObjectOfSort functionDomain
   argN             : (i : Fin n) → MereologicalObjectOfSort (doms i)
+  arg        : MereologicalObjectOfSort functionDomain
+  argRelationship  : ∀ (xs : Fin n → MereologicalObject),
+                    (∀ i, IsWithinBounds (doms i).Min (doms i).Max (xs i)) →
+                    (∀ i, xs i ↔ (argN i).mereologicalObject) ↔
+                    arg.mereologicalObject = productStructure.tuple xs
+  imagePair        : ImageFunctionPair functionDomain cod
   res              : MereologicalObjectOfSort cod
   fact : ∀ (xs : Fin n → MereologicalObject),
          (∀ i, IsWithinBounds (doms i).Min (doms i).Max (xs i)) →
          ∀ Y : MereologicalObject, IsWithinBounds cod.Min cod.Max Y →
          ((∀ i, xs i ↔ (argN i).mereologicalObject) ∧ Y ↔ res.mereologicalObject) ↔
          (Y ↔ imagePair.imageFn.apply (productStructure.tuple xs))
+
 
 -- The five mereological operations for a sort, all derived from its Min/Max.
 -- Construct with `{}` to get the canonical definitions:
