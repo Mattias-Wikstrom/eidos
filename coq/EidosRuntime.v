@@ -1,5 +1,7 @@
 (* Eidos compiler runtime library *)
 
+Require Import Fin.
+
 (* A mereological object is a Prop *)
 Definition MereologicalObject : Type := Prop.
 
@@ -86,9 +88,6 @@ Record SOLFunctionOneArg (dom cod : EidosSort) : Type := mkSOLFunctionOneArg
 (* n-ary SOL function; argDomains is a vector of domain sorts indexed by Fin n.
    We use (forall i : Fin n, ...) to represent Fin-indexed families. *)
 Section FinIndexed.
-
-  (* Coq's standard Fin type *)
-  Require Import Fin.
 
   Record SOLFunction (n : nat) (argDomains : Fin.t n -> EidosSort) (codomain : EidosSort) : Type :=
     mkSOLFunction
