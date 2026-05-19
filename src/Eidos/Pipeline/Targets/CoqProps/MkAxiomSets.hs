@@ -149,8 +149,8 @@ abbrevBodyToCoq = mereoExprToCoq' genericCoqAbbrev id
 renderAbbrevDef :: IR.AbbrevDef -> String
 renderAbbrevDef ad =
   "Definition " ++ IR.abbrevName ad
-  ++ " " ++ unwords [ "(" ++ p ++ " : Prop)" | p <- IR.abbrevParams ad ]
-  ++ " : Prop := " ++ renderCoqExpr (abbrevBodyToCoq (IR.abbrevBody ad)) ++ "."
+  ++ " " ++ unwords [ "(" ++ p ++ " : MereologicalObject)" | p <- IR.abbrevParams ad ]
+  ++ " : MereologicalObject := " ++ renderCoqExpr (abbrevBodyToCoq (IR.abbrevBody ad)) ++ "."
 
 renderCoqDoc :: CoqDoc -> String
 renderCoqDoc = renderCoqDocWith renderAbbrevDef
