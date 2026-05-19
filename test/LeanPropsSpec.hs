@@ -163,7 +163,7 @@ main = hspec $ do
   -- =========================================================================
 
     it "renders LProp" $
-      renderLeanExpr LProp `shouldBe` "Prop"
+      renderLeanExpr LProp `shouldBe` "MereologicalObject"
 
     it "renders LVar" $
       renderLeanExpr (LVar "Foo") `shouldBe` "Foo"
