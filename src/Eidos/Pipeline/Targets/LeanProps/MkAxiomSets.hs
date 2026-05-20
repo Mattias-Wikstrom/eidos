@@ -143,8 +143,8 @@ abbrevBodyToLean = mereoExprToLean' genericAbbrev id
 renderAbbrevDef :: IR.AbbrevDef -> String
 renderAbbrevDef ad =
   "def " ++ IR.abbrevName ad
-  ++ " " ++ unwords [ "(" ++ p ++ " : MereologicalObject)" | p <- IR.abbrevParams ad ]
-  ++ " : MereologicalObject := " ++ renderLeanExpr (abbrevBodyToLean (IR.abbrevBody ad))
+  ++ " " ++ unwords [ "(" ++ p ++ " : Prop)" | p <- IR.abbrevParams ad ]
+  ++ " : Prop := " ++ renderLeanExpr (abbrevBodyToLean (IR.abbrevBody ad))
 
 renderLeanDoc :: LeanDoc -> String
 renderLeanDoc = renderLeanDocWith renderAbbrevDef
