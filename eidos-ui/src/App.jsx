@@ -30,6 +30,16 @@ function buildProjectCatalogue() {
 const PROJECT_CATALOGUE = buildProjectCatalogue();
 const PROJECT_NAMES = Object.keys(PROJECT_CATALOGUE).sort();
 
+// ── Output targets ───────────────────────────────────────────────────────────
+
+const OUTPUT_TARGETS = [
+  { id: 'lean_using_props', label: 'Lean (using props)',  ext: 'lean' },
+  { id: 'coq_using_props',  label: 'Coq (using props)',   ext: 'v'    },
+  { id: 'lean_runtime',     label: 'Lean (runtime)',       ext: 'lean' },
+  { id: 'coq_runtime',      label: 'Coq (runtime)',        ext: 'v'    },
+  { id: 'mereological',     label: 'Mereological',         ext: 'mereo.theory' },
+];
+
 // ── Theory type helpers ──────────────────────────────────────────────────────
 
 const TYPE_TAG_COLORS = {
@@ -84,6 +94,7 @@ export default function App() {
   const [output, setOutput] = useState('');
   const [outputIsError, setOutputIsError] = useState(false);
   const [compiling, setCompiling] = useState(false);
+  const [target, setTarget] = useState('lean_using_props');
 
   const [showProjectPanel, setShowProjectPanel] = useState(false);
   const [newFileName, setNewFileName] = useState('');
@@ -176,7 +187,7 @@ export default function App() {
     try {
       setCompiling(true);
       const bundle = buildBundle(files, mainFile);
-      const result = await eidos.compileBundle(bundle);
+      const result = await eidos.compileBundle(bundle, target);
       setOutput(result);
       setOutputIsError(result.trimStart().startsWith('Error'));
     } catch (err) {
@@ -408,6 +419,16 @@ export default function App() {
         <div className="output-panel">
           <div className="output-header">
             <span className="output-label">output</span>
+            <select
+              className="target-select"
+              value={target}
+              onChange={e => setTarget(e.target.value)}
+              disabled={compiling}
+            >
+              {OUTPUT_TARGETS.map(t => (
+                <option key={t.id} value={t.id}>{t.label}</option>
+              ))}
+            </select>
             <button
               className={`compile-btn ${compiling ? 'compile-btn--busy' : ''}`}
               onClick={compile}

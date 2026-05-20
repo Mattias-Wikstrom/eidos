@@ -41,7 +41,7 @@ module Eidos.Entrypoints.Wasm.WasmFFI where
 import Foreign.C.String  (CString, newCString, peekCString)
 import qualified Data.Map.Strict as Map
 
-import Eidos.Entrypoints.Wasm.Wasm (compileBundleWithTypes, compileSingle, mainKey)
+import Eidos.Entrypoints.Wasm.Wasm (compileBundleWithTypes, compileSingle, mainKey, targetKey, resolveTarget)
 import Eidos.Pipeline.Resolution.ExternalRef (TheoryType(..))
 
 -- ---------------------------------------------------------------------------
@@ -101,7 +101,8 @@ compileBundleFromJSON json =
         Left err ->
           "Error: bundle metadata error: " ++ err
         Right (mainSrc, deps) ->
-          compileBundleWithTypes mainSrc deps
+          let target = resolveTarget (lookup targetKey bundle)
+          in compileBundleWithTypes target mainSrc deps
 
 theoryTypePrefix :: String
 theoryTypePrefix = "__theory_type__."

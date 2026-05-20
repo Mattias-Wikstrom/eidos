@@ -21,7 +21,7 @@ module WasmFFI
   ) where
 
 import qualified Data.Map.Strict as Map
-import Eidos.Entrypoints.Wasm.Wasm (compileBundleWithTypes, mainKey)
+import Eidos.Entrypoints.Wasm.Wasm (compileBundleWithTypes, mainKey, targetKey, resolveTarget)
 import Eidos.Pipeline.Resolution.ExternalRef (TheoryType(..))
 
 -- ---------------------------------------------------------------------------
@@ -37,7 +37,9 @@ compileBundleFromJSON json =
     Right pairs ->
       case buildTypedBundle pairs of
         Left  err              -> "Error: bundle metadata error: " ++ err
-        Right (mainSrc, deps)  -> compileBundleWithTypes mainSrc deps
+        Right (mainSrc, deps)  ->
+          let target = resolveTarget (lookup targetKey pairs)
+          in compileBundleWithTypes target mainSrc deps
 
 -- ---------------------------------------------------------------------------
 -- Bundle metadata handling

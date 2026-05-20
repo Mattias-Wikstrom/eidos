@@ -205,14 +205,21 @@ export async function loadEidos(wasmPath) {
   await getModule(wasmPath);   // warm the cache
   return {
     /** Compile a single theory with no @-references.
-     *  @returns {Promise<string>} Lean 4 output or "Error: …" */
-    async compileSingle(src) {
-      return runWasm(wasmPath, JSON.stringify({ __main__: src }));
+     *  @param {string} src
+     *  @param {string} [target] one of: lean_using_props, coq_using_props, lean_runtime, coq_runtime, mereological
+     *  @returns {Promise<string>} */
+    async compileSingle(src, target) {
+      const bundle = { __main__: src };
+      if (target) bundle.__target__ = target;
+      return runWasm(wasmPath, JSON.stringify(bundle));
     },
     /** Compile a bundle; bundle['__main__'] is the entry theory.
-     *  @returns {Promise<string>} Lean 4 output or "Error: …" */
-    async compileBundle(bundle) {
-      return runWasm(wasmPath, JSON.stringify(bundle));
+     *  @param {Object} bundle
+     *  @param {string} [target] one of: lean_using_props, coq_using_props, lean_runtime, coq_runtime, mereological
+     *  @returns {Promise<string>} */
+    async compileBundle(bundle, target) {
+      const payload = target ? { ...bundle, __target__: target } : bundle;
+      return runWasm(wasmPath, JSON.stringify(payload));
     },
   };
 }
