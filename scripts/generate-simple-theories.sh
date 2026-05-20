@@ -33,6 +33,8 @@ TARGETS=(
   "dump_ir:--dump-ir::irdump"
   "lean_using_props:--lean_using_props::lean"
   "coq_using_props:--coq_using_props::v"
+  "lean_runtime:--lean_runtime::lean"
+  "coq_runtime:--coq_runtime::v"
   "mereological:--mereological::mereo.theory"
 )
 
