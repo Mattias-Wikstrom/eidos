@@ -22,7 +22,7 @@ We find QIPL to be very intuitive and easy to work with once it is understood, b
 ### What Eidos Is *Not*
 Unlike, for example, Coq or Lean, Eidos does not come with a way to express mathematical proofs and to check their correctness. The sole goal in Eidos is to be able to refer to mathematical objects of all sorts in a very simple and natural way.
 
-We hope to be able to provide good support for exporting theories written in Eidos to Lean and possibly Coq as well. The same theory will be exportable in more than one way depending on which Lean/Coq features one wishes to take advantage of.
+We hope to be able to provide good support for exporting theories written in Eidos to Lean and Coq. The same theory will be exportable in more than one way depending on which Lean/Coq features one wishes to take advantage of. (Update: The implementation of these things is now well under way.)
 
 Due to the richness of languages such as Coq and Lean, going in the opposite direction seems less practical.
 
@@ -50,11 +50,11 @@ Propositional logic is logic where the only objects one deals with are propositi
 7. Negation. The negation -P says that P does not hold. -P is the same thing as P -> F and is thus the weakest proposition R such that P ^ R imply Q.
 
 Quantified propositional logic allows one to not only use the propositional connectives just listed but to also quantify over propositions:
-I. Universal quantification. Forall X.P(X) says that P(X) holds for every proposition X. Forall X.P(X) is the weakest proposition that implies every proposition of the form P(X).
-II. Existential quantification. Exists X.P(X) says that P(X) holds for at least one proposition X. Exists X.P(X) is the strongest proposition that is implied every proposition of the form P(X).
+I. Universal quantification. ∀X.P(X) says that P(X) holds for every proposition X. ∀X.P(X) is the weakest proposition that implies every proposition of the form P(X).
+II. Existential quantification. ∃X.P(X) says that P(X) holds for at least one proposition X. ∃X.P(X) is the strongest proposition that is implied every proposition of the form P(X).
 
 As a simple illustration of the things we have just listed, one can use negation, disjunction, and universal quantification to express LEM:
-Forall X.X v -X
+∀X.X v -X
 
 Among the ingredients 1.-7. and I.-II. that we have listed above, it suffices to use 3. and I. as the basic primitives. That all of QIPL follow from these two ingredients alone may be a first indication that it is a remarkable theory with lots of power.
 
@@ -283,11 +283,11 @@ The following illustrates how individuals and sets may be combined in a theory:
   signature {
     sort MySort;
     myIndividual : MySort;
-    mySet ⊆ MySort;
+    MySet ⊆ MySort;
   },
   axioms {
     assertions {
-      myIndividual ∈ mySet;
+      myIndividual ∈ MySet;
     }
   }
 }
@@ -314,7 +314,7 @@ Here is an example of a theory that uses a function:
   },
   axioms {
     facts {
-      [x:S][y:S]f(x, y) =_T f(y, x);
+      x : S, y : S, f(x, y) =_T f(y, x);
     }
   }
 }
@@ -337,7 +337,7 @@ Here is an example of a theory that uses a relation:
   },
   axioms {
     assertions {
-      [x:S][y:S]R(x, y) ↔ R(y, x);
+      x : S, y : S, R(x, y) ↔ R(y, x);
     }
   }
 }
@@ -404,7 +404,7 @@ Here is an example of a theory that defines a second-order relation:
   },
   axioms {
     assertions {
-      [P : ℙ][Q : ℙ](XOR(P, Q) ↔ ((¬P ∧ Q) ∨ (P ∧ ¬Q)));
+      P : ℙ, Q : ℙ, (XOR(P, Q) ↔ ((¬P ∧ Q) ∨ (P ∧ ¬Q)));
     }
   }
 }
@@ -476,15 +476,15 @@ The following is a simple example of an equational theory that uses the 'facts' 
   },
   axioms {
     facts {
-      [x:𝔻] [y:𝔻] [z:𝔻] op(x, op(y, z)) =_𝔻 op(op(x, y), z);
-      [x:𝔻] op(n, x) =_𝔻 x;
-      [x:𝔻] op(x, n) =_𝔻 x;
+      x : 𝔻, y : 𝔻, z : 𝔻, op(x, op(y, z)) =_𝔻 op(op(x, y), z);
+      x : 𝔻, op(n, x) =_𝔻 x;
+      x : 𝔻, op(x, n) =_𝔻 x;
     }
   }
 }
 ```
 
-A third subsection called 'metafactsfacts' allows one to work in a 'metafacts language' as compared with what one gets with the other two sections.
+A third subsection called 'metafacts' allows one to work in a 'metafacts language' as compared with what one gets with the other two sections.
 
 ### Logical Connectives
 The following connectives may be used among propositions:
@@ -547,8 +547,8 @@ The following asserts that any two sets of sort S are identical:
 Eidos requires all variables to have sorts, including free variables (variables that are not bound through quantifiers).
 
 Free variables are listed at the beginning of an expression using a bracket notation. Here are two examples:
-  [x:S] x ∈ MySet
-  [x:S] [X ⊆ S] x ∈ Y
+  x : S, x ∈ MySet
+  x : S, X ⊆ S, x ∈ Y
 
 ### Sets as Properties
 There is no distinction between 'sets of sort S' and 'properties of sort S'. The following two lines assert exactly the same thing:
