@@ -163,6 +163,38 @@ main = do
                   putStr $ PL.invokePipeline PL.TargetCoqProps (toTargetOptionsFromCoq opts) theory
                   exitSuccess
 
+    ["--lean_runtime", filePath] -> do
+      result <- parseFile filePath
+      case result of
+        Left err -> do
+          IO.hPutStrLn IO.stderr ("Parse error: " ++ show err)
+          exitFailure
+        Right ast -> do
+          irResult <- buildTheoryFromFile filePath ast
+          case irResult of
+            Left buildErr -> do
+              IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
+              exitFailure
+            Right theory -> do
+              putStr $ PL.invokePipeline PL.TargetLeanRuntime PL.defaultTargetOptions theory
+              exitSuccess
+
+    ["--coq_runtime", filePath] -> do
+      result <- parseFile filePath
+      case result of
+        Left err -> do
+          IO.hPutStrLn IO.stderr ("Parse error: " ++ show err)
+          exitFailure
+        Right ast -> do
+          irResult <- buildTheoryFromFile filePath ast
+          case irResult of
+            Left buildErr -> do
+              IO.hPutStrLn IO.stderr ("\nIR build error: " ++ buildErr)
+              exitFailure
+            Right theory -> do
+              putStr $ PL.invokePipeline PL.TargetCoqRuntime PL.defaultTargetOptions theory
+              exitSuccess
+
     ("--lean_using_props":rest) -> do
       case reverse rest of
         [] -> usage
@@ -236,6 +268,8 @@ usage = do
       IO.hPutStrLn IO.stderr "  eidos-parser --mereological <file.theory>     # Export a first-pass mereological core theory"
       IO.hPutStrLn IO.stderr "  eidos-parser --json <file.theory>             # Export IR as JSON"
       IO.hPutStrLn IO.stderr "  eidos-parser --json --compact <file.theory>   # Export IR as compact JSON"
+      IO.hPutStrLn IO.stderr "  eidos-parser --lean_runtime <file.theory>      # Export to Lean 4 using EidosRuntime structures"
+      IO.hPutStrLn IO.stderr "  eidos-parser --coq_runtime <file.theory>       # Export to Coq using EidosRuntime structures"
       IO.hPutStrLn IO.stderr "  eidos-parser --lean <file.theory>             # Export to Lean 4 using structure-based encoding (sorts → Types)"
       exitFailure
 

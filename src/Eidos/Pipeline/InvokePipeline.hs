@@ -22,13 +22,21 @@ import           Eidos.Pipeline.PipelineCore
 import           Eidos.Pipeline.IRProcessing.AxiomSet (asPath)
 import qualified Eidos.Pipeline.Targets.CoqProps.CoqProps as CoqProps
 import qualified Eidos.Pipeline.Targets.CoqProps.MkAxiomSets as CoqPropsMk
+import qualified Eidos.Pipeline.Targets.CoqRuntime.CoqRuntime as CoqRuntime
 import qualified Eidos.Pipeline.Targets.Lean.Lean as Lean
 import qualified Eidos.Pipeline.Targets.LeanProps.LeanProps as LeanProps
 import qualified Eidos.Pipeline.Targets.LeanProps.MkAxiomSets as LeanPropsMk
+import qualified Eidos.Pipeline.Targets.LeanRuntime.LeanRuntime as LeanRuntime
 import qualified Eidos.Pipeline.Targets.Mereological.Mereological as Mereological
 import           Data.List (intercalate, sortOn)
 
-data PipelineTarget = TargetLean | TargetLeanProps | TargetCoqProps | TargetMereological
+data PipelineTarget
+  = TargetLean
+  | TargetLeanProps
+  | TargetLeanRuntime
+  | TargetCoqProps
+  | TargetCoqRuntime
+  | TargetMereological
   deriving (Show, Eq)
 
 data TargetOptions = TargetOptions
@@ -84,6 +92,12 @@ invokePipeline target opts theory =
             , CoqProps.coqDocBlocks = nestCoqBlocks flatBlocks
             }
       in CoqProps.renderCoqDoc doc
+    TargetLeanRuntime ->
+      let prepared = prepareTheory defaultPipelineOptions theory
+      in LeanRuntime.renderLeanRuntime prepared
+    TargetCoqRuntime ->
+      let prepared = prepareTheory defaultPipelineOptions theory
+      in CoqRuntime.renderCoqRuntime prepared
     TargetMereological ->
       let prepared = prepareTheory defaultPipelineOptions theory
       in Mereological.exportToMereological prepared
