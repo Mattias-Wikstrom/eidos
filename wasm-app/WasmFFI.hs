@@ -35,11 +35,11 @@ compileBundleFromJSON json =
   case parseSimpleStringMap json of
     Left  err   -> "Error: JSON parse error: " ++ err
     Right pairs ->
-      case buildTypedBundle pairs of
-        Left  err              -> "Error: bundle metadata error: " ++ err
-        Right (mainSrc, deps)  ->
-          let target = resolveTarget (lookup targetKey pairs)
-          in compileBundleWithTypes target mainSrc deps
+      let target     = resolveTarget (lookup targetKey pairs)
+          pairsClean = filter ((/= targetKey) . fst) pairs
+      in case buildTypedBundle pairsClean of
+        Left  err             -> "Error: bundle metadata error: " ++ err
+        Right (mainSrc, deps) -> compileBundleWithTypes target mainSrc deps
 
 -- ---------------------------------------------------------------------------
 -- Bundle metadata handling

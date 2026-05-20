@@ -97,12 +97,13 @@ compileBundleFromJSON json =
   case parseSimpleStringMap json of
     Left err     -> "Error: JSON parse error: " ++ err
     Right bundle ->
-      case buildTypedBundle bundle of
+      let target      = resolveTarget (lookup targetKey bundle)
+          bundleClean = filter ((/= targetKey) . fst) bundle
+      in case buildTypedBundle bundleClean of
         Left err ->
           "Error: bundle metadata error: " ++ err
         Right (mainSrc, deps) ->
-          let target = resolveTarget (lookup targetKey bundle)
-          in compileBundleWithTypes target mainSrc deps
+          compileBundleWithTypes target mainSrc deps
 
 theoryTypePrefix :: String
 theoryTypePrefix = "__theory_type__."
