@@ -19,6 +19,7 @@ module Eidos.Pipeline.IRProcessing.NamingConventions
   , sortMinElem
   , sortMaxElem
   , sortIdentity
+  , sortIdentityRefl
 
     -- * FOL function derived names
   , funRes
@@ -84,6 +85,13 @@ sortMax s = s ++ "_Max"
 -- | Identity relation name derived from a sort name.  Example: @"S"@ → @"S_identity"@
 sortIdentity :: String -> String
 sortIdentity s = s ++ "_identity"
+
+-- | Reflected identity relation name derived from a sort name.
+--   Represents the reflection of @=_S@ (the identity on sort @S@) into a parent
+--   theory, as opposed to @=_(th.S)@ (the identity on the reflected sort @th.S@).
+--   Example: @"S"@ → @"S_identity_refl"@
+sortIdentityRefl :: String -> String
+sortIdentityRefl s = s ++ "_identity_refl"
 
 -- | Reflected lower-limit individual of a sort.  Example: @"S"@ → @"S_min_elem"@
 sortMinElem :: String -> String
