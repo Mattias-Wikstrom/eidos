@@ -97,7 +97,6 @@ mkAxiomSets pt = concat
   , relProductSortLimitAxiomSets
   , functionDeclAxiomSets
   , relDeclAxiomSets
-  , identityRelDeclAxiomSets
   , imageFunctionDeclAxiomSets
   , projectionFunctionDeclAxiomSets
   , projectionInverseDeclAxiomSets
@@ -107,6 +106,7 @@ mkAxiomSets pt = concat
   , relArgObjectDeclAxiomSets
   , productArgDeclAxiomSets
   , relArgumentDeclAxiomSets
+  , identityRelationAxiomSets
   , projectionWitnessDeclAxiomSets
   , invImgWitnessDeclAxiomSets
   , mereoDeclAxiomSets
@@ -549,21 +549,6 @@ mkAxiomSets pt = concat
              [(IR.relName r, ABDeclFunc arity)]
 
   -- -------------------------------------------------------------------------
-  -- R2b. Per-sort identity relation declarations
-  --
-  -- For each ordinary user sort S, generate a binary relation S_identity : S×S.
-  -- (Identity axioms are added separately.)
-  -- -------------------------------------------------------------------------
-  identityRelDeclAxiomSets :: [AxiomSet]
-  identityRelDeclAxiomSets = map mkIdentityDecl userSorts
-    where
-      mkIdentityDecl s =
-        let sn = NC.sanitizeHash (IR.sortName s)
-            rn = NC.sortIdentity sn
-        in axiomSet [SSort sn] (tags tIdentity)
-             [(rn, ABDeclFunc 2)]
-
-  -- -------------------------------------------------------------------------
   -- R3. Relation arg-object declarations
   -- -------------------------------------------------------------------------
   relArgObjectDeclAxiomSets :: [AxiomSet]
@@ -598,6 +583,44 @@ mkAxiomSets pt = concat
              , (NC.boundMax argN,
                   ABMereo (IR.MRevDiff (IR.MVar dMx) (IR.MVar argN)))
              ]
+
+  -- -------------------------------------------------------------------------
+  -- R4b. Generated identity relations (props backends)
+  -- -------------------------------------------------------------------------
+  identityRelationAxiomSets :: [AxiomSet]
+  identityRelationAxiomSets = concatMap mkIdentityForSort userSorts
+    where
+      mkIdentityForSort s =
+        let sn   = NC.sanitizeHash (IR.sortName s)
+            rn   = NC.sortIdentity sn
+            dMn  = NC.sortMin (NC.funDom rn)
+            dMx  = NC.sortMax (NC.funDom rn)
+            x1   = "X1"
+            x2   = "X2"
+            a1   = NC.funArgN rn 1
+            a2   = NC.funArgN rn 2
+            argN = NC.funArg rn
+            relApp = IR.MFOLApp rn [IR.MVar x1, IR.MVar x2]
+            bounded2 body =
+              IR.MBoundedSum x1 (IR.MVar (sortMinName sn)) (IR.MVar (sortMaxName sn))
+                (IR.MBoundedSum x2 (IR.MVar (sortMinName sn)) (IR.MVar (sortMaxName sn)) body)
+        in
+        [ axiomSet [SSort sn] (tags tIdentity)
+            [ (dMn, ABDeclProp)
+            , (dMx, ABDeclProp)
+            , (rn, ABDeclFunc 2)
+            , (a1, ABDeclProp)
+            , (a2, ABDeclProp)
+            , (argN, ABDeclProp)
+            , (NC.boundMin argN, ABMereo (IR.MRevDiff (IR.MVar argN) (IR.MVar dMn)))
+            , (NC.boundMax argN, ABMereo (IR.MRevDiff (IR.MVar dMx) (IR.MVar argN)))
+            , (NC.boundMin rn, ABMereo (bounded2 (IR.MRevDiff relApp (IR.MVar dMn))))
+            , (NC.boundMax rn, ABMereo (bounded2 (IR.MRevDiff (IR.MVar dMx) relApp)))
+            , (NC.funDomOrdering rn, ABMereo (IR.MRevDiff (IR.MVar dMx) (IR.MVar dMn)))
+            , (NC.funDomUpper rn, ABMereo (IR.MRevDiff (IR.MVar uMaxName) (IR.MVar dMx)))
+            , (NC.funDomLower rn, ABMereo (IR.MRevDiff (IR.MVar dMn) (IR.MVar pMaxName)))
+            ]
+        ]
 
   -- -------------------------------------------------------------------------
   -- 42. User fact axioms
