@@ -110,6 +110,8 @@ data Tag = TagSort
     -- ^ Concerns a sort (including product-domain sorts like @f_dom@).
   | TagSet
     -- ^ Concerns a set declared with @S1 ⊆ S@.
+  | TagIdentity
+    -- ^ Concerns a generated per-sort identity relation (e.g. @S_identity@).
   | TagIndividual
     -- ^ Concerns an individual declared with @i : S@.
   | TagFunction
