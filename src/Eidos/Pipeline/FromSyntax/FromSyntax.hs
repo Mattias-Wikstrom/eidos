@@ -827,9 +827,12 @@ addFOLInfraForReflected th (EntityRelation r)
       let nm       = relName r
           argSorts = relArgSorts r
           auxOrig  = FromReflection
-          -- Reflected domain sort: SortKindFromReflection with its own min/max.
-          -- This represents Powerset(S1 × S2 × …) in the metatheory.
-          domSort  = mkSort th SortKindFromReflection (NC.funDom nm) auxOrig
+          -- Reflected domain sort: SortKindProduct with its own min/max.
+          -- Using SortKindProduct (not SortKindFromReflection) keeps this sort
+          -- out of userSorts in the Lean backend, preventing a duplicate
+          -- declaration: renderRelation already emits the domain sort axiom
+          -- inline, so renderSort must not emit it a second time.
+          domSort  = mkSort th SortKindProduct (NC.funDom nm) auxOrig
           -- arg-position individuals: each nm_i is an element of inner_theory.S_i
           argObjs  = zipWith (\s i -> mkMereo th MereologicalEntityKindIndividual
                                         (NC.funArgN nm i) s auxOrig)
