@@ -65,6 +65,9 @@ data MereoExpr
   | MProductOfIndividuals String String String MereoExpr
     -- ^ @MProductOfIndividuals var lo hi body@ — existential quantification over an individual.
     --   Renders as @Π var : 𝕌 (IsIndividual(lo, hi, var) + body)@.
+  | MUnboundedSum String MereoExpr
+    -- ^ @MUnboundedSum var body@ — universal quantification over a set variable with no bounds guard.
+    --   Renders as @Σ var : 𝕌 (body)@.
   | MProjectIntoInterval MereoExpr MereoExpr MereoExpr
     -- ^ @ProjectIntoInterval(x, lo, hi)@
   deriving (Eq, Show)
@@ -100,6 +103,7 @@ collectUsedAbbrevNames e = nub (go e)
     go (MSumOfIndividuals  _ _ _ body) = "IsIndividual"    : go body
     go (MBoundedProduct    _ _ _ body) = "IsWithinBounds"  : go body
     go (MProductOfIndividuals _ _ _ body) = "IsIndividual" : go body
+    go (MUnboundedSum _ body) = go body
     go (MProjectIntoInterval x lo hi) =
       "ProjectIntoInterval" : go x ++ go lo ++ go hi
 
@@ -128,5 +132,7 @@ renderMereoExpr = go
       "Π " ++ var ++ " : 𝕌 (" ++ go (MIsWithinBounds lo var hi) ++ " + " ++ go body ++ ")"
     go (MProductOfIndividuals var lo hi body) =
       "Π " ++ var ++ " : 𝕌 (" ++ go (MIsIndividual lo var hi)   ++ " + " ++ go body ++ ")"
+    go (MUnboundedSum var body) =
+      "Σ " ++ var ++ " : 𝕌 (" ++ go body ++ ")"
     go (MProjectIntoInterval x lo hi) =
       "ProjectIntoInterval(" ++ go x ++ ", " ++ go lo ++ ", " ++ go hi ++ ")"

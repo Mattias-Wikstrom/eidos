@@ -71,6 +71,9 @@ structure FOLFunctionOneArg (dom cod : EidosSort) where
          ∀ X2 : MereologicalObject, IsWithinBounds cod.Min cod.Max X2 →
          ((X1 ↔ arg.mereologicalObject) ∧ (X2 ↔ res.mereologicalObject)) ↔
          (X2 ↔ imagePair.imageFn.apply X1)
+  extension : ∀ X : MereologicalObject,
+              imagePair.imageFn.apply X ↔
+              imagePair.imageFn.apply (ProjectIntoInterval X dom.Min dom.Max)
 
 structure ProductSort (n : Nat) (factors : Fin n → EidosSort) (product : EidosSort) where
   projections   : (i : Fin n) → ImageFunctionPair product (factors i)
@@ -103,6 +106,11 @@ structure FOLFunction (n : Nat) (doms : Fin n → EidosSort) (cod functionDomain
          ∀ Y : MereologicalObject, IsWithinBounds cod.Min cod.Max Y →
          ((∀ i, xs i ↔ (argN i).mereologicalObject) ∧ Y ↔ res.mereologicalObject) ↔
          (Y ↔ imagePair.imageFn.apply (productStructure.tuple xs))
+  extension : ∀ (xs : Fin n → MereologicalObject),
+              imagePair.imageFn.apply (productStructure.tuple xs) ↔
+              imagePair.imageFn.apply
+                (productStructure.tuple
+                  (fun i => ProjectIntoInterval (xs i) (doms i).Min (doms i).Max))
 
 
 -- The five mereological operations for a sort, all derived from its Min/Max.

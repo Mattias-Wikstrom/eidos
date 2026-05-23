@@ -176,6 +176,7 @@ data MereoExpr
     --   (a first-order individual); backends should guard with @IsIndividual@
     --   rather than @IsWithinBounds@.
   | MBoundedSum String MereoExpr MereoExpr MereoExpr
+  | MUnboundedSum String MereoExpr
   | MBoundedProduct String MereoExpr MereoExpr MereoExpr
   | MSumOfIndividuals String MereoExpr MereoExpr MereoExpr
   | MProductOfIndividuals String MereoExpr MereoExpr MereoExpr
@@ -245,6 +246,7 @@ collectUsedAbbrevNames = go
     go MZero                 = []
     go (MAbbrevApp n args)   = n : concatMap go args
     go (MBoundedSum _ lo hi body) = go lo ++ go hi ++ go body
+    go (MUnboundedSum _ body) = go body
     go (MBoundedProduct _ lo hi body) = go lo ++ go hi ++ go body
     go (MSumOfIndividuals _ lo hi body) = go lo ++ go hi ++ go body
     go (MProductOfIndividuals _ lo hi body) = go lo ++ go hi ++ go body

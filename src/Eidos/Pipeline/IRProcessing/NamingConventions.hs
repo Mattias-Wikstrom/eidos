@@ -40,6 +40,7 @@ module Eidos.Pipeline.IRProcessing.NamingConventions
   , axiomTupleWithProjections
   , axiomProjectionsFromTuple
   , axiomSeparates
+  , axiomExtension
 
     -- * Sort ordering names
   , sortOrdering
@@ -169,6 +170,10 @@ axiomProjectionsFromTuple fn = fn ++ "_projections_from_tuple"
 -- | IR separates axiom.  Example: @"f"@ → @"f_separates"@
 axiomSeparates :: String -> String
 axiomSeparates fn = fn ++ "_separates"
+
+-- | Extension axiom.  Example: @"f"@ → @"f_extension"@
+axiomExtension :: String -> String
+axiomExtension fn = fn ++ "_extension"
 
 -- ---------------------------------------------------------------------------
 -- Sort ordering names

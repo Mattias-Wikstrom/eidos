@@ -120,6 +120,10 @@ Section FinIndexed.
                       (X2 <-> mereologicalObject cod folRes))
                      <->
                      (X2 <-> solApply dom cod (imageFn dom cod folImagePair) X1)
+    ; folExtension : forall X : MereologicalObject,
+                       solApply dom cod (imageFn dom cod folImagePair) X <->
+                       solApply dom cod (imageFn dom cod folImagePair)
+                         (ProjectIntoInterval X (sMin dom) (sMax dom))
     }.
 
   Record ProductSort (n : nat) (factors : Fin.t n -> EidosSort) (product : EidosSort) : Type :=
@@ -168,6 +172,14 @@ Section FinIndexed.
                                   solApply functionDomain cod
                                     (imageFn functionDomain cod folFnImagePair)
                                     (tuple n doms functionDomain folFnProductStructure xs))
+    ; folFnExtension        : forall xs : Fin.t n -> MereologicalObject,
+                                solApply functionDomain cod
+                                  (imageFn functionDomain cod folFnImagePair)
+                                  (tuple n doms functionDomain folFnProductStructure xs) <->
+                                solApply functionDomain cod
+                                  (imageFn functionDomain cod folFnImagePair)
+                                  (tuple n doms functionDomain folFnProductStructure
+                                    (fun i => ProjectIntoInterval (xs i) (sMin (doms i)) (sMax (doms i))))
     }.
 
 End FinIndexed.

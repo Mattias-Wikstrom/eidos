@@ -41,6 +41,7 @@ data FunctionFactContext
   | FFCIRTupleWithProjections String      -- fn;   [SFunction fn, SIR],           [TagFunction, TagFOLFunction, TagIR, TagIRTupleProj]
   | FFCIRProjectionsFromTuple String      -- fn;   [SFunction fn, SIR],           [TagFunction, TagFOLFunction, TagIR, TagIRProjFromTuple]
   | FFCIRSeparates           String       -- fn;   [SFunction fn, SIR],           [TagFunction, TagFOLFunction, TagIR, TagIRSeparates]
+  | FFCExtension             String       -- fn;   [SFunction fn],                 [TagFunction, TagFOLFunction, TagExtension]
   | FFCRelBounds             String       -- rn;   [SSet rn],                     [TagSet, TagSorting]
   deriving (Show, Eq)
 
@@ -116,6 +117,7 @@ theoryFunctionFactEntries theory = concat
   , irTupleWithProjections
   , irProjectionsFromTuple
   , irSeparates
+  , extensions
   , relBounds
   ]
   where
@@ -379,6 +381,23 @@ theoryFunctionFactEntries theory = concat
               qY    = bounded "Y" dom sep
               qX    = bounded "X" dom qY
           in FunctionFactEntry (FFCIRSeparates fN) [(NC.axiomSeparates irN, qX)]
+
+    -- -----------------------------------------------------------------------
+    -- 36. Extension axioms: f(xs) ↔ f(project xs into each argument sort)
+    -- -----------------------------------------------------------------------
+    extensions = map mkExtension userDeclFol
+      where
+        mkExtension f =
+          let fN       = IR.funcName f
+              argSorts = IR.funcArgSorts f
+              varNs    = ["X" ++ show i | i <- [1 .. length argSorts]]
+              mkProj xi srt = app "ProjectIntoInterval" [var xi, sMin srt, sMax srt]
+              lhs      = app fN (map var varNs)
+              rhs      = app fN (zipWith mkProj varNs argSorts)
+              body     = bicond lhs rhs
+              quantified =
+                foldr IR.MUnboundedSum body varNs
+          in FunctionFactEntry (FFCExtension fN) [(NC.axiomExtension fN, quantified)]
 
     -- -----------------------------------------------------------------------
     -- R6. Relation bounds axioms
