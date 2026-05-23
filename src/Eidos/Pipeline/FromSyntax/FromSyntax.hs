@@ -827,9 +827,12 @@ addFOLInfraForReflected th (EntityRelation r)
       let nm       = relName r
           argSorts = relArgSorts r
           auxOrig  = FromReflection
-          -- Reflected domain sort: SortKindFromReflection with its own min/max.
-          -- This represents Powerset(S1 × S2 × …) in the metatheory.
-          domSort  = mkSort th SortKindFromReflection (NC.funDom nm) auxOrig
+          -- Reflected domain sort: SortKindProduct with its own min/max.
+          -- Using SortKindProduct (not SortKindFromReflection) keeps this sort
+          -- out of userSorts in the Lean backend, preventing a duplicate
+          -- declaration: renderRelation already emits the domain sort axiom
+          -- inline, so renderSort must not emit it a second time.
+          domSort  = mkSort th SortKindProduct (NC.funDom nm) auxOrig
           -- arg-position individuals: each nm_i is an element of inner_theory.S_i
           argObjs  = zipWith (\s i -> mkMereo th MereologicalEntityKindIndividual
                                         (NC.funArgN nm i) s auxOrig)
@@ -1279,13 +1282,6 @@ propagateSubtheory :: Theory -> String -> Bool -> Bool -> Theory -> Either Build
 propagateSubtheory parentTh subName isImplicit isReflection subTh =
   foldM addEntry parentTh (Map.toList (theoryObjectsByName subTh))
   where
-    -- Identity relations (FromSort origin) must not be reflected: the reflected-sort
-    -- handler creates fresh ones via addIdentityRelation, so reflecting the subtheory's
-    -- copy would produce a duplicate with the same qualified name.
-    isFromSortRelation :: Entity -> Bool
-    isFromSortRelation (EntityRelation r) = relOrigin r == FromSort
-    isFromSortRelation _                  = False
-
     addEntry th (name, entities) = do
       let qualifiedName = if null subName then name else subName ++ "." ++ name
 
@@ -1322,14 +1318,34 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
                                                       (theoryObjectsByName th1) }
               in Right th2
 
+        -- Special case: reflecting an identity relation (FromSort origin) →
+        -- rename S_identity → S_identity_refl.  This preserves th.(=_S) as a
+        -- distinct entity from =_(th.S) (the fresh identity on the reflected sort
+        -- th.S = P(S), which is created by the sort case above).
+        (True, [EntityRelation r])
+          | relOrigin r == FromSort
+          , theoryFullyQualifiedName (relTheory r) == theoryFullyQualifiedName subTh
+          , not (null (relArgSorts r)) ->
+              let s        = head (relArgSorts r)
+                  prefix   = if null subName then "" else subName ++ "."
+                  reflName = prefix ++ NC.sortIdentityRefl (sortName s)
+                  reflected0 = qualifySortRefs subName (reflectEntity subName (EntityRelation r))
+                  reflected  = case reflected0 of
+                                 EntityRelation r' ->
+                                   EntityRelation (r' { relName          = reflName
+                                                      , relAssociatedSet = (relAssociatedSet r')
+                                                            { mereoName = NC.funSet reflName }
+                                                      })
+                                 e -> e
+                  th1 = addEntityToParent th reflName reflected
+                  th2 = th1 { theoryObjects      = theoryObjects th1 ++ [reflected]
+                             , theoryObjectsByName = Map.insert reflName [reflected]
+                                                      (theoryObjectsByName th1) }
+              in Right (addFOLInfraForReflected th2 reflected)
+
         _ -> do
-          -- For reflection, skip identity relations (FromSort origin): they are
-          -- created fresh by the reflected-sort handler above.
-          let entitiesToProcess = if isReflection
-                                    then filter (not . isFromSortRelation) entities
-                                    else entities
-              transformed = if isReflection
-                              then map (qualifySortRefs subName . reflectEntity subName) entitiesToProcess
+          let transformed = if isReflection
+                              then map (qualifySortRefs subName . reflectEntity subName) entities
                               else entities
               localToSub = [e | e <- transformed, theoryFullyQualifiedName (entityTheory e) == theoryFullyQualifiedName subTh]
 
