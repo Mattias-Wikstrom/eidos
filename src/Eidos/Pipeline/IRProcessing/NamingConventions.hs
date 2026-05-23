@@ -47,6 +47,7 @@ module Eidos.Pipeline.IRProcessing.NamingConventions
   , sortUpper
   , sortLower
   , sortUniversalLower
+  , sortIdentity
   , funDomOrdering
   , funDomUpper
   , funDomLower
@@ -195,6 +196,10 @@ sortLower s = s ++ "_lower"
 --   Example: @"S"@ → @"S_u_lower"@
 sortUniversalLower :: String -> String
 sortUniversalLower s = s ++ "_u_lower"
+
+-- | Identity relation name for a sort. Example: @"S"@ → @"S_identity"@
+sortIdentity :: String -> String
+sortIdentity s = s ++ "_identity"
 
 -- | Domain-ordering axiom for a multi-arg function.
 --   Example: @"f"@ → @"f_dom_ordering"@

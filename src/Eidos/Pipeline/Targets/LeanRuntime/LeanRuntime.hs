@@ -205,6 +205,7 @@ renderLeanRuntime pt = unlines $ concat
   , concatMap renderFOL1Fn   folSingleFns
   , concatMap renderFOLNFn   folMultiFns
   , concatMap renderRelation userRelations
+  , concatMap renderIdentityRelation identityRelations
   , concatMap renderObject   userObjects
   , concatMap renderUserAbbrev (ptUserAbbrevDefs pt)
   , renderUserFacts userFacts
@@ -246,6 +247,7 @@ renderLeanRuntime pt = unlines $ concat
     folMultiFns  = filter (\f -> length (IR.funcArgSorts f) >  1) allFOL
 
     userRelations = [r | IR.EntityRelation r <- IR.theoryObjects theory]
+    identityRelations = [(sn, NC.sortIdentity sn) | s <- userSorts, let sn = sortId s]
 
     userObjects =
       [ m | IR.EntityMereological m <- IR.theoryObjects theory
@@ -312,6 +314,14 @@ renderLeanRuntime pt = unlines $ concat
              ++ " (" ++ finSortFamily n aNms ++ ") " ++ domSN
          , ""
          ]
+
+    -- Per-sort identity relations -------------------------------------------
+    renderIdentityRelation (sn, rn) =
+      [ "axiom " ++ rn ++ "_dom : EidosSort"
+      , "axiom " ++ rn ++ "_dom_sub_univ : OrdinarySortWithinUniverse " ++ rn ++ "_dom univ"
+      , "axiom " ++ rn ++ " : FOLRelation 2 (fun _ => " ++ sn ++ ") " ++ rn ++ "_dom"
+      , ""
+      ]
 
     -- Mereological object / individual --------------------------------------
     renderObject m =
