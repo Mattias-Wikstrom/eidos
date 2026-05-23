@@ -510,6 +510,7 @@ mkAxiomSets pt = concat
     FF.FFCIRTupleWithProjections fn    -> ([SFunction fn, SIR],                 [TagFunction, TagFOLFunction, TagIR, TagIRTupleProj])
     FF.FFCIRProjectionsFromTuple fn    -> ([SFunction fn, SIR],                 [TagFunction, TagFOLFunction, TagIR, TagIRProjFromTuple])
     FF.FFCIRSeparates           fn     -> ([SFunction fn, SIR],                 [TagFunction, TagFOLFunction, TagIR, TagIRSeparates])
+    FF.FFCExtension             fn     -> ([SFunction fn],                      [TagFunction, TagFOLFunction, TagConnection])
     FF.FFCRelBounds             rn     -> ([SSet rn],                           [TagSet, TagSorting])
 
   -- -------------------------------------------------------------------------
