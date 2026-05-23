@@ -117,6 +117,8 @@ mereoExprToCoq' abbrevHandler resolve = go
                       (go body))
     go (IR.MBoundedSum var lo hi body) =
       case (lo, hi) of
+        (IR.MZero, IR.MZero) ->
+          CForall var CProp (go body)
         (IR.MVar loName, IR.MVar hiName) ->
           CBoundedForall var (resolve loName) (resolve hiName) (go body)
         _ ->
