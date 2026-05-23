@@ -73,9 +73,10 @@ irPredicateName f = NC.irPredicate (IR.funcName f)
 -- Tag-set helpers
 -- ---------------------------------------------------------------------------
 
-tSort, tSet, tIndividual, tFun, tFOL, tSOL :: [Tag]
+tSort, tSet, tIdentity, tIndividual, tFun, tFOL, tSOL :: [Tag]
 tSort       = [TagSort, TagDecl]
 tSet        = [TagSet,  TagDecl]
+tIdentity   = [TagSet, TagIdentity, TagDecl]
 tIndividual = [TagIndividual, TagDecl]
 tFun        = [TagFunction, TagDecl]
 tFOL        = [TagFunction, TagFOLFunction, TagDecl]
@@ -96,6 +97,7 @@ mkAxiomSets pt = concat
   , relProductSortLimitAxiomSets
   , functionDeclAxiomSets
   , relDeclAxiomSets
+  , identityRelDeclAxiomSets
   , imageFunctionDeclAxiomSets
   , projectionFunctionDeclAxiomSets
   , projectionInverseDeclAxiomSets
@@ -545,6 +547,21 @@ mkAxiomSets pt = concat
         let arity = length (IR.relArgSorts r)
         in axiomSet [SSet (IR.relName r)] (tags tSet)
              [(IR.relName r, ABDeclFunc arity)]
+
+  -- -------------------------------------------------------------------------
+  -- R2b. Per-sort identity relation declarations
+  --
+  -- For each ordinary user sort S, generate a binary relation S_identity : S×S.
+  -- (Identity axioms are added separately.)
+  -- -------------------------------------------------------------------------
+  identityRelDeclAxiomSets :: [AxiomSet]
+  identityRelDeclAxiomSets = map mkIdentityDecl userSorts
+    where
+      mkIdentityDecl s =
+        let sn = NC.sanitizeHash (IR.sortName s)
+            rn = NC.sortIdentity sn
+        in axiomSet [SSort sn] (tags tIdentity)
+             [(rn, ABDeclFunc 2)]
 
   -- -------------------------------------------------------------------------
   -- R3. Relation arg-object declarations
