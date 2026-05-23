@@ -201,6 +201,7 @@ renderLeanRuntime pt = unlines $ concat
   , universeDecls
   , if IR.theoryUsesDomain theory then domainDecls else []
   , concatMap renderSort userSorts
+  , concatMap renderIdentityRel userSorts
   , concatMap renderSOLFn    solFunctions
   , concatMap renderFOL1Fn   folSingleFns
   , concatMap renderFOLNFn   folMultiFns
@@ -228,6 +229,16 @@ renderLeanRuntime pt = unlines $ concat
       , "def 𝕌_ops : MereologicalOps 𝕌 := {}"
       , ""
       ]
+
+    renderIdentityRel s =
+      let iN    = NC.sortIdentity (IR.sortName s)
+          domSN = NC.funDom iN
+          sn    = sortId s
+      in [ "axiom " ++ domSN ++ " : EidosSort"
+         , "axiom " ++ domSN ++ "_sub_univ : OrdinarySortWithinUniverse " ++ domSN ++ " univ"
+         , "axiom " ++ iN ++ " : FOLRelation 2 (fun _ => " ++ sn ++ ") " ++ domSN
+         , ""
+         ]
 
     domainDecls =
       [ "axiom 𝔻 : EidosSort"

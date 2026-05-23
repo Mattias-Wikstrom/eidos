@@ -43,6 +43,7 @@ data FunctionFactContext
   | FFCIRSeparates           String       -- fn;   [SFunction fn, SIR],           [TagFunction, TagFOLFunction, TagIR, TagIRSeparates]
   | FFCExtension             String       -- fn;   [SFunction fn],                 [TagFunction, TagFOLFunction, TagExtension]
   | FFCRelBounds             String       -- rn;   [SSet rn],                     [TagSet, TagSorting]
+  | FFCIdentityRelBounds     String       -- sn;   [SSort sn],                    [TagSort, TagIdentityRelation, TagSorting]
   deriving (Show, Eq)
 
 -- ---------------------------------------------------------------------------
@@ -119,6 +120,7 @@ theoryFunctionFactEntries theory = concat
   , irSeparates
   , extensions
   , relBounds
+  , identityRelBounds
   ]
   where
     solFunctions   = IR.theorySOLFunctions theory
@@ -416,4 +418,25 @@ theoryFunctionFactEntries theory = concat
           in FunctionFactEntry (FFCRelBounds rN)
                [ (NC.boundMin rN, quantify (impl relApp (sMin dom)))
                , (NC.boundMax rN, quantify (impl (sMax dom) relApp))
+               ]
+
+    -- -----------------------------------------------------------------------
+    -- ID. Identity relation bounds axioms (generated per ordinary sort)
+    -- -----------------------------------------------------------------------
+    identityRelBounds = map mkBounds userSortsList
+      where
+        userSortsList =
+          [ s | IR.EntitySort s <- IR.theoryObjects theory
+              , IR.sortKind s `elem` [IR.SortKindFromSignature, IR.SortKindFromReflection] ]
+        mkBounds s =
+          let sN     = IR.sortName s
+              iN     = NC.sortIdentity sN
+              dN     = NC.funDom iN
+              dMinE  = var (NC.sortMin dN)
+              dMaxE  = var (NC.sortMax dN)
+              relApp = app iN [var "X1", var "X2"]
+              quantify body = bounded "X1" s (bounded "X2" s body)
+          in FunctionFactEntry (FFCIdentityRelBounds sN)
+               [ (NC.boundMin iN, quantify (impl relApp dMinE))
+               , (NC.boundMax iN, quantify (impl dMaxE relApp))
                ]

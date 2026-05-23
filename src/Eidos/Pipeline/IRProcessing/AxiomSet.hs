@@ -186,6 +186,10 @@ data Tag = TagSort
     --   sort-restricted inputs: @f(x) ↔ f(ProjectIntoInterval(x, S_Min, S_Max))@
     --   for all mereological objects @x@, where @S@ is @f@'s declared argument sort.
     --   Always co-occurs with 'TagFunction' and 'TagFOLFunction'.
+  | TagIdentityRelation
+    -- ^ Concerns the identity relation automatically generated for an ordinary
+    --   sort @S@: a binary FOL relation @S_identity@ whose two argument sorts are
+    --   both @S@.  Always co-occurs with 'TagSort'.
 
   deriving (Eq, Ord, Show, Enum, Bounded)
 
