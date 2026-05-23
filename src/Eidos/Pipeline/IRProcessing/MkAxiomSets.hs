@@ -115,7 +115,6 @@ mkAxiomSets pt = concat
   , propDeclAxiomSets
   , setDeclAxiomSets
   , functionFactAxiomSets
-  , identityRelProductSortOrderAxiomSets
   , individualDeclAxiomSets
   , sortLimitFactAxiomSets
   , userFactAxiomSets
@@ -175,7 +174,15 @@ mkAxiomSets pt = concat
         ]
 
   userRelations =
-    [ r | IR.EntityRelation r <- IR.theoryObjects theory ]
+    [ r | IR.EntityRelation r <- IR.theoryObjects theory
+        , IR.relOrigin r /= IR.FromSort ]
+
+  -- Identity relations are those with FromSort origin (auto-generated per sort).
+  -- Suppress 𝔻's identity relation when 𝔻 is not used by the theory.
+  identityRelations =
+    [ r | IR.EntityRelation r <- IR.theoryObjects theory
+        , IR.relOrigin r == IR.FromSort
+        , usesDomain || IR.sortKind (head (IR.relArgSorts r)) /= IR.SortKindDomain ]
 
   relDomMinName r = NC.sortMin (NC.sanitizeHash (IR.sortName (IR.relDomain r)))
   relDomMaxName r = NC.sortMax (NC.sanitizeHash (IR.sortName (IR.relDomain r)))
@@ -471,11 +478,15 @@ mkAxiomSets pt = concat
   -- no D_Min/D_Max axioms appear in the output.
   dSortStructuralFactNames :: [String]
   dSortStructuralFactNames =
-    [ NC.sortOrdering       dSortName
-    , NC.sortLower          dSortName
-    , NC.sortUpper          dSortName
-    , NC.sortUniversalLower dSortName
-    ]
+    let dIdentN = NC.sortIdentity dSortName
+    in [ NC.sortOrdering       dSortName
+       , NC.sortLower          dSortName
+       , NC.sortUpper          dSortName
+       , NC.sortUniversalLower dSortName
+       , NC.funDomOrdering     dIdentN
+       , NC.funDomUpper        dIdentN
+       , NC.funDomLower        dIdentN
+       ]
 
   sortLimitFactAxiomSets :: [AxiomSet]
   sortLimitFactAxiomSets =
@@ -593,38 +604,37 @@ mkAxiomSets pt = concat
   --      S_identity_dom_Min, S_identity_dom_Max
   -- -------------------------------------------------------------------------
   identityRelProductSortLimitAxiomSets :: [AxiomSet]
-  identityRelProductSortLimitAxiomSets = map mkLimits userSorts
+  identityRelProductSortLimitAxiomSets = map mkLimits identityRelations
     where
-      mkLimits s =
-        let iN = NC.sortIdentity (IR.sortName s)
-            dN = NC.funDom iN
-        in axiomSet [SSort (IR.sortName s)] (tags [TagSort, TagIdentityRelation, TagDecl])
-             [ (NC.sortMin dN, ABDeclProp)
-             , (NC.sortMax dN, ABDeclProp)
+      mkLimits r =
+        let sN = IR.sortName (head (IR.relArgSorts r))
+        in axiomSet [SSort sN] (tags [TagSort, TagIdentityRelation, TagDecl])
+             [ (relDomMinName r, ABDeclProp)
+             , (relDomMaxName r, ABDeclProp)
              ]
 
   -- -------------------------------------------------------------------------
   -- ID2. Identity relation declarations: S_identity
   -- -------------------------------------------------------------------------
   identityRelDeclAxiomSets :: [AxiomSet]
-  identityRelDeclAxiomSets = map mkDecl userSorts
+  identityRelDeclAxiomSets = map mkDecl identityRelations
     where
-      mkDecl s =
-        let iN = NC.sortIdentity (IR.sortName s)
-        in axiomSet [SSort (IR.sortName s)] (tags [TagSort, TagIdentityRelation, TagDecl])
-             [(iN, ABDeclFunc 2)]
+      mkDecl r =
+        let sN = IR.sortName (head (IR.relArgSorts r))
+        in axiomSet [SSort sN] (tags [TagSort, TagIdentityRelation, TagDecl])
+             [(IR.relName r, ABDeclFunc 2)]
 
   -- -------------------------------------------------------------------------
   -- ID3. Identity relation arg-object declarations: S_identity_1, S_identity_2
   -- -------------------------------------------------------------------------
   identityRelArgObjectDeclAxiomSets :: [AxiomSet]
-  identityRelArgObjectDeclAxiomSets = concatMap mkDecls userSorts
+  identityRelArgObjectDeclAxiomSets = concatMap mkDecls identityRelations
     where
-      mkDecls s =
-        let iN = NC.sortIdentity (IR.sortName s)
-        in [ axiomSet [SSort (IR.sortName s)] (tags [TagSort, TagIdentityRelation, TagDecl])
-               [(NC.funArgN iN k, ABDeclProp)]
-           | k <- [1, 2]
+      mkDecls r =
+        let sN = IR.sortName (head (IR.relArgSorts r))
+        in [ axiomSet [SSort sN] (tags [TagSort, TagIdentityRelation, TagDecl])
+               [(sanitizeName (IR.mereoName obj), ABDeclProp)]
+           | (_, obj) <- zip [1..] (IR.relArgObjects r)
            ]
 
   -- -------------------------------------------------------------------------
@@ -632,37 +642,17 @@ mkAxiomSets pt = concat
   --      S_identity_arg, S_identity_arg_min, S_identity_arg_max
   -- -------------------------------------------------------------------------
   identityRelArgumentDeclAxiomSets :: [AxiomSet]
-  identityRelArgumentDeclAxiomSets = map mkDecl userSorts
+  identityRelArgumentDeclAxiomSets = map mkDecl identityRelations
     where
-      mkDecl s =
-        let iN   = NC.sortIdentity (IR.sortName s)
-            dN   = NC.funDom iN
-            argN = NC.funArg iN
-            dMn  = NC.sortMin dN
-            dMx  = NC.sortMax dN
-        in axiomSet [SSort (IR.sortName s)] (tags [TagSort, TagIdentityRelation, TagDecl])
+      mkDecl r =
+        let sN   = IR.sortName (head (IR.relArgSorts r))
+            argN = sanitizeName (IR.mereoName (IR.relArgument r))
+            dMn  = relDomMinName r
+            dMx  = relDomMaxName r
+        in axiomSet [SSort sN] (tags [TagSort, TagIdentityRelation, TagDecl])
              [ (argN, ABDeclProp)
              , (NC.boundMin argN, ABMereo (IR.MRevDiff (IR.MVar argN) (IR.MVar dMn)))
              , (NC.boundMax argN, ABMereo (IR.MRevDiff (IR.MVar dMx)  (IR.MVar argN)))
-             ]
-
-  -- -------------------------------------------------------------------------
-  -- ID6. Identity relation product sort orderings
-  --      S_identity_dom_upper, S_identity_dom_ordering, S_identity_dom_lower
-  -- -------------------------------------------------------------------------
-  identityRelProductSortOrderAxiomSets :: [AxiomSet]
-  identityRelProductSortOrderAxiomSets = map mkOrder userSorts
-    where
-      mkOrder s =
-        let sN    = IR.sortName s
-            iN    = NC.sortIdentity sN
-            dN    = NC.funDom iN
-            dMinN = NC.sortMin dN
-            dMaxN = NC.sortMax dN
-        in axiomSet [SSort sN] (tags [TagSort, TagIdentityRelation, TagOrdering])
-             [ (NC.funDomUpper    iN, ABMereo (IR.MRevDiff (IR.MVar uMaxName) (IR.MVar dMaxN)))
-             , (NC.funDomOrdering iN, ABMereo (IR.MRevDiff (IR.MVar dMaxN)    (IR.MVar dMinN)))
-             , (NC.funDomLower    iN, ABMereo (IR.MRevDiff (IR.MVar dMinN)    (IR.MVar pMaxName)))
              ]
 
   -- -------------------------------------------------------------------------

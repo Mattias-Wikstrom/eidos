@@ -423,14 +423,17 @@ theoryFunctionFactEntries theory = concat
     -- -----------------------------------------------------------------------
     -- ID. Identity relation bounds axioms (generated per ordinary sort)
     -- -----------------------------------------------------------------------
-    identityRelBounds = map mkBounds userSortsList
+    identityRelBounds = map mkBounds identityRelList
       where
-        userSortsList =
-          [ s | IR.EntitySort s <- IR.theoryObjects theory
-              , IR.sortKind s `elem` [IR.SortKindFromSignature, IR.SortKindFromReflection] ]
-        mkBounds s =
-          let sN     = IR.sortName s
-              iN     = NC.sortIdentity sN
+        usesDomain = IR.theoryUsesDomain theory
+        identityRelList =
+          [ r | IR.EntityRelation r <- IR.theoryObjects theory
+              , IR.relOrigin r == IR.FromSort
+              , usesDomain || IR.sortKind (head (IR.relArgSorts r)) /= IR.SortKindDomain ]
+        mkBounds r =
+          let s      = head (IR.relArgSorts r)
+              sN     = IR.sortName s
+              iN     = IR.relName r
               dN     = NC.funDom iN
               dMinE  = var (NC.sortMin dN)
               dMaxE  = var (NC.sortMax dN)

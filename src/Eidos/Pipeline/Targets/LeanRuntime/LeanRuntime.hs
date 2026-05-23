@@ -201,7 +201,7 @@ renderLeanRuntime pt = unlines $ concat
   , universeDecls
   , if IR.theoryUsesDomain theory then domainDecls else []
   , concatMap renderSort userSorts
-  , concatMap renderIdentityRel userSorts
+  , concatMap renderIdentityRel userIdentityRels
   , concatMap renderSOLFn    solFunctions
   , concatMap renderFOL1Fn   folSingleFns
   , concatMap renderFOLNFn   folMultiFns
@@ -230,10 +230,10 @@ renderLeanRuntime pt = unlines $ concat
       , ""
       ]
 
-    renderIdentityRel s =
-      let iN    = NC.sortIdentity (IR.sortName s)
-          domSN = NC.funDom iN
-          sn    = sortId s
+    renderIdentityRel r =
+      let iN    = IR.relName r
+          domSN = sortId (IR.relDomain r)
+          sn    = sortId (head (IR.relArgSorts r))
       in [ "axiom " ++ domSN ++ " : EidosSort"
          , "axiom " ++ domSN ++ "_sub_univ : OrdinarySortWithinUniverse " ++ domSN ++ " univ"
          , "axiom " ++ iN ++ " : FOLRelation 2 (fun _ => " ++ sn ++ ") " ++ domSN
@@ -256,7 +256,13 @@ renderLeanRuntime pt = unlines $ concat
     folSingleFns = filter (\f -> length (IR.funcArgSorts f) == 1) allFOL
     folMultiFns  = filter (\f -> length (IR.funcArgSorts f) >  1) allFOL
 
-    userRelations = [r | IR.EntityRelation r <- IR.theoryObjects theory]
+    userRelations = [r | IR.EntityRelation r <- IR.theoryObjects theory
+                       , IR.relOrigin r /= IR.FromSort]
+
+    userIdentityRels =
+      [ r | IR.EntityRelation r <- IR.theoryObjects theory
+          , IR.relOrigin r == IR.FromSort
+          , IR.theoryUsesDomain theory || IR.sortKind (head (IR.relArgSorts r)) /= IR.SortKindDomain ]
 
     userObjects =
       [ m | IR.EntityMereological m <- IR.theoryObjects theory

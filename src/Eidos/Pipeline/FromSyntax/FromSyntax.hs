@@ -94,9 +94,11 @@ decorateTheoryBody refMap body parentMaybe name isReflection constraints = do
   let thA = addSortToTh th0 (theoryUniverse th0)
       thB = addSortToTh thA (theoryDomain   th0)
       thC = addSortToTh thB (theoryProp     th0)
+      -- 𝔻 always gets an identity relation; axiom emission is gated on usesDomain.
+      thD = addIdentityRelation thC (theoryDomain th0)
 
   -- ── Pass 1: subtheories ───────────────────────────────────────────────
-  (th1, subtheories) <- foldM (buildSubtheoryEntry refMap constraints) (thC, []) (sections body)
+  (th1, subtheories) <- foldM (buildSubtheoryEntry refMap constraints) (thD, []) (sections body)
   let th2 = trimToCanonicals (addImplicitMergeFacts (addCanonicals (th1 { theorySubtheories = subtheories })))
 
   -- ── Pass 2: signature ─────────────────────────────────────────────────
@@ -235,7 +237,8 @@ buildSignatureItem th0 th item = do
       let s = mkSort th SortKindFromSignature nm FromSignature
           entity = EntitySort s
       shouldInsert <- shouldInsertDeclaration nm entity
-      return (if shouldInsert then addSortToTh th s else th)
+      let th' = if shouldInsert then addSortToTh th s else th
+      return (if shouldInsert then addIdentityRelation th' s else th')
 
     SigRelationalSort (RelationalSortDeclaration nm rel sortExprAST) -> do
       parentSort <- lookupSortByExpr th sortExprAST
@@ -247,7 +250,8 @@ buildSignatureItem th0 th item = do
         then do
           let th1 = addSortToTh th' s
               th2 = relationalSortFacts th1 rel s parentSort
-          return th2
+              th3 = addIdentityRelation th2 s
+          return th3
         else return th'
 
     SigFunction (FunctionDeclaration nm domainExprs codomainExpr) -> do
@@ -1129,6 +1133,17 @@ addSortToTh th s =
       th6 = relateSortToUniverse th5 s
   in th6
 
+-- | Add an automatically-generated identity relation for sort @s@.
+-- The relation @S_identity@ has both argument sorts equal to @s@ and
+-- originates with 'FromSort'.  Its domain sort ordering facts are
+-- stored in the IR so that 'sortLimitFactAxiomSets' picks them up.
+addIdentityRelation :: Theory -> Sort -> Theory
+addIdentityRelation th s =
+  let nm  = NC.sortIdentity (sortName s)
+      rel = mkRelation th nm [s, s] FromSort
+      th1 = addEntityToTh th (EntityRelation rel)
+  in addProductSortOrderingFacts th1 nm (relDomain rel)
+
 mkRelatedSort :: Theory -> String -> String -> Sort -> Sort
 mkRelatedSort th rel nm parentS =
   let relationship = case rel of
@@ -1264,18 +1279,27 @@ propagateSubtheory :: Theory -> String -> Bool -> Bool -> Theory -> Either Build
 propagateSubtheory parentTh subName isImplicit isReflection subTh =
   foldM addEntry parentTh (Map.toList (theoryObjectsByName subTh))
   where
+    -- Identity relations (FromSort origin) must not be reflected: the reflected-sort
+    -- handler creates fresh ones via addIdentityRelation, so reflecting the subtheory's
+    -- copy would produce a duplicate with the same qualified name.
+    isFromSortRelation :: Entity -> Bool
+    isFromSortRelation (EntityRelation r) = relOrigin r == FromSort
+    isFromSortRelation _                  = False
+
     addEntry th (name, entities) = do
       let qualifiedName = if null subName then name else subName ++ "." ++ name
 
-      -- Special case: reflecting a sort → create a fresh sort with proper sort limits.
-      -- The original sort's min/max (S_Min, S_Max) are reflected separately as individuals
-      -- named S_min_elem / S_max_elem (see case below), so no name clash arises.
+      -- Special case: reflecting a sort → create a fresh sort with proper sort limits
+      -- AND a fresh identity relation.  The original sort's min/max (S_Min, S_Max) are
+      -- reflected separately as individuals named S_min_elem / S_max_elem (see case
+      -- below), so no name clash arises.
       case (isReflection, entities) of
         (True, [EntitySort s])
           | theoryFullyQualifiedName (sortTheory s) == theoryFullyQualifiedName subTh ->
               let reflectedSort = (mkSort th SortKindFromReflection qualifiedName FromReflection)
                                     { sortReflectedFrom = Just subTh }
-              in Right (addSortToTh th reflectedSort)
+                  th' = addSortToTh th reflectedSort
+              in Right (addIdentityRelation th' reflectedSort)
 
         -- Special case: reflecting a sort limit → emit as an individual named
         -- S_min_elem / S_max_elem rather than S_Min / S_Max, which are reserved
@@ -1299,8 +1323,13 @@ propagateSubtheory parentTh subName isImplicit isReflection subTh =
               in Right th2
 
         _ -> do
-          let transformed = if isReflection
-                              then map (qualifySortRefs subName . reflectEntity subName) entities
+          -- For reflection, skip identity relations (FromSort origin): they are
+          -- created fresh by the reflected-sort handler above.
+          let entitiesToProcess = if isReflection
+                                    then filter (not . isFromSortRelation) entities
+                                    else entities
+              transformed = if isReflection
+                              then map (qualifySortRefs subName . reflectEntity subName) entitiesToProcess
                               else entities
               localToSub = [e | e <- transformed, theoryFullyQualifiedName (entityTheory e) == theoryFullyQualifiedName subTh]
 
