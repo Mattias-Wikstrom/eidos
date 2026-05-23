@@ -391,16 +391,11 @@ theoryFunctionFactEntries theory = concat
           let fN       = IR.funcName f
               argSorts = IR.funcArgSorts f
               varNs    = ["X" ++ show i | i <- [1 .. length argSorts]]
-              uSort     = IR.theoryUniverse (IR.funcTheory f)
               mkProj xi srt = app "ProjectIntoInterval" [var xi, sMin srt, sMax srt]
               lhs      = app fN (map var varNs)
               rhs      = app fN (zipWith mkProj varNs argSorts)
               body     = bicond lhs rhs
-              quantified =
-                foldr (\xi acc -> bounded xi uSort acc)
-                      body
-                      varNs
-          in FunctionFactEntry (FFCExtension fN) [(NC.axiomExtension fN, quantified)]
+          in FunctionFactEntry (FFCExtension fN) [(NC.axiomExtension fN, body)]
 
     -- -----------------------------------------------------------------------
     -- R6. Relation bounds axioms
