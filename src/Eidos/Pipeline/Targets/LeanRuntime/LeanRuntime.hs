@@ -66,6 +66,8 @@ mereoToLean = go
       LE.LApp (LE.LVar name) (map go args)
     go (IR.MFOLApp name args) =
       LE.LApp (LE.LVar (runtimeResolve name)) (map go args)
+    go (IR.MUnboundedSum var body) =
+      LE.LForallKw var LE.LProp (go body)
     go (IR.MBoundedSum var lo hi body) =
       case (lo, hi) of
         (IR.MVar loN, IR.MVar hiN) ->
@@ -114,6 +116,8 @@ abbrevBodyToLean = go
       LE.LProjectIntoInterval (go x) (go lo) (go hi)
     go (IR.MAbbrevApp name args) = LE.LApp (LE.LVar name) (map go args)
     go (IR.MFOLApp name args)    = LE.LApp (LE.LVar name) (map go args)
+    go (IR.MUnboundedSum var body) =
+      LE.LForallKw var LE.LProp (go body)
     go (IR.MBoundedSum var lo hi body) =
       case (lo, hi) of
         (IR.MVar loN, IR.MVar hiN) -> LE.LBoundedForall var loN hiN (go body)

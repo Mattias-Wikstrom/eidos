@@ -101,10 +101,10 @@ mereoExprToLean' abbrevHandler resolve = go
       abbrevHandler name (map go args)
     go (IR.MFOLApp name args) =
       LApp (LVar (resolve name)) (map go args)
+    go (IR.MUnboundedSum var body) =
+      LForallKw var LProp (go body)
     go (IR.MBoundedSum var lo hi body) =
       case (lo, hi) of
-        (IR.MZero, IR.MZero) ->
-          LForallKw var LProp (go body)
         (IR.MVar loName, IR.MVar hiName) ->
           LBoundedForall var (resolve loName) (resolve hiName) (go body)
         _ ->

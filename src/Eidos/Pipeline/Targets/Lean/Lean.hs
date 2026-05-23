@@ -175,6 +175,7 @@ mereoExprToLeanType = go
     go (IR.MSymDiff _ _)  = LTVar "<unsupported: symmetric difference>"
     go (IR.MAbbrevApp n _) = LTVar ("<unsupported: abbreviation " ++ n ++ ">")
     go (IR.MFOLApp    n _) = LTVar ("<unsupported: FOL application " ++ n ++ ">")
+    go (IR.MUnboundedSum  _ _) = LTVar "<unsupported: unbounded sum>"
     go (IR.MBoundedSum     _ _ _ _) = LTVar "<unsupported: bounded sum>"
     go (IR.MBoundedProduct _ _ _ _) = LTVar "<unsupported: bounded product>"
     go (IR.MSumOfIndividuals     _ _ _ _) = LTVar "<unsupported: sum of individuals>"

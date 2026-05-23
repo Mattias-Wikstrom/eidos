@@ -115,10 +115,10 @@ mereoExprToCoq' abbrevHandler resolve = go
           CExists var CProp
                (CConj (CApp (CVar "IsIndividual") [go lo, go hi, CVar var])
                       (go body))
+    go (IR.MUnboundedSum var body) =
+      CForall var CProp (go body)
     go (IR.MBoundedSum var lo hi body) =
       case (lo, hi) of
-        (IR.MZero, IR.MZero) ->
-          CForall var CProp (go body)
         (IR.MVar loName, IR.MVar hiName) ->
           CBoundedForall var (resolve loName) (resolve hiName) (go body)
         _ ->

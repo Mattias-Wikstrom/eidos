@@ -396,7 +396,7 @@ theoryFunctionFactEntries theory = concat
               rhs      = app fN (zipWith mkProj varNs argSorts)
               body     = bicond lhs rhs
               quantified =
-                foldr (\xi acc -> IR.MBoundedSum xi IR.MZero IR.MZero acc) body varNs
+                foldr IR.MUnboundedSum body varNs
           in FunctionFactEntry (FFCExtension fN) [(NC.axiomExtension fN, quantified)]
 
     -- -----------------------------------------------------------------------

@@ -89,6 +89,8 @@ mereoToCoq = go
       CE.CApp (CE.CVar name) (map go args)
     go (IR.MFOLApp name args) =
       CE.CApp (CE.CVar (runtimeResolve name)) (map go args)
+    go (IR.MUnboundedSum var body) =
+      CE.CForall var CE.CProp (go body)
     go (IR.MBoundedSum var lo hi body) =
       case (lo, hi) of
         (IR.MVar loN, IR.MVar hiN) ->
@@ -137,6 +139,8 @@ abbrevBodyToCoq = go
       CE.CProjectIntoInterval (go x) (go lo) (go hi)
     go (IR.MAbbrevApp name args) = CE.CApp (CE.CVar name) (map go args)
     go (IR.MFOLApp name args)    = CE.CApp (CE.CVar name) (map go args)
+    go (IR.MUnboundedSum var body) =
+      CE.CForall var CE.CProp (go body)
     go (IR.MBoundedSum var lo hi body) =
       case (lo, hi) of
         (IR.MVar loN, IR.MVar hiN) -> CE.CBoundedForall var loN hiN (go body)
