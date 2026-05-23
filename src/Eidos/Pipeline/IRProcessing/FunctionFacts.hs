@@ -41,7 +41,7 @@ data FunctionFactContext
   | FFCIRTupleWithProjections String      -- fn;   [SFunction fn, SIR],           [TagFunction, TagFOLFunction, TagIR, TagIRTupleProj]
   | FFCIRProjectionsFromTuple String      -- fn;   [SFunction fn, SIR],           [TagFunction, TagFOLFunction, TagIR, TagIRProjFromTuple]
   | FFCIRSeparates           String       -- fn;   [SFunction fn, SIR],           [TagFunction, TagFOLFunction, TagIR, TagIRSeparates]
-  | FFCExtension             String       -- fn;   [SFunction fn],                 [TagFunction, TagFOLFunction, TagConnection]
+  | FFCExtension             String       -- fn;   [SFunction fn],                 [TagFunction, TagFOLFunction, TagExtension]
   | FFCRelBounds             String       -- rn;   [SSet rn],                     [TagSet, TagSorting]
   deriving (Show, Eq)
 
@@ -383,7 +383,7 @@ theoryFunctionFactEntries theory = concat
           in FunctionFactEntry (FFCIRSeparates fN) [(NC.axiomSeparates irN, qX)]
 
     -- -----------------------------------------------------------------------
-    -- 35b. Extension axioms: f(xs) = f(project xs into each argument sort)
+    -- 36. Extension axioms: f(xs) ↔ f(project xs into each argument sort)
     -- -----------------------------------------------------------------------
     extensions = map mkExtension userDeclFol
       where

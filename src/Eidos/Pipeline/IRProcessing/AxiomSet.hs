@@ -181,6 +181,11 @@ data Tag = TagSort
   | TagUserAbbrevDef
     -- ^ A user-defined abbreviation from an @abbreviations { }@ section.
     --   Backends emit these as @def@\/@Definition@ (not @axiom@\/@Axiom@).
+  | TagExtension
+    -- ^ States that a FOL function is fully determined by its values on
+    --   sort-restricted inputs: @f(x) ↔ f(ProjectIntoInterval(x, S_Min, S_Max))@
+    --   for all mereological objects @x@, where @S@ is @f@'s declared argument sort.
+    --   Always co-occurs with 'TagFunction' and 'TagFOLFunction'.
 
   deriving (Eq, Ord, Show, Enum, Bounded)
 

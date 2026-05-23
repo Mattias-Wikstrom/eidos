@@ -121,7 +121,7 @@ Section FinIndexed.
                      <->
                      (X2 <-> solApply dom cod (imageFn dom cod folImagePair) X1)
     ; folExtension : forall X : MereologicalObject,
-                       solApply dom cod (imageFn dom cod folImagePair) X =
+                       solApply dom cod (imageFn dom cod folImagePair) X <->
                        solApply dom cod (imageFn dom cod folImagePair)
                          (ProjectIntoInterval X (sMin dom) (sMax dom))
     }.
@@ -175,7 +175,7 @@ Section FinIndexed.
     ; folFnExtension        : forall xs : Fin.t n -> MereologicalObject,
                                 solApply functionDomain cod
                                   (imageFn functionDomain cod folFnImagePair)
-                                  (tuple n doms functionDomain folFnProductStructure xs) =
+                                  (tuple n doms functionDomain folFnProductStructure xs) <->
                                 solApply functionDomain cod
                                   (imageFn functionDomain cod folFnImagePair)
                                   (tuple n doms functionDomain folFnProductStructure
