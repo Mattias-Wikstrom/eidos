@@ -1,0 +1,31 @@
+=========================================
+Partial Theories and the external keyword
+=========================================
+
+Just as Eidos currently allows you to have a 'subtheories' section in a theory, so it may soon be possible to have an 'external' section. Such sections will not be allowed, though, in ordinary theories, but only in theories that have '.partial.theory' rather than just '.theory' as their file extension.
+
+While the 'subtheories' section works a bit like the #include directive in C and stops you from having circular dependencies, the 'external' section does allow partial theories to reference each other in circular ways.
+
+As the name suggests, one way to think of a partial theory is to see it as providing one part of a complete theory. Two or more partial theories may form one single theory when combined. It is as if one theory has been split up across multiple files. One may compare this to a) partial classes in C# and b) a modern module system where modules can cross-reference each other.
+
+The second reason for having 'external' in Eidos is that this makes it possible to connect Eidos theories to things outside Eidos. One may compare this with how a C program can call into functions that have been written as assembly code instead of C code. The function gets marked as 'external' on the C side and the linker/loader will take care of hooking things up correctly. 
+
+Just as linker/loader details are implementation-specific rather than something that is part of the C language, so Eidos leaves almost everything implementation-specific when it comes to hooking up partial Eidos to external things. What matters from the Eidos viewpoint is simply that it is possible.
+
+Imagine, for example, a partial Eidos theory A that describes the operations of a Turing machine. The theory could leave it unspecified what exists on the tape when the machine starts, and that can then be specified by another partial Eidos theory B. If the squares on the tape have indices …, -2, -1, 0, 2, 3, … and if S(k) is the symbol on the square with index k, then the axioms in A may fail to tell one what S(x) is for any x while the theory B supplies exactly this information.
+
+But one can also imagine that the file 'B.partial.theory' does not exist and that something implementation specific, say 'B.external' exists in its place. The Eidos implementation will recognize the file format of 'B.external' and can get information on S(k) for different choices of k in this way.
+
+How that happens is all implementation-specific, and one could imagine S(k) being obtained by looking somewhere on the Internet or by asking the user what square he/she wants to have on square k.
+
+Such things would be completely up to the particular implementation, and an implementation can also choose not to support any external hooking of this kind.
+
+What matters from the Eidos viewpoint is simply that there is a way for Eidos theories to be directly connected with things outside Eidos. It becomes literally possible for an Eidos theory to reason about things in the actual world.
+
+And what turns out to hold in an Eidos theory can of course also influence things outside Eidos. The interaction becomes two-way.
+
+This aspect of Eidos is entirely optional since it is available only in theories with the .partial.eidos file extension. The 'pure' part of Eidos remains as it is.
+
+It becomes the responsibility of partial Eidos theories to ensure that the way in which they are connected to external things makes good sense. For example, two Eidos theories could share the Prop sort and agree that it is to satisfy LEM (the Law of Excluded Middle), or they could share the Prop sort and agree on not including LEM. This may be compared to connecting electronic components and making sure they agree on how to represent 0 and how to represent 1 (along with many other things).
+
+Just as Eidos supports named and implicit subtheories, so it seems reasonable to support 'named' and 'implicit' sections as subsections of the 'external' section. The 'implicit' case means that Prop and D get shared, along with any other sorts that have the same name in both theories. Care is needed to make sure this will not be a problem. 
