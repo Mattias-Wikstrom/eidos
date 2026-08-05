@@ -13,7 +13,7 @@ This document describes a language called *EidosLang* that can be used to expres
 
 One may even argue that the language is adequate as a means for expressing *any* mathematical theory in a natural manner.
 
-Eidos is based on the discovery that Quantified Intuitionistic Propositional Logic (QIPL) has the same expressive power as first-order logic (i.e., it is Turing-complete) while at the same time being incredibly simple. One may think of Eidos as syntactic sugar on top of QIPL.
+Eidos is based on the discovery that Quantified Intuitionistic Propositional Logic (QIPL) has the same expressive power as first-order logic while at the same time being incredibly simple. One may think of Eidos as syntactic sugar on top of QIPL.
 
 Unlike many languages for expressing mathematical theories, Eidos is not based on type theory. The idea behind the language is instead to provide ‘syntactic sugar’ on top of quantified intuitionistic propositional logic (QIPL). QIPL has been known for a long time to be Turing-complete, but it may appear very counterintuitive and hard to work with at first.
 
@@ -58,7 +58,7 @@ As a simple illustration of the things we have just listed, one can use negation
 
 Among the ingredients 1.-7. and I.-II. that we have listed above, it suffices to use 3. and I. as the basic primitives. That all of QIPL follow from these two ingredients alone may be a first indication that it is a remarkable theory with lots of power.
 
-A second illustration comes from the fact that QIPL is Turing-complete. In spite of involving so little in its foundations, QIPL turns out to be (in a sense) maximally expressive.
+A second illustration comes from the fact that QIPL is Turing-complete and has the same expressive power as first-order logic. In spite of involving so little in its foundations, QIPL turns out to be (in a sense) maximally expressive.
 
 ### The Mereological Interpretation of QIPL
 As presented above, QIPL is a language where all that one reasons about are propositions. Some alternative interpretation of QIPL is therefore necessary if one wishes to see it as an all-purpose language.
